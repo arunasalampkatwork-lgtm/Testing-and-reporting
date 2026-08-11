@@ -1,0 +1,93 @@
+[
+    {
+        "node_id": "AST-A9B9F797",
+        "name": "SS-1",
+        "node_type": "SUBSTATION",
+        "parent_id": null
+    },
+    {
+        "node_id": "AST-7C57DED4",
+        "name": "HV-201A",
+        "node_type": "SWITCHBOARD",
+        "parent_id": "AST-A9B9F797"
+    },
+    {
+        "node_id": "AST-0E671395",
+        "name": "P-01",
+        "node_type": "PANEL",
+        "parent_id": "AST-7C57DED4",
+        "equipment_name": "201-MK-01",
+        "equipment_type": "motor",
+        "ct_count": 3,
+        "relay_count": 1,
+        "aux_count": 2
+    },
+    {
+        "node_id": "AST-05CA3A8E",
+        "name": "P02",
+        "node_type": "PANEL",
+        "parent_id": "AST-7C57DED4",
+        "equipment_name": "201-MG-18A",
+        "equipment_type": "Motor",
+        "ct_count": 3,
+        "relay_count": 1,
+        "aux_count": 2
+    },
+    {
+        "node_id": "AST-043B7F6A",
+        "name": "P03",
+        "node_type": "PANEL",
+        "parent_id": "AST-7C57DED4",
+        "equipment_name": "205-K-8",
+        "equipment_type": "Motor",
+        "ct_count": 3,
+        "relay_count": 1,
+        "aux_count": 2
+    },
+    {
+        "node_id": "AST-C902FE25",
+        "name": "SS-2",
+        "node_type": "SUBSTATION",
+        "parent_id": null
+    },
+    {
+        "node_id": "AST-C5F5EE8A",
+        "name": "HV-203A",
+        "node_type": "SWITCHBOARD",
+        "parent_id": "AST-C902FE25"
+    },
+    {
+        "node_id": "AST-9A4E30B5",
+        "name": "222-K-1B",
+        "node_type": "PANEL",
+        "parent_id": "AST-C5F5EE8A",
+        "equipment_name": "222-K-1B",
+        "equipment_type": "MOTOR",
+        "ct_count": 3,
+        "relay_count": 1,
+        "aux_count": 1
+    },
+    {
+        "node_id": "AST-14565599",
+        "name": "EURO-IV",
+        "node_type": "SUBSTATION",
+        "parent_id": null
+    },
+    {
+        "node_id": "AST-5C385D49",
+        "name": "HV-207A",
+        "node_type": "SWITCHBOARD",
+        "parent_id": "AST-14565599"
+    },
+    {
+        "node_id": "AST-F2758DD0",
+        "name": "211-KM-3A",
+        "node_type": "PANEL",
+        "parent_id": "AST-5C385D49",
+        "equipment_name": "211-KM-3A",
+        "equipment_type": "MOTOR",
+        "ct_count": 3,
+        "relay_count": 1,
+        "aux_count": 2
+    }
+]

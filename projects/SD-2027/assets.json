@@ -1,0 +1,62 @@
+[
+    {
+        "node_id": "AST-583F5EDC",
+        "name": "SS-1",
+        "node_type": "SUBSTATION",
+        "parent_id": null
+    },
+    {
+        "node_id": "AST-65687D6A",
+        "name": "HV-201A",
+        "node_type": "SWITCHBOARD",
+        "parent_id": "AST-583F5EDC"
+    },
+    {
+        "node_id": "AST-864CBA69",
+        "name": "P01",
+        "node_type": "PANEL",
+        "parent_id": "AST-65687D6A",
+        "equipment_name": "",
+        "equipment_type": "",
+        "ct_count": 0,
+        "relay_count": 0,
+        "aux_count": 0,
+        "linked_asset_id": null
+    },
+    {
+        "node_id": "AST-81C4BDD6",
+        "name": "P02",
+        "node_type": "PANEL",
+        "parent_id": "AST-65687D6A",
+        "equipment_name": "",
+        "equipment_type": "",
+        "ct_count": 0,
+        "relay_count": 0,
+        "aux_count": 0,
+        "linked_asset_id": null
+    },
+    {
+        "node_id": "AST-7D9F7587",
+        "name": "SS-2",
+        "node_type": "SUBSTATION",
+        "parent_id": null
+    },
+    {
+        "node_id": "AST-AEBB1479",
+        "name": "HV-203A",
+        "node_type": "SWITCHBOARD",
+        "parent_id": "AST-7D9F7587"
+    },
+    {
+        "node_id": "AST-5C29F6E3",
+        "name": "222-K-1B",
+        "node_type": "PANEL",
+        "parent_id": "AST-AEBB1479",
+        "equipment_name": "",
+        "equipment_type": "",
+        "ct_count": 0,
+        "relay_count": 0,
+        "aux_count": 0,
+        "linked_asset_id": null
+    }
+]

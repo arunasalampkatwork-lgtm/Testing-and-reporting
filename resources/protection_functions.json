@@ -1,0 +1,17 @@
+[
+    {
+        "code": "50",
+        "name": "Overcurrent Protection",
+        "template": "50_overcurrent.docx"
+    },
+    {
+        "code": "50G",
+        "name": "Earth Fault Protection",
+        "template": "50G_earth_fault.docx"
+    },
+    {
+        "code": "49",
+        "name": "Thermal Overload Protection",
+        "template": "49_thermal_overload.docx"
+    }
+]
