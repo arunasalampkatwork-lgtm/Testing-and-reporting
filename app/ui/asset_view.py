@@ -5,6 +5,7 @@ from PySide6.QtWidgets import (
     QWidget,
     QVBoxLayout,
     QHBoxLayout,
+    QFormLayout,
     QTreeWidget,
     QTreeWidgetItem,
     QPushButton,
@@ -14,6 +15,8 @@ from PySide6.QtWidgets import (
     QListWidgetItem,
     QLabel,
     QDialog,
+    QLineEdit,
+    QDialogButtonBox,
 )
 
 from app.services.asset_manager import AssetManager
@@ -30,6 +33,132 @@ from app.ui.aux_relay_testing_dialog import AuxRelayTestingDialog
 from app.ui.test_history_view import TestHistoryView
 
 
+class PanelAssetDialog(QDialog):
+
+    def __init__(
+        self,
+        parent=None,
+    ):
+
+        super().__init__(parent)
+
+        self.setWindowTitle(
+            "Add Panel"
+        )
+
+        self.setModal(True)
+
+        layout = QVBoxLayout(self)
+
+        form = QFormLayout()
+
+        # -------------------------------------------------
+        # PANEL NAME
+        # -------------------------------------------------
+
+        self.name_edit = QLineEdit()
+
+        self.name_edit.setPlaceholderText(
+            "Example: Panel-1"
+        )
+
+        form.addRow(
+            "Panel Name:",
+            self.name_edit,
+        )
+
+        # -------------------------------------------------
+        # ASSET TAG
+        # -------------------------------------------------
+
+        self.asset_tag_edit = QLineEdit()
+
+        self.asset_tag_edit.setPlaceholderText(
+            "Example: 101-P-001A"
+        )
+
+        form.addRow(
+            "Asset Tag:",
+            self.asset_tag_edit,
+        )
+
+        layout.addLayout(
+            form
+        )
+
+        # -------------------------------------------------
+        # BUTTONS
+        # -------------------------------------------------
+
+        buttons = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok
+            | QDialogButtonBox.StandardButton.Cancel
+        )
+
+        buttons.accepted.connect(
+            self.accept
+        )
+
+        buttons.rejected.connect(
+            self.reject
+        )
+
+        layout.addWidget(
+            buttons
+        )
+
+        self.name_edit.setFocus()
+
+    # =====================================================
+    # GET VALUES
+    # =====================================================
+
+    def get_values(self):
+
+        return (
+            self.name_edit.text().strip(),
+            self.asset_tag_edit.text().strip(),
+        )
+
+    # =====================================================
+    # VALIDATE
+    # =====================================================
+
+    def accept(self):
+
+        name = self.name_edit.text().strip()
+
+        asset_tag = (
+            self.asset_tag_edit.text().strip()
+        )
+
+        if not name:
+
+            QMessageBox.warning(
+                self,
+                "Missing Panel Name",
+                "Please enter a panel name.",
+            )
+
+            self.name_edit.setFocus()
+
+            return
+
+        if not asset_tag:
+
+            QMessageBox.warning(
+                self,
+                "Missing Asset Tag",
+                "Please enter the panel asset tag.",
+            )
+
+            self.asset_tag_edit.setFocus()
+
+            return
+
+        super().accept()
+
+
 class AssetView(QWidget):
 
     def __init__(
@@ -42,22 +171,23 @@ class AssetView(QWidget):
 
         super().__init__(parent)
 
-        # =====================================================
+        # =================================================
         # REFERENCES
-        # =====================================================
+        # =================================================
 
         self.project_folder = project_folder
         self.project = project
         self.test_service = test_service
 
-        # Currently open testing dialog.
-        # Keeping one reference prevents Qt from eating the
-        # dialog alive, because apparently windows need supervision.
         self.testing_dialog = None
 
-        # =====================================================
+        # Prevent accidental double execution of
+        # create_panel().
+        self._creating_panel = False
+
+        # =================================================
         # MANAGERS
-        # =====================================================
+        # =================================================
 
         self.asset_manager = AssetManager(
             project_folder
@@ -67,15 +197,17 @@ class AssetView(QWidget):
             project_folder
         )
 
-        # =====================================================
+        # =================================================
         # MAIN LAYOUT
-        # =====================================================
+        # =================================================
 
-        layout = QVBoxLayout(self)
+        layout = QVBoxLayout(
+            self
+        )
 
-        # =====================================================
+        # =================================================
         # ASSET TREE
-        # =====================================================
+        # =================================================
 
         self.tree = QTreeWidget()
 
@@ -91,9 +223,9 @@ class AssetView(QWidget):
             self.tree
         )
 
-        # =====================================================
+        # =================================================
         # COMPONENT SECTION
-        # =====================================================
+        # =================================================
 
         self.component_label = QLabel(
             "Test Components"
@@ -109,9 +241,9 @@ class AssetView(QWidget):
             self.component_list
         )
 
-        # =====================================================
+        # =================================================
         # COMPONENT CONFIGURATION
-        # =====================================================
+        # =================================================
 
         self.configure_component = QPushButton(
             "Configure Component"
@@ -121,9 +253,9 @@ class AssetView(QWidget):
             self.configure_component
         )
 
-        # =====================================================
+        # =================================================
         # PROTECTION FUNCTION CONFIGURATION
-        # =====================================================
+        # =================================================
 
         self.configure_protection = QPushButton(
             "Configure Protection Functions"
@@ -133,9 +265,9 @@ class AssetView(QWidget):
             self.configure_protection
         )
 
-        # =====================================================
+        # =================================================
         # BOTTOM BUTTONS
-        # =====================================================
+        # =================================================
 
         buttons = QHBoxLayout()
 
@@ -191,9 +323,9 @@ class AssetView(QWidget):
             buttons
         )
 
-        # =====================================================
+        # =================================================
         # SIGNALS
-        # =====================================================
+        # =================================================
 
         self.tree.itemSelectionChanged.connect(
             self.display_selected_components
@@ -235,17 +367,17 @@ class AssetView(QWidget):
             self.open_test_history
         )
 
-        # =====================================================
+        # =================================================
         # INITIAL STATE
-        # =====================================================
+        # =================================================
 
         self._update_button_states()
 
         self.refresh_tree()
 
-    # =========================================================
+    # =====================================================
     # TREE
-    # =========================================================
+    # =====================================================
 
     def refresh_tree(self):
 
@@ -271,9 +403,9 @@ class AssetView(QWidget):
 
         self._update_button_states()
 
-    # =========================================================
+    # =====================================================
     # CREATE TREE ITEM
-    # =========================================================
+    # =====================================================
 
     def _create_tree_item(
         self,
@@ -309,9 +441,9 @@ class AssetView(QWidget):
 
         return item
 
-    # =========================================================
+    # =====================================================
     # SELECTED NODE
-    # =========================================================
+    # =====================================================
 
     def get_selected_node(self):
 
@@ -332,9 +464,9 @@ class AssetView(QWidget):
             node_id
         )
 
-    # =========================================================
+    # =====================================================
     # SELECTED PANEL
-    # =========================================================
+    # =====================================================
 
     def get_selected_panel(self):
 
@@ -356,9 +488,9 @@ class AssetView(QWidget):
 
         return None
 
-    # =========================================================
+    # =====================================================
     # SELECTED COMPONENT
-    # =========================================================
+    # =====================================================
 
     def get_selected_component(self):
 
@@ -378,9 +510,9 @@ class AssetView(QWidget):
             component_id
         )
 
-    # =========================================================
+    # =====================================================
     # SELECT COMPONENT BY ID
-    # =========================================================
+    # =====================================================
 
     def select_component_by_id(
         self,
@@ -409,34 +541,29 @@ class AssetView(QWidget):
 
         return False
 
-    # =========================================================
+    # =====================================================
     # INPUT DIALOG
-    # =========================================================
+    # =====================================================
 
     def ask_name(
         self,
         title,
     ):
 
-        name, ok = QInputDialog.getText(
+        text, ok = QInputDialog.getText(
             self,
             title,
-            "Name:",
+            title,
         )
 
         if not ok:
-            return None
+            return ""
 
-        name = name.strip()
+        return text.strip()
 
-        if not name:
-            return None
-
-        return name
-
-    # =========================================================
+    # =====================================================
     # CREATE SUBSTATION
-    # =========================================================
+    # =====================================================
 
     def create_substation(self):
 
@@ -464,9 +591,9 @@ class AssetView(QWidget):
                 str(error),
             )
 
-    # =========================================================
+    # =====================================================
     # CREATE SWITCHBOARD
-    # =========================================================
+    # =====================================================
 
     def create_switchboard(self):
 
@@ -523,68 +650,100 @@ class AssetView(QWidget):
                 str(error),
             )
 
-    # =========================================================
+    # =====================================================
     # CREATE PANEL
-    # =========================================================
+    # =====================================================
 
     def create_panel(self):
 
-        parent = self.get_selected_node()
-
-        if parent is None:
-
-            QMessageBox.warning(
-                self,
-                "Invalid Selection",
-                "Please select a switchboard first.",
-            )
-
+        if self._creating_panel:
             return
 
-        if str(
-            getattr(
-                parent,
-                "node_type",
-                "",
-            )
-        ).upper() != "SWITCHBOARD":
-
-            QMessageBox.warning(
-                self,
-                "Invalid Selection",
-                "A panel must belong to a switchboard.",
-            )
-
-            return
-
-        name = self.ask_name(
-            "Add Panel"
-        )
-
-        if not name:
-            return
+        self._creating_panel = True
 
         try:
 
-            self.asset_manager.create_node(
-                name=name,
-                node_type="PANEL",
-                parent_id=parent.node_id,
+            parent = self.get_selected_node()
+
+            if parent is None:
+
+                QMessageBox.warning(
+                    self,
+                    "Invalid Selection",
+                    "Please select a switchboard first.",
+                )
+
+                return
+
+            if str(
+                getattr(
+                    parent,
+                    "node_type",
+                    "",
+                )
+            ).upper() != "SWITCHBOARD":
+
+                QMessageBox.warning(
+                    self,
+                    "Invalid Selection",
+                    "A panel must belong to a switchboard.",
+                )
+
+                return
+
+            # -------------------------------------------------
+            # ONE DIALOG FOR BOTH VALUES
+            # -------------------------------------------------
+
+            dialog = PanelAssetDialog(
+                parent=self
             )
+
+            if (
+                dialog.exec()
+                != QDialog.DialogCode.Accepted
+            ):
+                return
+
+            name, asset_tag = (
+                dialog.get_values()
+            )
+
+            if not name or not asset_tag:
+                return
+
+            # -------------------------------------------------
+            # CREATE PANEL
+            # -------------------------------------------------
+
+            try:
+
+                self.asset_manager.create_node(
+                    name=name,
+                    node_type="PANEL",
+                    parent_id=parent.node_id,
+                    asset_tag=asset_tag,
+                )
+
+            except ValueError as error:
+
+                QMessageBox.warning(
+                    self,
+                    "Cannot Create Panel",
+                    str(error),
+                )
+
+                return
 
             self.refresh_tree()
 
-        except ValueError as error:
+        finally:
 
-            QMessageBox.warning(
-                self,
-                "Cannot Create",
-                str(error),
-            )
+            self._creating_panel = False
 
-    # =========================================================
+    # =====================================================
     # DISPLAY COMPONENTS
-    # =========================================================
+    # =====================================================
 
     def display_selected_components(self):
 
@@ -593,7 +752,9 @@ class AssetView(QWidget):
         node = self.get_selected_node()
 
         if node is None:
+
             self._update_button_states()
+
             return
 
         if str(
@@ -605,6 +766,7 @@ class AssetView(QWidget):
         ).upper() != "PANEL":
 
             self._update_button_states()
+
             return
 
         components = (
@@ -634,17 +796,17 @@ class AssetView(QWidget):
 
         self._update_button_states()
 
-    # =========================================================
+    # =====================================================
     # COMPONENT SELECTION
-    # =========================================================
+    # =====================================================
 
     def on_component_selection_changed(self):
 
         self._update_button_states()
 
-    # =========================================================
+    # =====================================================
     # BUTTON STATE
-    # =========================================================
+    # =====================================================
 
     def _update_button_states(self):
 
@@ -698,9 +860,9 @@ class AssetView(QWidget):
             panel_selected
         )
 
-    # =========================================================
+    # =====================================================
     # PANEL CONFIGURATION
-    # =========================================================
+    # =====================================================
 
     def configure_selected_panel(self):
 
@@ -721,7 +883,10 @@ class AssetView(QWidget):
             parent=self,
         )
 
-        if dialog.exec() != QDialog.DialogCode.Accepted:
+        if (
+            dialog.exec()
+            != QDialog.DialogCode.Accepted
+        ):
             return
 
         configuration = (
@@ -766,7 +931,10 @@ class AssetView(QWidget):
                 "saved successfully.",
             )
 
-        except (ValueError, TypeError) as error:
+        except (
+            ValueError,
+            TypeError,
+        ) as error:
 
             QMessageBox.warning(
                 self,
@@ -774,9 +942,9 @@ class AssetView(QWidget):
                 str(error),
             )
 
-    # =========================================================
+    # =====================================================
     # COMPONENT CONFIGURATION
-    # =========================================================
+    # =====================================================
 
     def configure_selected_component(self):
 
@@ -797,7 +965,10 @@ class AssetView(QWidget):
             self,
         )
 
-        if dialog.exec() != QDialog.DialogCode.Accepted:
+        if (
+            dialog.exec()
+            != QDialog.DialogCode.Accepted
+        ):
             return
 
         configuration = (
@@ -831,9 +1002,9 @@ class AssetView(QWidget):
                 str(error),
             )
 
-    # =========================================================
+    # =====================================================
     # PROTECTION FUNCTION CONFIGURATION
-    # =========================================================
+    # =====================================================
 
     def configure_selected_protection(self):
 
@@ -873,16 +1044,11 @@ class AssetView(QWidget):
             self,
         )
 
-        if dialog.exec() != QDialog.DialogCode.Accepted:
+        if (
+            dialog.exec()
+            != QDialog.DialogCode.Accepted
+        ):
             return
-
-        # -----------------------------------------------------
-        # IMPORTANT
-        #
-        # ProtectionFunctionDialog may update the object
-        # directly. We explicitly persist it through the
-        # ComponentManager so the change reaches components.json.
-        # -----------------------------------------------------
 
         try:
 
@@ -909,9 +1075,9 @@ class AssetView(QWidget):
                 str(error),
             )
 
-    # =========================================================
+    # =====================================================
     # SAVE COMPONENT CONFIGURATION
-    # =========================================================
+    # =====================================================
 
     def save_component_configuration(
         self,
@@ -1002,9 +1168,9 @@ class AssetView(QWidget):
 
             return False
 
-    # =========================================================
+    # =====================================================
     # OPEN COMPONENT TESTING
-    # =========================================================
+    # =====================================================
 
     def open_component_testing(self):
 
@@ -1028,9 +1194,9 @@ class AssetView(QWidget):
             )
         ).strip().upper()
 
-        # -----------------------------------------------------
+        # -------------------------------------------------
         # Prevent duplicate window
-        # -----------------------------------------------------
+        # -------------------------------------------------
 
         if self.testing_dialog is not None:
 
@@ -1039,6 +1205,7 @@ class AssetView(QWidget):
                 if self.testing_dialog.isVisible():
 
                     self.testing_dialog.raise_()
+
                     self.testing_dialog.activateWindow()
 
                     return
@@ -1047,9 +1214,9 @@ class AssetView(QWidget):
 
                 self.testing_dialog = None
 
-        # -----------------------------------------------------
+        # -------------------------------------------------
         # Determine panel
-        # -----------------------------------------------------
+        # -------------------------------------------------
 
         panel = self.get_selected_panel()
 
@@ -1082,9 +1249,9 @@ class AssetView(QWidget):
 
             return
 
-        # -----------------------------------------------------
+        # -------------------------------------------------
         # Project ID
-        # -----------------------------------------------------
+        # -------------------------------------------------
 
         project_id = getattr(
             self.project,
@@ -1102,9 +1269,9 @@ class AssetView(QWidget):
 
             return
 
-        # =====================================================
+        # =================================================
         # NUMERICAL RELAY
-        # =====================================================
+        # =================================================
 
         if component_type == "NUMERICAL_RELAY":
 
@@ -1117,14 +1284,13 @@ class AssetView(QWidget):
                 parent=self,
             )
 
-        # =====================================================
+        # =================================================
         # CT
-        # =====================================================
+        # =================================================
 
         elif component_type in (
             "CT",
             "CURRENT TRANSFORMER",
-            "CURRENT_TRANSFORMER",
         ):
 
             self.testing_dialog = CTTestingDialog(
@@ -1135,14 +1301,13 @@ class AssetView(QWidget):
                 parent=self,
             )
 
-        # =====================================================
+        # =================================================
         # AUXILIARY RELAY
-        # =====================================================
+        # =================================================
 
         elif component_type in (
             "AUXILIARY_RELAY",
             "AUX RELAY",
-            "AUXILIARY RELAY",
         ):
 
             self.testing_dialog = AuxRelayTestingDialog(
@@ -1153,9 +1318,9 @@ class AssetView(QWidget):
                 parent=self,
             )
 
-        # =====================================================
+        # =================================================
         # UNKNOWN
-        # =====================================================
+        # =================================================
 
         else:
 
@@ -1171,9 +1336,9 @@ class AssetView(QWidget):
 
             return
 
-        # =====================================================
+        # =================================================
         # DIALOG LIFETIME
-        # =====================================================
+        # =================================================
 
         self.testing_dialog.setAttribute(
             Qt.WidgetAttribute.WA_DeleteOnClose
@@ -1186,11 +1351,12 @@ class AssetView(QWidget):
         self.testing_dialog.show()
 
         self.testing_dialog.raise_()
+
         self.testing_dialog.activateWindow()
 
-    # =========================================================
+    # =====================================================
     # CLOSE TESTING DIALOG
-    # =========================================================
+    # =====================================================
 
     def close_testing_dialog(self):
 
@@ -1207,17 +1373,17 @@ class AssetView(QWidget):
 
         self.testing_dialog = None
 
-    # =========================================================
+    # =====================================================
     # TESTING DIALOG CLOSED
-    # =========================================================
+    # =====================================================
 
     def on_testing_dialog_closed(self):
 
         self.testing_dialog = None
 
-    # =========================================================
+    # =====================================================
     # TEST HISTORY
-    # =========================================================
+    # =====================================================
 
     def open_test_history(self):
 
@@ -1274,9 +1440,9 @@ class AssetView(QWidget):
 
         self.test_history_view.exec()
 
-    # =========================================================
+    # =====================================================
     # REFRESH COMPONENT VIEW
-    # =========================================================
+    # =====================================================
 
     def refresh_component_view(self):
 

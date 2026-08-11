@@ -3,6 +3,10 @@ import json
 from uuid import uuid4
 
 from app.models.asset_node import AssetNode
+from app.services.asset_library_manager import (
+    AssetLibraryManager,
+    DuplicateAssetError
+)
 
 
 class AssetManager:
@@ -16,6 +20,14 @@ class AssetManager:
 
         self.assets_file = (
             project_folder / "assets.json"
+        )
+
+        # -------------------------------------------------
+        # GLOBAL ASSET LIBRARY
+        # -------------------------------------------------
+
+        self.asset_library = (
+            AssetLibraryManager()
         )
 
         self.nodes = {}
@@ -40,10 +52,16 @@ class AssetManager:
         self,
         name: str,
         node_type: str,
-        parent_id: str | None = None
+        parent_id: str | None = None,
+        asset_tag: str | None = None,
+        serial_number: str | None = None,
+        manufacturer: str | None = None,
+        model: str | None = None
     ):
 
-        name = str(name).strip()
+        name = str(
+            name
+        ).strip()
 
         node_type = str(
             node_type
@@ -61,9 +79,9 @@ class AssetManager:
                 "Node type cannot be empty."
             )
 
-        # -----------------------------------------------------
-        # Validate parent
-        # -----------------------------------------------------
+        # -------------------------------------------------
+        # VALIDATE PARENT
+        # -------------------------------------------------
 
         if parent_id is not None:
 
@@ -73,47 +91,269 @@ class AssetManager:
                     "Parent asset does not exist."
                 )
 
-        # -----------------------------------------------------
-        # Prevent duplicate nodes
-        # -----------------------------------------------------
+        # -------------------------------------------------
+        # PROJECT-LOCAL DUPLICATE
+        # -------------------------------------------------
 
         for node in self.nodes.values():
 
             if (
                 node.parent_id == parent_id
-                and node.name.lower() == name.lower()
-                and node.node_type.upper()
+                and
+                node.name.lower()
+                == name.lower()
+                and
+                node.node_type.upper()
                 == node_type
             ):
 
                 raise ValueError(
                     f"{node_type.replace('_', ' ').title()} "
-                    f"'{name}' already exists."
+                    f"'{name}' already exists "
+                    f"in this project."
                 )
 
-        # -----------------------------------------------------
-        # Create
-        # -----------------------------------------------------
+        # -------------------------------------------------
+        # GLOBAL ASSET
+        #
+        # Only physical equipment types should be entered
+        # into the global library.
+        #
+        # For now PANEL is the first one.
+        # -------------------------------------------------
+
+        asset_id = None
+
+        if node_type == "PANEL":
+
+            if not asset_tag:
+
+                raise ValueError(
+                    "Asset tag is required for a panel."
+                )
+
+            asset = (
+                self.asset_library.create_asset(
+                    asset_type="PANEL",
+                    asset_tag=asset_tag,
+                    name=name,
+                    serial_number=serial_number,
+                    manufacturer=manufacturer,
+                    model=model
+                )
+            )
+
+            asset_id = asset[
+                "asset_id"
+            ]
+
+        # -------------------------------------------------
+        # CREATE PROJECT NODE
+        # -------------------------------------------------
 
         node_id = self._generate_id()
 
         node = AssetNode(
+
             node_id=node_id,
+
             name=name,
+
             node_type=node_type,
-            parent_id=parent_id
+
+            parent_id=parent_id,
+
+            asset_id=asset_id
         )
 
-        self.nodes[node_id] = node
+        self.nodes[
+            node_id
+        ] = node
+
+        # -------------------------------------------------
+        # CREATE PROJECT FOLDER
+        # -------------------------------------------------
 
         self._create_folder(
             node
         )
 
+        # -------------------------------------------------
+        # SAVE
+        # -------------------------------------------------
+
         self.save_assets()
 
         return node
+    def link_asset(
+        self,
+        asset_id,
+        parent_id=None,
+        name=None
+    ):
 
+        # -------------------------------------------------
+        # GET GLOBAL ASSET
+        # -------------------------------------------------
+
+        asset = (
+            self.asset_library.get_asset(
+                asset_id
+            )
+        )
+
+        if asset is None:
+
+            raise ValueError(
+                "Global asset does not exist."
+            )
+
+        # -------------------------------------------------
+        # ONLY PANEL FOR NOW
+        # -------------------------------------------------
+
+        if (
+            asset.get("asset_type", "")
+            .upper()
+            != "PANEL"
+        ):
+
+            raise ValueError(
+                "Only panels can currently be linked."
+            )
+
+        # -------------------------------------------------
+        # VALIDATE PARENT
+        # -------------------------------------------------
+
+        if parent_id is not None:
+
+            if parent_id not in self.nodes:
+
+                raise ValueError(
+                    "Parent asset does not exist."
+                )
+
+        # -------------------------------------------------
+        # DETERMINE DISPLAY NAME
+        # -------------------------------------------------
+
+        display_name = (
+            str(
+                name
+                if name is not None
+                else asset.get(
+                    "name"
+                )
+                or asset.get(
+                    "asset_tag"
+                )
+                or "Linked Panel"
+            )
+            .strip()
+        )
+
+        # -------------------------------------------------
+        # PREVENT SAME ASSET FROM BEING LINKED TWICE
+        # -------------------------------------------------
+
+        for node in self.nodes.values():
+
+            if (
+                getattr(
+                    node,
+                    "asset_id",
+                    None
+                )
+                == asset_id
+            ):
+
+                raise ValueError(
+                    f"Asset "
+                    f"'{asset.get('asset_tag', asset_id)}' "
+                    f"already exists in this project."
+                )
+
+        # -------------------------------------------------
+        # PREVENT SAME NODE
+        # -------------------------------------------------
+
+        for node in self.nodes.values():
+
+            if (
+                node.parent_id == parent_id
+                and
+                node.name.lower()
+                == display_name.lower()
+                and
+                node.node_type.upper()
+                == "PANEL"
+            ):
+
+                raise ValueError(
+                    f"Panel '{display_name}' "
+                    f"already exists in this project."
+                )
+
+        # -------------------------------------------------
+        # CREATE PROJECT NODE
+        # -------------------------------------------------
+
+        node_id = self._generate_id()
+
+        linked_node = AssetNode(
+
+            node_id=node_id,
+
+            name=display_name,
+
+            node_type="PANEL",
+
+            parent_id=parent_id,
+
+            asset_id=asset_id,
+
+            # Keep this temporarily so existing link UI
+            # continues to understand that this is linked.
+            linked_asset_id=asset_id,
+
+            equipment_name=asset.get(
+                "equipment_name",
+                ""
+            ),
+
+            equipment_type=asset.get(
+                "equipment_type",
+                ""
+            ),
+
+            ct_count=asset.get(
+                "ct_count",
+                0
+            ),
+
+            relay_count=asset.get(
+                "relay_count",
+                0
+            ),
+
+            aux_count=asset.get(
+                "aux_count",
+                0
+            )
+        )
+
+        self.nodes[
+            node_id
+        ] = linked_node
+
+        self._create_folder(
+            linked_node
+        )
+
+        self.save_assets()
+
+        return linked_node
     # =========================================================
     # CREATE FOLDER
     # =========================================================
@@ -419,6 +659,13 @@ class AssetManager:
                             "aux_count",
                             0
                         ),
+                    "asset_id":
+                        getattr(
+                            node,
+                            "asset_id",
+                            None
+                        ),
+
                     "linked_asset_id":
                         getattr(
                             node,
@@ -488,6 +735,10 @@ class AssetManager:
                 node_type=item["node_type"],
 
                 parent_id=item["parent_id"],
+
+                asset_id=item.get(
+                    "asset_id"
+                ),
 
                 linked_asset_id=item.get(
                     "linked_asset_id"
@@ -727,4 +978,26 @@ class AssetManager:
             node,
             "linked_asset_id",
             None
+        )
+    def search_global_assets(
+        self,
+        search_text="",
+        asset_type="PANEL"
+    ):
+
+        return (
+            self.asset_library.search(
+                search_text=search_text,
+                asset_type=asset_type
+            )
+        )
+    def get_global_asset(
+        self,
+        asset_id
+    ):
+
+        return (
+            self.asset_library.get_asset(
+                asset_id
+            )
         )

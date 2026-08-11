@@ -16,11 +16,12 @@
         "name": "P01",
         "node_type": "PANEL",
         "parent_id": "AST-65687D6A",
-        "equipment_name": "",
-        "equipment_type": "",
-        "ct_count": 0,
-        "relay_count": 0,
-        "aux_count": 0,
+        "equipment_name": "1-MG-1A",
+        "equipment_type": "Motor",
+        "ct_count": 4,
+        "relay_count": 1,
+        "aux_count": 1,
+        "asset_id": null,
         "linked_asset_id": null
     },
     {
@@ -33,6 +34,7 @@
         "ct_count": 0,
         "relay_count": 0,
         "aux_count": 0,
+        "asset_id": null,
         "linked_asset_id": null
     },
     {
@@ -57,6 +59,32 @@
         "ct_count": 0,
         "relay_count": 0,
         "aux_count": 0,
+        "asset_id": null,
+        "linked_asset_id": null
+    },
+    {
+        "node_id": "AST-E3EF770E",
+        "name": "Coke Yard",
+        "node_type": "SUBSTATION",
+        "parent_id": null
+    },
+    {
+        "node_id": "AST-A6A9FEE1",
+        "name": "HV-Sec-A",
+        "node_type": "SWITCHBOARD",
+        "parent_id": "AST-E3EF770E"
+    },
+    {
+        "node_id": "AST-F47D1628",
+        "name": "Panel-01",
+        "node_type": "PANEL",
+        "parent_id": "AST-65687D6A",
+        "equipment_name": "",
+        "equipment_type": "",
+        "ct_count": 0,
+        "relay_count": 0,
+        "aux_count": 0,
+        "asset_id": "ASSET-315DF0FCDA",
         "linked_asset_id": null
     }
 ]

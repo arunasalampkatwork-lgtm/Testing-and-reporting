@@ -1,0 +1,35 @@
+[
+    {
+        "asset_id": "ASSET-4D1D94DEE4",
+        "asset_type": "PANEL",
+        "asset_tag": "Incomer",
+        "name": "Incomer",
+        "description": "",
+        "serial_number": "",
+        "manufacturer": "",
+        "model": "",
+        "metadata": {}
+    },
+    {
+        "asset_id": "ASSET-315DF0FCDA",
+        "asset_type": "PANEL",
+        "asset_tag": "SS-1 P01",
+        "name": "Panel-01",
+        "description": "",
+        "serial_number": "",
+        "manufacturer": "",
+        "model": "",
+        "metadata": {}
+    },
+    {
+        "asset_id": "ASSET-691FE0B7FC",
+        "asset_type": "PANEL",
+        "asset_tag": "SS-1 P04",
+        "name": "P04",
+        "description": "",
+        "serial_number": "",
+        "manufacturer": "",
+        "model": "",
+        "metadata": {}
+    }
+]

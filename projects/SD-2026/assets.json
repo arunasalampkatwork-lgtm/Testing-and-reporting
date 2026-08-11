@@ -20,7 +20,9 @@
         "equipment_type": "motor",
         "ct_count": 3,
         "relay_count": 1,
-        "aux_count": 2
+        "aux_count": 2,
+        "asset_id": null,
+        "linked_asset_id": null
     },
     {
         "node_id": "AST-05CA3A8E",
@@ -31,7 +33,9 @@
         "equipment_type": "Motor",
         "ct_count": 3,
         "relay_count": 1,
-        "aux_count": 2
+        "aux_count": 2,
+        "asset_id": null,
+        "linked_asset_id": null
     },
     {
         "node_id": "AST-043B7F6A",
@@ -42,7 +46,9 @@
         "equipment_type": "Motor",
         "ct_count": 3,
         "relay_count": 1,
-        "aux_count": 2
+        "aux_count": 2,
+        "asset_id": null,
+        "linked_asset_id": null
     },
     {
         "node_id": "AST-C902FE25",
@@ -65,7 +71,9 @@
         "equipment_type": "MOTOR",
         "ct_count": 3,
         "relay_count": 1,
-        "aux_count": 1
+        "aux_count": 1,
+        "asset_id": null,
+        "linked_asset_id": null
     },
     {
         "node_id": "AST-14565599",
@@ -88,6 +96,46 @@
         "equipment_type": "MOTOR",
         "ct_count": 3,
         "relay_count": 1,
-        "aux_count": 2
+        "aux_count": 2,
+        "asset_id": null,
+        "linked_asset_id": null
+    },
+    {
+        "node_id": "AST-4CF1EAED",
+        "name": "Coke Yard",
+        "node_type": "SUBSTATION",
+        "parent_id": null
+    },
+    {
+        "node_id": "AST-19DD678F",
+        "name": "HV-Sec-A",
+        "node_type": "SWITCHBOARD",
+        "parent_id": "AST-4CF1EAED"
+    },
+    {
+        "node_id": "AST-669FB8CD",
+        "name": "Incomer",
+        "node_type": "PANEL",
+        "parent_id": "AST-19DD678F",
+        "equipment_name": "",
+        "equipment_type": "",
+        "ct_count": 0,
+        "relay_count": 0,
+        "aux_count": 0,
+        "asset_id": "ASSET-4D1D94DEE4",
+        "linked_asset_id": null
+    },
+    {
+        "node_id": "AST-9989D0F0",
+        "name": "P04",
+        "node_type": "PANEL",
+        "parent_id": "AST-7C57DED4",
+        "equipment_name": "205-G-1",
+        "equipment_type": "Motor",
+        "ct_count": 3,
+        "relay_count": 1,
+        "aux_count": 1,
+        "asset_id": "ASSET-691FE0B7FC",
+        "linked_asset_id": null
     }
 ]
