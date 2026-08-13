@@ -1,3 +1,4 @@
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QDialog,
     QVBoxLayout,
@@ -14,18 +15,25 @@ class AssetLinkDialog(QDialog):
 
     def __init__(
         self,
-        panels,
+        assets,
+        asset_type="PANEL",
         parent=None
     ):
 
         super().__init__(parent)
 
-        self.panels = panels
+        self.assets = assets or []
+        self.asset_type = str(
+            asset_type or "PANEL"
+        ).strip().upper()
+        self.selected_asset = None
 
-        self.selected_panel = None
+        label = self.asset_type.replace(
+            "_", " "
+        ).title()
 
         self.setWindowTitle(
-            "Link Existing Panel"
+            f"Link Existing {label}"
         )
 
         self.resize(
@@ -45,8 +53,12 @@ class AssetLinkDialog(QDialog):
             self
         )
 
+        label = self.asset_type.replace(
+            "_", " "
+        ).title()
+
         title = QLabel(
-            "Select an Existing Panel"
+            f"Select an Existing {label}"
         )
 
         title.setStyleSheet(
@@ -62,32 +74,37 @@ class AssetLinkDialog(QDialog):
             title
         )
 
-        self.panel_list = QListWidget()
+        self.asset_list = QListWidget()
 
         layout.addWidget(
-            self.panel_list
+            self.asset_list
         )
 
         # -----------------------------------------------------
         # Populate panels
         # -----------------------------------------------------
 
-        for panel in self.panels:
+        for asset in self.assets:
 
-            item = QListWidgetItem(
+            name = str(asset.get("name", ""))
+            asset_tag = str(asset.get("asset_tag", ""))
+            serial_number = str(asset.get("serial_number", ""))
+            manufacturer = str(asset.get("manufacturer", ""))
+            model = str(asset.get("model", ""))
 
-                f"{panel.name} | "
-                f"{getattr(panel, 'equipment_name', '')}"
+            text = (
+                f"{name} | "
+                f"{asset_tag} | "
+                f"{manufacturer} {model} | "
+                f"{serial_number}"
             )
 
+            item = QListWidgetItem(text)
             item.setData(
-                256,
-                panel
+                Qt.ItemDataRole.UserRole,
+                asset
             )
-
-            self.panel_list.addItem(
-                item
-            )
+            self.asset_list.addItem(item)
 
         # -----------------------------------------------------
         # Buttons
@@ -99,8 +116,12 @@ class AssetLinkDialog(QDialog):
             "Cancel"
         )
 
+        label = self.asset_type.replace(
+            "_", " "
+        ).title()
+
         link_button = QPushButton(
-            "Link Panel"
+            f"Link {label}"
         )
 
         cancel_button.clicked.connect(
@@ -131,30 +152,27 @@ class AssetLinkDialog(QDialog):
 
     def accept_selection(self):
 
-        item = (
-            self.panel_list.currentItem()
-        )
+        item = self.asset_list.currentItem()
 
         if item is None:
 
             QMessageBox.warning(
                 self,
-                "No Panel Selected",
-                "Please select a panel."
+                "No Asset Selected",
+                "Please select an asset.",
             )
-
             return
 
-        self.selected_panel = item.data(
-            256
+        self.selected_asset = item.data(
+            Qt.ItemDataRole.UserRole
         )
 
         self.accept()
 
-    # =========================================================
-    # GET PANEL
-    # =========================================================
+    def get_selected_asset(self):
+
+        return self.selected_asset
 
     def get_selected_panel(self):
 
-        return self.selected_panel
+        return self.selected_asset

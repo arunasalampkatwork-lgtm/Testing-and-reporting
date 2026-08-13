@@ -86,5 +86,30 @@
         "aux_count": 0,
         "asset_id": "ASSET-315DF0FCDA",
         "linked_asset_id": null
+    },
+    {
+        "node_id": "AST-A0337321",
+        "name": "REF-2",
+        "node_type": "SUBSTATION",
+        "parent_id": null
+    },
+    {
+        "node_id": "AST-9A99E89B",
+        "name": "REF-2A",
+        "node_type": "SWITCHBOARD",
+        "parent_id": "AST-A0337321"
+    },
+    {
+        "node_id": "AST-A4A817D4",
+        "name": "P-01",
+        "node_type": "PANEL",
+        "parent_id": "AST-9A99E89B",
+        "equipment_name": "",
+        "equipment_type": "",
+        "ct_count": 0,
+        "relay_count": 0,
+        "aux_count": 0,
+        "asset_id": "ASSET-09BA5670B3",
+        "linked_asset_id": null
     }
 ]

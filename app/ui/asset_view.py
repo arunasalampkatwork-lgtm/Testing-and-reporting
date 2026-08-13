@@ -31,6 +31,7 @@ from app.ui.ct_testing_dialog import CTTestingDialog
 from app.ui.aux_relay_testing_dialog import AuxRelayTestingDialog
 
 from app.ui.test_history_view import TestHistoryView
+from app.ui.asset_link_dialog import AssetLinkDialog
 
 
 class PanelAssetDialog(QDialog):
@@ -279,8 +280,16 @@ class AssetView(QWidget):
             "+ Switchboard"
         )
 
+        self.link_switchboard = QPushButton(
+            "Link Existing Switchboard"
+        )
+
         self.add_panel = QPushButton(
             "+ Panel"
+        )
+
+        self.link_panel = QPushButton(
+            "Link Existing Panel"
         )
 
         self.configure_panel = QPushButton(
@@ -304,7 +313,15 @@ class AssetView(QWidget):
         )
 
         buttons.addWidget(
+            self.link_switchboard
+        )
+
+        buttons.addWidget(
             self.add_panel
+        )
+
+        buttons.addWidget(
+            self.link_panel
         )
 
         buttons.addWidget(
@@ -355,8 +372,16 @@ class AssetView(QWidget):
             self.create_switchboard
         )
 
+        self.link_switchboard.clicked.connect(
+            self.link_existing_switchboard
+        )
+
         self.add_panel.clicked.connect(
             self.create_panel
+        )
+
+        self.link_panel.clicked.connect(
+            self.link_existing_panel
         )
 
         self.open_testing.clicked.connect(
@@ -742,6 +767,280 @@ class AssetView(QWidget):
             self._creating_panel = False
 
     # =====================================================
+    # GET AVAILABLE MASTER SWITCHBOARDS
+    # =====================================================
+
+    def get_available_master_switchboards(self):
+
+        parent = self.get_selected_node()
+
+        if parent is None:
+
+            return []
+
+        if str(
+            getattr(
+                parent,
+                "node_type",
+                ""
+            )
+        ).upper() != "SUBSTATION":
+
+            return []
+
+        return self.asset_manager.get_available_global_assets(
+            asset_type="SWITCHBOARD",
+            parent_node=parent
+        )
+
+    # =====================================================
+    # LINK EXISTING GLOBAL SWITCHBOARD
+    # =====================================================
+
+    def link_existing_switchboard(self):
+
+        parent = self.get_selected_node()
+
+        # -------------------------------------------------
+        # Must select a substation
+        # -------------------------------------------------
+
+        if parent is None:
+
+            QMessageBox.warning(
+                self,
+                "Select Substation",
+                "Please select a substation first."
+            )
+
+            return
+
+        # -------------------------------------------------
+        # Validate parent type
+        # -------------------------------------------------
+
+        if str(
+            getattr(
+                parent,
+                "node_type",
+                ""
+            )
+        ).upper() != "SUBSTATION":
+
+            QMessageBox.warning(
+                self,
+                "Invalid Selection",
+                "An existing switchboard must be "
+                "linked under a substation."
+            )
+
+            return
+
+        # -------------------------------------------------
+        # Get only switchboards belonging to this
+        # particular substation
+        # -------------------------------------------------
+
+        available_switchboards = (
+            self.get_available_master_switchboards()
+        )
+
+        if not available_switchboards:
+
+            QMessageBox.information(
+                self,
+                "No Available Switchboards",
+                "There are no unlinked switchboards "
+                "available for this substation."
+            )
+
+            return
+
+        # -------------------------------------------------
+        # Open selection dialog
+        # -------------------------------------------------
+
+        dialog = AssetLinkDialog(
+            available_switchboards,
+            asset_type="SWITCHBOARD",
+            parent=self
+        )
+
+        if (
+            dialog.exec()
+            != QDialog.DialogCode.Accepted
+        ):
+
+            return
+
+        selected = (
+            dialog.get_selected_asset()
+        )
+
+        if selected is None:
+
+            return
+
+        # -------------------------------------------------
+        # Link global switchboard to project
+        # -------------------------------------------------
+
+        try:
+
+            linked_node = (
+                self.asset_manager.link_asset(
+                    asset_id=selected["asset_id"],
+                    parent_id=parent.node_id,
+                    name=selected.get(
+                        "name"
+                    )
+                )
+            )
+
+            # -------------------------------------------------
+            # Refresh project tree
+            # -------------------------------------------------
+
+            self.refresh_tree()
+
+            QMessageBox.information(
+                self,
+                "Switchboard Linked",
+                f"Switchboard "
+                f"'{linked_node.name}' "
+                "has been linked to this project."
+            )
+
+        except ValueError as error:
+
+            QMessageBox.warning(
+                self,
+                "Cannot Link Switchboard",
+                str(error)
+            )
+
+    # =====================================================
+    # GLOBAL PANEL DATABASE
+    # =====================================================
+
+    def get_available_master_panels(self):
+
+        parent = self.get_selected_node()
+
+        if parent is None or str(
+            getattr(parent, "node_type", "")
+        ).upper() != "SWITCHBOARD":
+            return []
+
+        return self.asset_manager.get_available_global_assets(
+            asset_type="PANEL",
+            parent_node=parent,
+        )
+
+    # =====================================================
+    # LINK EXISTING GLOBAL PANEL
+    # =====================================================
+
+    def link_existing_panel(self):
+
+        parent = self.get_selected_node()
+
+        if parent is None:
+
+            QMessageBox.warning(
+                self,
+                "Select Switchboard",
+                "Please select a switchboard first."
+            )
+
+            return
+
+        if str(
+            getattr(
+                parent,
+                "node_type",
+                ""
+            )
+        ).upper() != "SWITCHBOARD":
+
+            QMessageBox.warning(
+                self,
+                "Invalid Selection",
+                "An existing panel must be linked "
+                "under a switchboard."
+            )
+
+            return
+
+        available_panels = (
+            self.get_available_master_panels()
+        )
+
+        if not available_panels:
+
+            QMessageBox.information(
+                self,
+                "No Available Panels",
+                "There are no unlinked panels in the "
+                "global asset database."
+            )
+
+            return
+
+        dialog = AssetLinkDialog(
+            available_panels,
+            asset_type="PANEL",
+            parent=self,
+        )
+
+        if (
+            dialog.exec()
+            != QDialog.DialogCode.Accepted
+        ):
+            return
+
+        selected = dialog.get_selected_asset()
+
+        if selected is None:
+            return
+
+        try:
+
+            linked_node = (
+                self.asset_manager.link_asset(
+                    asset_id=selected["asset_id"],
+                    parent_id=parent.node_id,
+                    name=selected.get(
+                        "name"
+                    )
+                )
+            )
+
+            # Restore the physical panel's component
+            # configuration into this project.
+            self.component_manager.restore_global_panel_components(
+                linked_node.node_id,
+                selected
+            )
+
+            self.refresh_tree()
+
+            QMessageBox.information(
+                self,
+                "Panel Linked",
+                f"Panel '{linked_node.name}' "
+                "has been linked to this project."
+            )
+
+        except ValueError as error:
+
+            QMessageBox.warning(
+                self,
+                "Cannot Link Panel",
+                str(error)
+            )
+
+    # =====================================================
     # DISPLAY COMPONENTS
     # =====================================================
 
@@ -814,15 +1113,28 @@ class AssetView(QWidget):
 
         component = self.get_selected_component()
 
-        panel_selected = (
-            node is not None
-            and str(
+        node_type = (
+            str(
                 getattr(
                     node,
                     "node_type",
                     "",
                 )
-            ).upper() == "PANEL"
+            ).upper()
+            if node is not None
+            else ""
+        )
+
+        panel_selected = (
+            node_type == "PANEL"
+        )
+
+        substation_selected = (
+            node_type == "SUBSTATION"
+        )
+
+        switchboard_selected = (
+            node_type == "SWITCHBOARD"
         )
 
         relay_selected = (
@@ -838,6 +1150,14 @@ class AssetView(QWidget):
 
         component_selected = (
             component is not None
+        )
+
+        self.link_panel.setEnabled(
+            switchboard_selected
+        )
+
+        self.link_switchboard.setEnabled(
+            substation_selected
         )
 
         self.configure_panel.setEnabled(
