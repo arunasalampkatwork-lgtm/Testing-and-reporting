@@ -34,6 +34,9 @@ class AssetManager:
 
         self.load_assets()
 
+        # Repair / migrate physical assets into the global library.
+        self._migrate_global_hierarchy()
+
     # =========================================================
     # ID
     # =========================================================
@@ -114,38 +117,60 @@ class AssetManager:
                 )
 
         # -------------------------------------------------
-        # GLOBAL ASSET
+        # GLOBAL PHYSICAL ASSET
         #
-        # Only physical equipment types should be entered
-        # into the global library.
-        #
-        # For now PANEL is the first one.
+        # Substations, switchboards and panels are physical
+        # assets. Keep one master record for each physical
+        # asset and store the master parent relationship in
+        # metadata.parent_asset_id.
         # -------------------------------------------------
 
         asset_id = None
 
-        if node_type == "PANEL":
+        if node_type in (
+            "SUBSTATION",
+            "SWITCHBOARD",
+            "PANEL",
+        ):
 
-            if not asset_tag:
+            if node_type == "PANEL" and not asset_tag:
 
                 raise ValueError(
                     "Asset tag is required for a panel."
                 )
 
-            asset = (
-                self.asset_library.create_asset(
-                    asset_type="PANEL",
-                    asset_tag=asset_tag,
-                    name=name,
-                    serial_number=serial_number,
-                    manufacturer=manufacturer,
-                    model=model
-                )
+            global_tag = (
+                asset_tag
+                if asset_tag
+                else name
             )
 
-            asset_id = asset[
-                "asset_id"
-            ]
+            parent_asset_id = None
+
+            if parent_id is not None:
+                parent_node = self.nodes.get(parent_id)
+                if parent_node is not None:
+                    parent_asset_id = getattr(
+                        parent_node,
+                        "asset_id",
+                        None
+                    )
+
+            metadata = {}
+            if parent_asset_id:
+                metadata["parent_asset_id"] = parent_asset_id
+
+            asset = self.asset_library.create_asset(
+                asset_type=node_type,
+                asset_tag=global_tag,
+                name=name,
+                serial_number=serial_number,
+                manufacturer=manufacturer,
+                model=model,
+                metadata=metadata
+            )
+
+            asset_id = asset["asset_id"]
 
         # -------------------------------------------------
         # CREATE PROJECT NODE
@@ -194,7 +219,12 @@ class AssetManager:
 
         # -------------------------------------------------
         # GET GLOBAL ASSET
+        #
+        # Reload so configuration/component changes made by
+        # another manager instance are visible immediately.
         # -------------------------------------------------
+
+        self.asset_library.load()
 
         asset = (
             self.asset_library.get_asset(
@@ -208,18 +238,17 @@ class AssetManager:
                 "Global asset does not exist."
             )
 
-        # -------------------------------------------------
-        # ONLY PANEL FOR NOW
-        # -------------------------------------------------
-
-        if (
+        asset_type = str(
             asset.get("asset_type", "")
-            .upper()
-            != "PANEL"
-        ):
+        ).strip().upper()
 
+        if asset_type not in (
+            "SUBSTATION",
+            "SWITCHBOARD",
+            "PANEL",
+        ):
             raise ValueError(
-                "Only panels can currently be linked."
+                f"Asset type '{asset_type}' cannot be linked."
             )
 
         # -------------------------------------------------
@@ -232,6 +261,47 @@ class AssetManager:
 
                 raise ValueError(
                     "Parent asset does not exist."
+                )
+
+            parent_node = self.nodes[parent_id]
+            parent_type = str(
+                getattr(parent_node, "node_type", "")
+            ).upper()
+
+            expected_parent = (
+                "SWITCHBOARD"
+                if asset_type == "PANEL"
+                else "SUBSTATION"
+                if asset_type == "SWITCHBOARD"
+                else None
+            )
+
+            if expected_parent and parent_type != expected_parent:
+                raise ValueError(
+                    f"A {asset_type.replace('_', ' ').title()} "
+                    f"must belong to a {expected_parent.title()}."
+                )
+
+            master_parent_id = (
+                (asset.get("metadata") or {}).get(
+                    "parent_asset_id"
+                )
+            )
+
+            parent_asset_id = getattr(
+                parent_node,
+                "asset_id",
+                None
+            )
+
+            if (
+                master_parent_id
+                and parent_asset_id
+                and master_parent_id != parent_asset_id
+            ):
+                raise ValueError(
+                    f"This {asset_type.replace('_', ' ').lower()} "
+                    "belongs to a different master parent."
                 )
 
         # -------------------------------------------------
@@ -287,7 +357,7 @@ class AssetManager:
                 == display_name.lower()
                 and
                 node.node_type.upper()
-                == "PANEL"
+                == asset_type
             ):
 
                 raise ValueError(
@@ -307,7 +377,7 @@ class AssetManager:
 
             name=display_name,
 
-            node_type="PANEL",
+            node_type=asset_type,
 
             parent_id=parent_id,
 
@@ -354,6 +424,156 @@ class AssetManager:
         self.save_assets()
 
         return linked_node
+    # =========================================================
+    # GLOBAL HIERARCHY MIGRATION / REPAIR
+    # =========================================================
+
+    def _migrate_global_hierarchy(self):
+
+        changed = False
+
+        # Give existing substations and switchboards global IDs.
+        for node in list(self.nodes.values()):
+
+            node_type = str(
+                getattr(node, "node_type", "")
+            ).upper()
+
+            if node_type not in ("SUBSTATION", "SWITCHBOARD"):
+                continue
+
+            if getattr(node, "asset_id", None):
+                continue
+
+            existing = self.asset_library.find_duplicate(
+                asset_type=node_type,
+                asset_tag=node.name
+            )
+
+            if existing:
+                node.asset_id = existing["asset_id"]
+            else:
+                parent = self.nodes.get(
+                    getattr(node, "parent_id", None)
+                )
+                metadata = {}
+                parent_asset_id = getattr(
+                    parent, "asset_id", None
+                ) if parent else None
+                if parent_asset_id:
+                    metadata["parent_asset_id"] = parent_asset_id
+
+                asset = self.asset_library.create_asset(
+                    asset_type=node_type,
+                    asset_tag=node.name,
+                    name=node.name,
+                    metadata=metadata
+                )
+                node.asset_id = asset["asset_id"]
+
+            changed = True
+
+        # Repair parent relationships for global panels/switchboards.
+        for node in list(self.nodes.values()):
+
+            node_type = str(
+                getattr(node, "node_type", "")
+            ).upper()
+
+            if node_type not in ("SWITCHBOARD", "PANEL"):
+                continue
+
+            asset_id = getattr(node, "asset_id", None)
+            parent = self.nodes.get(
+                getattr(node, "parent_id", None)
+            )
+
+            if not asset_id or parent is None:
+                continue
+
+            parent_asset_id = getattr(
+                parent, "asset_id", None
+            )
+            if not parent_asset_id:
+                continue
+
+            asset = self.asset_library.get_asset(asset_id)
+            if not asset:
+                continue
+
+            metadata = dict(
+                asset.get("metadata") or {}
+            )
+            if metadata.get("parent_asset_id") != parent_asset_id:
+                metadata["parent_asset_id"] = parent_asset_id
+                self.asset_library.update_asset(
+                    asset_id,
+                    {"metadata": metadata}
+                )
+                changed = True
+
+        if changed:
+            self.save_assets()
+
+    # =========================================================
+    # AVAILABLE GLOBAL ASSETS FOR A PARENT
+    # =========================================================
+
+    def get_available_global_assets(
+        self,
+        asset_type,
+        parent_node=None
+    ):
+
+        asset_type = str(asset_type or "").strip().upper()
+
+        assets = self.asset_library.get_all_assets(
+            asset_type=asset_type
+        )
+
+        linked_ids = {
+            getattr(node, "asset_id", None)
+            for node in self.nodes.values()
+            if getattr(node, "asset_id", None)
+        }
+
+        if parent_node is None:
+            return [
+                asset for asset in assets
+                if asset.get("asset_id") not in linked_ids
+            ]
+
+        expected_parent = (
+            "SWITCHBOARD"
+            if asset_type == "PANEL"
+            else "SUBSTATION"
+            if asset_type == "SWITCHBOARD"
+            else None
+        )
+
+        if str(
+            getattr(parent_node, "node_type", "")
+        ).upper() != expected_parent:
+            return []
+
+        parent_asset_id = getattr(
+            parent_node,
+            "asset_id",
+            None
+        )
+
+        if not parent_asset_id:
+            return []
+
+        return [
+            asset
+            for asset in assets
+            if asset.get("asset_id") not in linked_ids
+            and (asset.get("metadata") or {}).get(
+                "parent_asset_id"
+            ) == parent_asset_id
+        ]
+
     # =========================================================
     # CREATE FOLDER
     # =========================================================
@@ -523,6 +743,41 @@ class AssetManager:
                 0
             ) or 0
         )
+
+        # -------------------------------------------------
+        # Synchronize the physical panel configuration with
+        # the global asset library.
+        # -------------------------------------------------
+
+        global_asset_id = getattr(
+            node,
+            "asset_id",
+            None
+        )
+
+        if global_asset_id:
+
+            try:
+
+                self.asset_library.update_asset(
+                    global_asset_id,
+                    {
+                        "name": node.name,
+                        "equipment_name":
+                            node.equipment_name,
+                        "equipment_type":
+                            node.equipment_type,
+                        "ct_count":
+                            node.ct_count,
+                        "relay_count":
+                            node.relay_count,
+                        "aux_count":
+                            node.aux_count
+                    }
+                )
+
+            except ValueError:
+                pass
 
         self.save_assets()
 
@@ -984,6 +1239,8 @@ class AssetManager:
         search_text="",
         asset_type="PANEL"
     ):
+
+        self.asset_library.load()
 
         return (
             self.asset_library.search(

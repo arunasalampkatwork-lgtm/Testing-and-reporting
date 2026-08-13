@@ -1,10 +1,14 @@
+from PySide6.QtGui import QAction
+
 from PySide6.QtWidgets import (
     QMainWindow,
-    QStackedWidget
+    QStackedWidget,
+    QToolBar
 )
 
 from app.ui.project_view import ProjectView
 from app.ui.asset_view import AssetView
+from app.ui.asset_browser_view import AssetBrowserView
 
 from app.config.settings import PROJECTS_DIR
 
@@ -58,6 +62,61 @@ class MainWindow(QMainWindow):
         )
 
         # =================================================
+        # GLOBAL ASSET BROWSER
+        # =================================================
+
+        self.asset_browser_view = AssetBrowserView(
+            parent=self
+        )
+
+        self.stack.addWidget(
+            self.asset_browser_view
+        )
+
+        self.asset_browser_view.back_requested.connect(
+            self.show_project_view
+        )
+
+        # =================================================
+        # NAVIGATION TOOLBAR
+        # =================================================
+
+        toolbar = QToolBar(
+            "Navigation",
+            self
+        )
+
+        toolbar.setMovable(False)
+
+        self.addToolBar(toolbar)
+
+        projects_action = QAction(
+            "Projects",
+            self
+        )
+
+        projects_action.triggered.connect(
+            self.show_project_view
+        )
+
+        toolbar.addAction(
+            projects_action
+        )
+
+        assets_action = QAction(
+            "Asset Database",
+            self
+        )
+
+        assets_action.triggered.connect(
+            self.show_asset_browser
+        )
+
+        toolbar.addAction(
+            assets_action
+        )
+
+        # =================================================
         # CURRENT PROJECT VARIABLES
         # =================================================
 
@@ -70,6 +129,27 @@ class MainWindow(QMainWindow):
         self.test_service = None
 
         self.asset_view = None
+
+    # =====================================================
+    # NAVIGATION
+    # =====================================================
+
+    def show_project_view(self):
+
+        self.stack.setCurrentWidget(
+            self.project_view
+        )
+
+    def show_asset_browser(self):
+
+        try:
+            self.asset_browser_view.refresh()
+        except Exception:
+            pass
+
+        self.stack.setCurrentWidget(
+            self.asset_browser_view
+        )
 
     # =====================================================
     # OPEN PROJECT

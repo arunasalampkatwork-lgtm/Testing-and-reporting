@@ -3,6 +3,7 @@ import json
 from uuid import uuid4
 
 from app.models.test_component import TestComponent
+from app.services.asset_library_manager import AssetLibraryManager
 
 
 class ComponentManager:
@@ -19,6 +20,8 @@ class ComponentManager:
         )
 
         self.components = {}
+
+        self.asset_library = AssetLibraryManager()
 
         self.load_components()
 
@@ -161,6 +164,10 @@ class ComponentManager:
         )
 
         self.save_components()
+
+        self._sync_panel_components_to_global(
+            panel_id
+        )
 
     # =========================================================
     # RECONCILE COMPONENT TYPE
@@ -418,6 +425,10 @@ class ComponentManager:
 
         self.save_components()
 
+        self._sync_panel_components_to_global(
+            component.panel_id
+        )
+
     # =========================================================
     # UPDATE PROTECTION FUNCTIONS
     # =========================================================
@@ -443,6 +454,137 @@ class ComponentManager:
         )
 
         self.save_components()
+
+        self._sync_panel_components_to_global(
+            component.panel_id
+        )
+
+    # =========================================================
+    # GLOBAL ASSET SYNCHRONIZATION
+    # =========================================================
+
+    def _get_global_panel_id(self, panel_id):
+
+        assets_file = self.project_folder / "assets.json"
+
+        if not assets_file.exists():
+            return None
+
+        try:
+            with open(
+                assets_file,
+                "r",
+                encoding="utf-8"
+            ) as file:
+                data = json.load(file)
+
+            for item in data:
+                if (
+                    item.get("node_id") == panel_id
+                    and str(
+                        item.get("node_type", "")
+                    ).upper() == "PANEL"
+                ):
+                    return item.get("asset_id")
+
+        except (json.JSONDecodeError, TypeError, OSError):
+            return None
+
+        return None
+
+    def _sync_panel_components_to_global(self, panel_id):
+
+        global_asset_id = self._get_global_panel_id(panel_id)
+
+        if not global_asset_id:
+            return
+
+        asset = self.asset_library.get_asset(
+            global_asset_id
+        )
+
+        if asset is None:
+            return
+
+        metadata = dict(
+            asset.get("metadata") or {}
+        )
+
+        components = []
+
+        for component in self.get_panel_components(panel_id):
+
+            components.append({
+                "component_type": component.component_type,
+                "name": component.name,
+                "manufacturer": getattr(component, "manufacturer", ""),
+                "model": getattr(component, "model", ""),
+                "serial_number": getattr(component, "serial_number", ""),
+                "description": getattr(component, "description", ""),
+                "ct_ratio": getattr(component, "ct_ratio", ""),
+                "ct_class": getattr(component, "ct_class", ""),
+                "burden": getattr(component, "burden", ""),
+                "core": getattr(component, "core", ""),
+                "vt_ratio": getattr(component, "vt_ratio", ""),
+                "firmware": getattr(component, "firmware", ""),
+                "coil_voltage": getattr(component, "coil_voltage", ""),
+                "contact_configuration": getattr(
+                    component,
+                    "contact_configuration",
+                    ""
+                ),
+                "protection_functions": getattr(
+                    component,
+                    "protection_functions",
+                    []
+                )
+            })
+
+        metadata["components"] = components
+
+        try:
+            self.asset_library.update_asset(
+                global_asset_id,
+                {"metadata": metadata}
+            )
+        except ValueError:
+            pass
+
+    def restore_global_panel_components(
+        self,
+        panel_id,
+        global_asset
+    ):
+
+        metadata = global_asset.get("metadata") or {}
+        snapshots = metadata.get("components") or []
+
+        if not snapshots:
+            return
+
+        if self.get_panel_components(panel_id):
+            return
+
+        for snapshot in snapshots:
+
+            component = self.create_component(
+                panel_id=panel_id,
+                component_type=snapshot.get(
+                    "component_type",
+                    ""
+                ),
+                name=snapshot.get(
+                    "name",
+                    ""
+                )
+            )
+
+            self.update_component_configuration(
+                component.component_id,
+                snapshot
+            )
+
+        self._sync_panel_components_to_global(panel_id)
 
     # =========================================================
     # SAVE
