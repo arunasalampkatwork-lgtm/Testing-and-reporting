@@ -170,5 +170,54 @@
         "metadata": {
             "parent_asset_id": "ASSET-9C993CE1E5"
         }
+    },
+    {
+        "asset_id": "ASSET-971EBB5247",
+        "asset_type": "SWITCHBOARD",
+        "asset_tag": "HV-201B",
+        "name": "HV-201B",
+        "description": "",
+        "serial_number": "",
+        "manufacturer": "",
+        "model": "",
+        "metadata": {
+            "parent_asset_id": "ASSET-2233A4A247"
+        }
+    },
+    {
+        "asset_id": "ASSET-48E317D5D3",
+        "asset_type": "PANEL",
+        "asset_tag": "HV-201BP21",
+        "name": "P-21",
+        "description": "",
+        "serial_number": "",
+        "manufacturer": "",
+        "model": "",
+        "metadata": {
+            "parent_asset_id": "ASSET-971EBB5247"
+        },
+        "equipment_name": "201-MG-18A",
+        "equipment_type": "MOTOR",
+        "ct_count": 3,
+        "relay_count": 1,
+        "aux_count": 1
+    },
+    {
+        "asset_id": "ASSET-861AD051C3",
+        "asset_type": "PANEL",
+        "asset_tag": "HV-201BP22",
+        "name": "P-22",
+        "description": "",
+        "serial_number": "",
+        "manufacturer": "",
+        "model": "",
+        "metadata": {
+            "parent_asset_id": "ASSET-971EBB5247"
+        },
+        "equipment_name": "201-MG-17B",
+        "equipment_type": "MOTOR",
+        "ct_count": 3,
+        "relay_count": 1,
+        "aux_count": 1
     }
 ]

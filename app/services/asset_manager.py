@@ -536,6 +536,24 @@ class AssetManager:
             for node in self.nodes.values()
             if getattr(node, "asset_id", None)
         }
+    # -------------------------------------------------
+        # SUBSTATIONS
+        #
+        # They are root-level assets, so they don't have
+        # a parent project node.
+        # -------------------------------------------------
+
+        if asset_type == "SUBSTATION":
+
+            return [
+                asset
+                for asset in assets
+                if asset.get("asset_id") not in linked_ids
+            ]
+
+        # -------------------------------------------------
+        # Other assets require a parent
+        # -------------------------------------------------
 
         if parent_node is None:
             return [
