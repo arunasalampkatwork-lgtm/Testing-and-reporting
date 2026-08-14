@@ -1,0 +1,174 @@
+[
+    {
+        "asset_id": "ASSET-4D1D94DEE4",
+        "asset_type": "PANEL",
+        "asset_tag": "Incomer",
+        "name": "Incomer",
+        "description": "",
+        "serial_number": "",
+        "manufacturer": "",
+        "model": "",
+        "metadata": {
+            "parent_asset_id": "ASSET-EBF6543EB5"
+        }
+    },
+    {
+        "asset_id": "ASSET-315DF0FCDA",
+        "asset_type": "PANEL",
+        "asset_tag": "SS-1 P01",
+        "name": "Panel-01",
+        "description": "",
+        "serial_number": "",
+        "manufacturer": "",
+        "model": "",
+        "metadata": {
+            "parent_asset_id": "ASSET-00CEFCE9DF"
+        }
+    },
+    {
+        "asset_id": "ASSET-691FE0B7FC",
+        "asset_type": "PANEL",
+        "asset_tag": "SS-1 P04",
+        "name": "P04",
+        "description": "",
+        "serial_number": "",
+        "manufacturer": "",
+        "model": "",
+        "metadata": {
+            "parent_asset_id": "ASSET-00CEFCE9DF"
+        }
+    },
+    {
+        "asset_id": "ASSET-2233A4A247",
+        "asset_type": "SUBSTATION",
+        "asset_tag": "SS-1",
+        "name": "SS-1",
+        "description": "",
+        "serial_number": "",
+        "manufacturer": "",
+        "model": "",
+        "metadata": {}
+    },
+    {
+        "asset_id": "ASSET-00CEFCE9DF",
+        "asset_type": "SWITCHBOARD",
+        "asset_tag": "HV-201A",
+        "name": "HV-201A",
+        "description": "",
+        "serial_number": "",
+        "manufacturer": "",
+        "model": "",
+        "metadata": {
+            "parent_asset_id": "ASSET-2233A4A247"
+        }
+    },
+    {
+        "asset_id": "ASSET-CA9DB28D5D",
+        "asset_type": "SUBSTATION",
+        "asset_tag": "SS-2",
+        "name": "SS-2",
+        "description": "",
+        "serial_number": "",
+        "manufacturer": "",
+        "model": "",
+        "metadata": {}
+    },
+    {
+        "asset_id": "ASSET-DE59885799",
+        "asset_type": "SWITCHBOARD",
+        "asset_tag": "HV-203A",
+        "name": "HV-203A",
+        "description": "",
+        "serial_number": "",
+        "manufacturer": "",
+        "model": "",
+        "metadata": {
+            "parent_asset_id": "ASSET-CA9DB28D5D"
+        }
+    },
+    {
+        "asset_id": "ASSET-9EBA75D886",
+        "asset_type": "SUBSTATION",
+        "asset_tag": "EURO-IV",
+        "name": "EURO-IV",
+        "description": "",
+        "serial_number": "",
+        "manufacturer": "",
+        "model": "",
+        "metadata": {}
+    },
+    {
+        "asset_id": "ASSET-7D435F2FE1",
+        "asset_type": "SWITCHBOARD",
+        "asset_tag": "HV-207A",
+        "name": "HV-207A",
+        "description": "",
+        "serial_number": "",
+        "manufacturer": "",
+        "model": "",
+        "metadata": {
+            "parent_asset_id": "ASSET-9EBA75D886"
+        }
+    },
+    {
+        "asset_id": "ASSET-2E827D03A6",
+        "asset_type": "SUBSTATION",
+        "asset_tag": "Coke Yard",
+        "name": "Coke Yard",
+        "description": "",
+        "serial_number": "",
+        "manufacturer": "",
+        "model": "",
+        "metadata": {}
+    },
+    {
+        "asset_id": "ASSET-EBF6543EB5",
+        "asset_type": "SWITCHBOARD",
+        "asset_tag": "HV-Sec-A",
+        "name": "HV-Sec-A",
+        "description": "",
+        "serial_number": "",
+        "manufacturer": "",
+        "model": "",
+        "metadata": {
+            "parent_asset_id": "ASSET-2E827D03A6"
+        }
+    },
+    {
+        "asset_id": "ASSET-DDFC4DAE1A",
+        "asset_type": "SUBSTATION",
+        "asset_tag": "REF-2",
+        "name": "REF-2",
+        "description": "",
+        "serial_number": "",
+        "manufacturer": "",
+        "model": "",
+        "metadata": {}
+    },
+    {
+        "asset_id": "ASSET-9C993CE1E5",
+        "asset_type": "SWITCHBOARD",
+        "asset_tag": "REF-2A",
+        "name": "REF-2A",
+        "description": "",
+        "serial_number": "",
+        "manufacturer": "",
+        "model": "",
+        "metadata": {
+            "parent_asset_id": "ASSET-DDFC4DAE1A"
+        }
+    },
+    {
+        "asset_id": "ASSET-09BA5670B3",
+        "asset_type": "PANEL",
+        "asset_tag": "REF-2-P-01",
+        "name": "P-01",
+        "description": "",
+        "serial_number": "",
+        "manufacturer": "",
+        "model": "",
+        "metadata": {
+            "parent_asset_id": "ASSET-9C993CE1E5"
+        }
+    }
+]

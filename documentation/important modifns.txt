@@ -1,0 +1,5 @@
+list of substations:
+config/settings.py
+
+Protection functions:
+C:\Users\Micro_Soft\Desktop\ProtectionTestingSuite\resources\protection_functions.json
