@@ -17,8 +17,6 @@ from PySide6.QtWidgets import (
     QTableWidgetItem,
     QHeaderView,
 )
-
-
 class CTTestingDialog(QDialog):
 
     """
@@ -394,6 +392,9 @@ class CTTestingDialog(QDialog):
         # =================================================
         # RATIO TEST
         # =================================================
+        # Keep the ratio test in its original position:
+        # CT Identification -> Phase Configuration -> Ratio Test.
+        # Only the table dimensions are enlarged.
 
         self.ratio_group = QGroupBox(
             "CT Ratio Test"
@@ -403,10 +404,48 @@ class CTTestingDialog(QDialog):
             self.ratio_group
         )
 
+        ratio_layout.setContentsMargins(
+            12,
+            16,
+            12,
+            12
+        )
+
+        ratio_layout.setSpacing(
+            10
+        )
+
+        ratio_help = QLabel(
+            "Inject the specified primary current and record the "
+            "corresponding CT secondary current. Measured ratio "
+            "and ratio error are calculated automatically."
+        )
+
+        ratio_help.setWordWrap(
+            True
+        )
+
+        ratio_help.setStyleSheet(
+            """
+            QLabel {
+                font-size: 14px;
+                padding: 4px;
+            }
+            """
+        )
+
+        ratio_layout.addWidget(
+            ratio_help
+        )
+
         self.phase_table = QTableWidget()
 
+        self.phase_table.setObjectName(
+            "CTRatioTable"
+        )
+
         self.phase_table.setColumnCount(
-            5
+            6
         )
 
         self.phase_table.setHorizontalHeaderLabels(
@@ -415,33 +454,135 @@ class CTTestingDialog(QDialog):
                 "Injected Primary (A)",
                 "Recorded Secondary (A)",
                 "Measured Ratio",
-                "Ratio Error (%)"
+                "Ratio Error (%)",
+                "Result",
             ]
         )
 
+        self.phase_table.setSelectionBehavior(
+            QTableWidget.SelectionBehavior.SelectRows
+        )
+
+        self.phase_table.setSelectionMode(
+            QTableWidget.SelectionMode.SingleSelection
+        )
+
         self.phase_table.setEditTriggers(
-            QTableWidget.EditTrigger
-            .DoubleClicked
-            |
-            QTableWidget.EditTrigger
-            .SelectedClicked
-            |
-            QTableWidget.EditTrigger
-            .EditKeyPressed
+            QTableWidget.EditTrigger.NoEditTriggers
         )
 
         self.phase_table.setAlternatingRowColors(
             True
         )
 
-        self.phase_table.horizontalHeader().setSectionResizeMode(
-            QHeaderView.ResizeMode.Stretch
+        self.phase_table.setWordWrap(
+            False
+        )
+
+        self.phase_table.setShowGrid(
+            True
+        )
+
+        self.phase_table.setStyleSheet(
+            """
+            QTableWidget {
+                font-size: 14px;
+                alternate-background-color: #333333;
+                background: #2b2b2b;
+                gridline-color: #555555;
+            }
+
+            QTableWidget::item {
+                padding: 8px;
+            }
+
+            QHeaderView::section {
+                font-weight: bold;
+                padding: 10px;
+            }
+            """
+        )
+
+        # -------------------------------------------------
+        # TABLE HEADER
+        # -------------------------------------------------
+
+        table_header = (
+            self.phase_table.horizontalHeader()
+        )
+
+        table_header.setMinimumHeight(
+            52
+        )
+
+        table_header.setDefaultAlignment(
+            Qt.AlignmentFlag.AlignCenter
+        )
+
+        table_header.setStretchLastSection(
+            False
+        )
+
+        table_header.setSectionResizeMode(
+            0,
+            QHeaderView.ResizeMode.Fixed
+        )
+
+        self.phase_table.setColumnWidth(
+            0,
+            90
+        )
+
+        for column in (1, 2, 3, 4):
+            table_header.setSectionResizeMode(
+                column,
+                QHeaderView.ResizeMode.Stretch
+            )
+
+        table_header.setSectionResizeMode(
+            5,
+            QHeaderView.ResizeMode.Fixed
+        )
+
+        self.phase_table.setColumnWidth(
+            5,
+            110
+        )
+
+        # -------------------------------------------------
+        # ROW HEIGHT
+        # -------------------------------------------------
+
+        self.phase_table.verticalHeader().setDefaultSectionSize(
+            62
+        )
+
+        self.phase_table.verticalHeader().setMinimumSectionSize(
+            56
+        )
+
+        self.phase_table.verticalHeader().setVisible(
+            False
+        )
+
+        # -------------------------------------------------
+        # BIGGER TABLE, SAME POSITION
+        # -------------------------------------------------
+
+        self.phase_table.setMinimumHeight(
+            150
+        )
+
+        self.phase_table.setMaximumHeight(
+            380
         )
 
         ratio_layout.addWidget(
             self.phase_table
         )
 
+        # Ratio group remains in the same place in the
+        # scrolling content, immediately after phase configuration.
         container_layout.addWidget(
             self.ratio_group
         )
@@ -1170,19 +1311,47 @@ class CTTestingDialog(QDialog):
             )
 
             primary = QLineEdit()
+            primary.setMinimumHeight(48)
+            primary.setAlignment(
+                Qt.AlignmentFlag.AlignCenter
+            )
 
             secondary = QLineEdit()
+            secondary.setMinimumHeight(48)
+            secondary.setAlignment(
+                Qt.AlignmentFlag.AlignCenter
+            )
 
             ratio = QLineEdit()
+            ratio.setMinimumHeight(48)
+            ratio.setAlignment(
+                Qt.AlignmentFlag.AlignCenter
+            )
 
             ratio.setReadOnly(
                 True
             )
 
             error = QLineEdit()
+            error.setMinimumHeight(48)
 
             error.setReadOnly(
                 True
+            )
+
+            error.setAlignment(
+                Qt.AlignmentFlag.AlignCenter
+            )
+
+            result = QLineEdit()
+            result.setMinimumHeight(48)
+
+            result.setReadOnly(
+                True
+            )
+
+            result.setAlignment(
+                Qt.AlignmentFlag.AlignCenter
             )
 
             self.phase_table.setCellWidget(
@@ -1209,6 +1378,12 @@ class CTTestingDialog(QDialog):
                 error
             )
 
+            self.phase_table.setCellWidget(
+                row,
+                5,
+                result
+            )
+
             self.phase_rows[
                 phase
             ] = {
@@ -1224,6 +1399,9 @@ class CTTestingDialog(QDialog):
 
                 "error":
                     error,
+
+                "result":
+                    result,
             }
 
             primary.textChanged.connect(
@@ -1280,6 +1458,10 @@ class CTTestingDialog(QDialog):
                 "error"
             ].clear()
 
+            row[
+                "result"
+            ].clear()
+
             self.update_overall_result()
 
             return
@@ -1312,6 +1494,10 @@ class CTTestingDialog(QDialog):
                 "error"
             ].clear()
 
+            row[
+                "result"
+            ].clear()
+
             self.update_overall_result()
 
             return
@@ -1335,6 +1521,21 @@ class CTTestingDialog(QDialog):
             "error"
         ].setText(
             f"{error:.2f}"
+        )
+
+        tolerance = self._get_float(
+            self.fields[
+                "tolerance_percent"
+            ].text()
+        )
+
+        if tolerance is None:
+            tolerance = 5.0
+
+        row["result"].setText(
+            "PASS"
+            if abs(error) <= tolerance
+            else "FAIL"
         )
 
         self.update_overall_result()
