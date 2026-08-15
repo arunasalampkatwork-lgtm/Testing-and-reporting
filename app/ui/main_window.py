@@ -1,14 +1,15 @@
-from PySide6.QtGui import QAction
 
 from PySide6.QtWidgets import (
     QMainWindow,
     QStackedWidget,
-    QToolBar
+    QToolBar,
 )
+from PySide6.QtGui import QAction
 
+from app.ui.asset_browser_view import AssetBrowserView
 from app.ui.project_view import ProjectView
 from app.ui.asset_view import AssetView
-from app.ui.asset_browser_view import AssetBrowserView
+from app.ui.report_generator_dialog import ReportGeneratorDialog
 
 from app.config.settings import PROJECTS_DIR
 
@@ -23,6 +24,10 @@ class MainWindow(QMainWindow):
     def __init__(self):
 
         super().__init__()
+
+        # =================================================
+        # WINDOW
+        # =================================================
 
         self.setWindowTitle(
             "Protection Testing Suite"
@@ -57,12 +62,8 @@ class MainWindow(QMainWindow):
             self.open_project
         )
 
-        self.stack.setCurrentWidget(
-            self.project_view
-        )
-
         # =================================================
-        # GLOBAL ASSET BROWSER
+        # ASSET BROWSER
         # =================================================
 
         self.asset_browser_view = AssetBrowserView(
@@ -73,65 +74,98 @@ class MainWindow(QMainWindow):
             self.asset_browser_view
         )
 
-        self.asset_browser_view.back_requested.connect(
-            self.show_project_view
-        )
+        # =================================================
+        # CURRENT PROJECT VARIABLES
+        # =================================================
+
+        self.current_project = None
+        self.current_project_folder = None
+        self.database = None
+        self.test_service = None
+        self.asset_view = None
 
         # =================================================
-        # NAVIGATION TOOLBAR
+        # TOOLBAR
         # =================================================
+
+        self.build_toolbar()
+
+        self.stack.setCurrentWidget(
+            self.project_view
+        )
+
+    # =====================================================
+    # TOOLBAR
+    # =====================================================
+
+    def build_toolbar(self):
 
         toolbar = QToolBar(
             "Navigation",
             self
         )
 
-        toolbar.setMovable(False)
+        toolbar.setMovable(
+            False
+        )
 
-        self.addToolBar(toolbar)
+        self.addToolBar(
+            toolbar
+        )
 
-        projects_action = QAction(
+        # -------------------------------------------------
+        # PROJECTS
+        # -------------------------------------------------
+
+        project_action = QAction(
             "Projects",
             self
         )
 
-        projects_action.triggered.connect(
+        project_action.triggered.connect(
             self.show_project_view
         )
 
         toolbar.addAction(
-            projects_action
+            project_action
         )
 
-        assets_action = QAction(
+        # -------------------------------------------------
+        # ASSET DATABASE
+        # -------------------------------------------------
+
+        asset_browser_action = QAction(
             "Asset Database",
             self
         )
 
-        assets_action.triggered.connect(
+        asset_browser_action.triggered.connect(
             self.show_asset_browser
         )
 
         toolbar.addAction(
-            assets_action
+            asset_browser_action
         )
 
-        # =================================================
-        # CURRENT PROJECT VARIABLES
-        # =================================================
+        # -------------------------------------------------
+        # REPORTS
+        # -------------------------------------------------
 
-        self.current_project = None
+        report_action = QAction(
+            "Reports",
+            self
+        )
 
-        self.current_project_folder = None
+        report_action.triggered.connect(
+            self.open_report_generator
+        )
 
-        self.database = None
-
-        self.test_service = None
-
-        self.asset_view = None
+        toolbar.addAction(
+            report_action
+        )
 
     # =====================================================
-    # NAVIGATION
+    # SHOW PROJECT VIEW
     # =====================================================
 
     def show_project_view(self):
@@ -140,10 +174,21 @@ class MainWindow(QMainWindow):
             self.project_view
         )
 
+    # =====================================================
+    # SHOW ASSET BROWSER
+    # =====================================================
+
     def show_asset_browser(self):
 
         try:
-            self.asset_browser_view.refresh()
+
+            if hasattr(
+                self.asset_browser_view,
+                "refresh"
+            ):
+
+                self.asset_browser_view.refresh()
+
         except Exception:
             pass
 
@@ -152,15 +197,31 @@ class MainWindow(QMainWindow):
         )
 
     # =====================================================
+    # REPORT GENERATOR
+    # =====================================================
+
+    def open_report_generator(self):
+
+        dialog = ReportGeneratorDialog(
+            parent=self
+        )
+
+        dialog.exec()
+
+    # =====================================================
     # OPEN PROJECT
     # =====================================================
 
-    def open_project(self, project):
+    def open_project(
+        self,
+        project
+    ):
 
         self.current_project = project
 
         project_folder = (
-            PROJECTS_DIR /
+            PROJECTS_DIR
+            /
             project.title
         )
 
@@ -168,12 +229,18 @@ class MainWindow(QMainWindow):
             project_folder
         )
 
+        project_folder.mkdir(
+            parents=True,
+            exist_ok=True
+        )
+
         # =================================================
         # DATABASE
         # =================================================
 
         database_path = (
-            project_folder /
+            project_folder
+            /
             "testing.db"
         )
 
@@ -190,13 +257,41 @@ class MainWindow(QMainWindow):
         )
 
         # =================================================
-        # ASSET VIEW
+        # REMOVE OLD ASSET VIEW
+        # =================================================
+
+        if self.asset_view is not None:
+
+            try:
+
+                old_index = (
+                    self.stack.indexOf(
+                        self.asset_view
+                    )
+                )
+
+                if old_index >= 0:
+
+                    self.stack.removeWidget(
+                        self.asset_view
+                    )
+
+                self.asset_view.deleteLater()
+
+            except RuntimeError:
+                pass
+
+            self.asset_view = None
+
+        # =================================================
+        # CREATE ASSET VIEW
         # =================================================
 
         self.asset_view = AssetView(
             project_folder,
             project,
-            self.test_service
+            self.test_service,
+            parent=self
         )
 
         self.stack.addWidget(
@@ -206,3 +301,82 @@ class MainWindow(QMainWindow):
         self.stack.setCurrentWidget(
             self.asset_view
         )
+
+        # =================================================
+        # REFRESH GLOBAL ASSET BROWSER
+        # =================================================
+
+        try:
+
+            if hasattr(
+                self.asset_browser_view,
+                "refresh"
+            ):
+
+                self.asset_browser_view.refresh()
+
+        except Exception:
+            pass
+
+    # =====================================================
+    # CLOSE CURRENT PROJECT
+    # =====================================================
+
+    def close_current_project(self):
+
+        self.current_project = None
+        self.current_project_folder = None
+        self.database = None
+        self.test_service = None
+
+        if self.asset_view is not None:
+
+            try:
+
+                index = (
+                    self.stack.indexOf(
+                        self.asset_view
+                    )
+                )
+
+                if index >= 0:
+
+                    self.stack.removeWidget(
+                        self.asset_view
+                    )
+
+                self.asset_view.deleteLater()
+
+            except RuntimeError:
+                pass
+
+            self.asset_view = None
+
+        self.stack.setCurrentWidget(
+            self.project_view
+        )
+
+    # =====================================================
+    # CLOSE EVENT
+    # =====================================================
+
+    def closeEvent(
+        self,
+        event
+    ):
+
+        if self.asset_view is not None:
+
+            try:
+
+                if hasattr(
+                    self.asset_view,
+                    "close_testing_dialog"
+                ):
+
+                    self.asset_view.close_testing_dialog()
+
+            except Exception:
+                pass
+
+        event.accept()
