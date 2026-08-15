@@ -63,15 +63,15 @@ class PanelAssetDialog(QDialog):
             self.name_edit,
         )
 
-        self.asset_tag_edit = QLineEdit()
-        self.asset_tag_edit.setPlaceholderText(
-            "Example: 101-P-001A"
-        )
+        # self.asset_tag_edit = QLineEdit()
+        # self.asset_tag_edit.setPlaceholderText(
+        #     "Example: 101-P-001A"
+        # )
 
-        form.addRow(
-            "Asset Tag:",
-            self.asset_tag_edit,
-        )
+        # form.addRow(
+        #     "Asset Tag:",
+        #     self.asset_tag_edit,
+        # )
 
         layout.addLayout(form)
 
@@ -88,16 +88,13 @@ class PanelAssetDialog(QDialog):
         self.name_edit.setFocus()
 
     def get_values(self):
+        return self.name_edit.text().strip()
 
-        return (
-            self.name_edit.text().strip(),
-            self.asset_tag_edit.text().strip(),
-        )
 
     def accept(self):
 
         name = self.name_edit.text().strip()
-        asset_tag = self.asset_tag_edit.text().strip()
+        #asset_tag = self.asset_tag_edit.text().strip()
 
         if not name:
 
@@ -110,16 +107,16 @@ class PanelAssetDialog(QDialog):
             self.name_edit.setFocus()
             return
 
-        if not asset_tag:
+        # if not asset_tag:
 
-            QMessageBox.warning(
-                self,
-                "Missing Asset Tag",
-                "Please enter the panel asset tag.",
-            )
+        #     QMessageBox.warning(
+        #         self,
+        #         "Missing Asset Tag",
+        #         "Please enter the panel asset tag.",
+        #     )
 
-            self.asset_tag_edit.setFocus()
-            return
+        #     self.asset_tag_edit.setFocus()
+        #    return
 
         super().accept()
 
@@ -1027,9 +1024,9 @@ class AssetView(QWidget):
 
                 return
 
-            name, asset_tag = dialog.get_values()
+            name = dialog.get_values()
 
-            if not name or not asset_tag:
+            if not name:
                 return
 
             try:
@@ -1038,7 +1035,7 @@ class AssetView(QWidget):
                     name=name,
                     node_type="PANEL",
                     parent_id=parent.node_id,
-                    asset_tag=asset_tag,
+                    # asset_tag=asset_tag,
                 )
 
             except ValueError as error:

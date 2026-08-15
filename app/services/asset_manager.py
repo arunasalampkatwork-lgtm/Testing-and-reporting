@@ -133,11 +133,6 @@ class AssetManager:
             "PANEL",
         ):
 
-            if node_type == "PANEL" and not asset_tag:
-
-                raise ValueError(
-                    "Asset tag is required for a panel."
-                )
 
             global_tag = (
                 asset_tag
