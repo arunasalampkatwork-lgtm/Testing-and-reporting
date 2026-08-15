@@ -44,6 +44,7 @@ from app.services.panel_report_service import (
 )
 
 
+
 class PanelAssetDialog(QDialog):
 
     def __init__(
@@ -51,85 +52,93 @@ class PanelAssetDialog(QDialog):
         parent=None,
     ):
 
-        super().__init__(parent)
+        super().__init__(
+            parent
+        )
 
         self.setWindowTitle(
             "Add Panel"
         )
 
-        self.setModal(True)
+        self.setModal(
+            True
+        )
 
-        layout = QVBoxLayout(self)
+        self.resize(
+            450,
+            140
+        )
+
+        layout = QVBoxLayout(
+            self
+        )
 
         form = QFormLayout()
 
         self.name_edit = QLineEdit()
+
         self.name_edit.setPlaceholderText(
-            "Example: Panel-1"
+            "Example: P-03"
         )
 
         form.addRow(
             "Panel Name:",
-            self.name_edit,
+            self.name_edit
         )
 
-        # self.asset_tag_edit = QLineEdit()
-        # self.asset_tag_edit.setPlaceholderText(
-        #     "Example: 101-P-001A"
-        # )
-
-        # form.addRow(
-        #     "Asset Tag:",
-        #     self.asset_tag_edit,
-        # )
-
-        layout.addLayout(form)
+        layout.addLayout(
+            form
+        )
 
         buttons = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Ok
-            | QDialogButtonBox.StandardButton.Cancel
+            |
+            QDialogButtonBox.StandardButton.Cancel
         )
 
-        buttons.accepted.connect(self.accept)
-        buttons.rejected.connect(self.reject)
+        buttons.accepted.connect(
+            self.accept
+        )
 
-        layout.addWidget(buttons)
+        buttons.rejected.connect(
+            self.reject
+        )
+
+        layout.addWidget(
+            buttons
+        )
 
         self.name_edit.setFocus()
 
     def get_values(self):
-        return self.name_edit.text().strip()
 
+        return (
+            self.name_edit
+            .text()
+            .strip()
+        )
 
     def accept(self):
 
-        name = self.name_edit.text().strip()
-        #asset_tag = self.asset_tag_edit.text().strip()
+        name = (
+            self.name_edit
+            .text()
+            .strip()
+        )
 
         if not name:
 
             QMessageBox.warning(
                 self,
                 "Missing Panel Name",
-                "Please enter a panel name.",
+                "Please enter a panel name."
             )
 
             self.name_edit.setFocus()
+
             return
 
-        # if not asset_tag:
-
-        #     QMessageBox.warning(
-        #         self,
-        #         "Missing Asset Tag",
-        #         "Please enter the panel asset tag.",
-        #     )
-
-        #     self.asset_tag_edit.setFocus()
-        #    return
-
         super().accept()
-
 
 class AssetView(QWidget):
 
@@ -744,28 +753,146 @@ class AssetView(QWidget):
         # =================================================
 
         self._update_button_states()
+        self._tree_initialized = False
         self.refresh_tree()
 
     # =================================================
     # TREE
     # =================================================
 
+
     def refresh_tree(self):
 
-        self.tree.clear()
-        self.component_list.clear()
+        expanded_node_ids = set()
 
-        roots = self.asset_manager.get_children(None)
+        def collect_expanded(item):
 
-        for node in roots:
+            node_id = item.data(
+                0,
+                Qt.ItemDataRole.UserRole
+            )
 
-            item = self._create_tree_item(node)
+            if node_id and item.isExpanded():
+                expanded_node_ids.add(node_id)
 
-            self.tree.addTopLevelItem(item)
+            for index in range(item.childCount()):
 
-        self.tree.expandAll()
+                collect_expanded(
+                    item.child(index)
+                )
+
+        for index in range(
+            self.tree.topLevelItemCount()
+        ):
+
+            collect_expanded(
+                self.tree.topLevelItem(index)
+            )
+
+        # =================================================
+        # REMEMBER CURRENT SELECTION
+        # =================================================
+
+        selected_node_id = None
+
+        current_item = self.tree.currentItem()
+
+        if current_item is not None:
+
+            selected_node_id = current_item.data(
+                0,
+                Qt.ItemDataRole.UserRole
+            )
+
+        # =================================================
+        # REBUILD TREE
+        # =================================================
+
+        self.tree.blockSignals(True)
+
+        try:
+
+            self.tree.clear()
+
+            self.component_list.clear()
+
+            roots = self.asset_manager.get_children(None)
+
+            for node in roots:
+
+                item = self._create_tree_item(
+                    node
+                )
+
+                self.tree.addTopLevelItem(
+                    item
+                )
+
+            # =================================================
+            # INITIAL LOAD
+            #
+            # First load is collapsed.
+            # Later refreshes preserve the user's state.
+            # =================================================
+
+            if not self._tree_initialized:
+
+                self.tree.collapseAll()
+
+            else:
+
+                def restore_expansion(item):
+
+                    node_id = item.data(
+                        0,
+                        Qt.ItemDataRole.UserRole
+                    )
+
+                    if node_id in expanded_node_ids:
+
+                        item.setExpanded(
+                            True
+                        )
+
+                    for index in range(
+                        item.childCount()
+                    ):
+
+                        restore_expansion(
+                            item.child(index)
+                        )
+
+                for index in range(
+                    self.tree.topLevelItemCount()
+                ):
+
+                    restore_expansion(
+                        self.tree.topLevelItem(index)
+                    )
+
+        finally:
+
+            self.tree.blockSignals(False)
+
+        # =================================================
+        # RESTORE SELECTION
+        # =================================================
+
+        if selected_node_id:
+
+            self.select_tree_node(
+                selected_node_id
+            )
+
+        # =================================================
+        # UPDATE STATE
+        # =================================================
+
+        self._tree_initialized = True
 
         self._update_button_states()
+
+        self.display_selected_components()
     # =================================================
     # SELECT TREE NODE
     # =================================================
@@ -1477,6 +1604,7 @@ class AssetView(QWidget):
     # CREATE PANEL
     # =================================================
 
+
     def create_panel(self):
 
         if self._creating_panel:
@@ -1493,7 +1621,7 @@ class AssetView(QWidget):
                 QMessageBox.warning(
                     self,
                     "Invalid Selection",
-                    "Please select a switchboard first.",
+                    "Please select a switchboard first."
                 )
 
                 return
@@ -1509,10 +1637,12 @@ class AssetView(QWidget):
                 QMessageBox.warning(
                     self,
                     "Invalid Selection",
-                    "A panel must belong to a switchboard.",
+                    "A panel must belong to a switchboard."
                 )
 
                 return
+
+            parent_id = parent.node_id
 
             dialog = PanelAssetDialog(
                 parent=self
@@ -1530,13 +1660,98 @@ class AssetView(QWidget):
             if not name:
                 return
 
+            # =================================================
+            # AUTO-GENERATE PHYSICAL ASSET TAG
+            #
+            # Hierarchy:
+            #     REF-III SS-2
+            #         HV-203A
+            #
+            # Panel:
+            #     P-03
+            #
+            # Result:
+            #     REF-III-SS-2-HV-203A-P-03
+            # =================================================
+
+            hierarchy_names = []
+
+            current = parent
+
+            while current is not None:
+
+                current_name = str(
+                    getattr(
+                        current,
+                        "name",
+                        ""
+                    )
+                ).strip()
+
+                if current_name:
+
+                    hierarchy_names.append(
+                        current_name
+                    )
+
+                current_parent_id = getattr(
+                    current,
+                    "parent_id",
+                    None
+                )
+
+                if current_parent_id is None:
+                    break
+
+                current = (
+                    self.asset_manager.get_node(
+                        current_parent_id
+                    )
+                )
+
+            hierarchy_names.reverse()
+
+            tag_parts = []
+
+            for value in hierarchy_names:
+
+                cleaned = (
+                    str(value)
+                    .strip()
+                    .replace(" ", "-")
+                )
+
+                if cleaned:
+                    tag_parts.append(cleaned)
+
+            panel_tag_name = (
+                str(name)
+                .strip()
+                .replace(" ", "-")
+            )
+
+            if panel_tag_name:
+                tag_parts.append(
+                    panel_tag_name
+                )
+
+            asset_tag = "-".join(
+                tag_parts
+            )
+
+            # =================================================
+            # CREATE
+            # =================================================
+
             try:
 
-                self.asset_manager.create_node(
-                    name=name,
-                    node_type="PANEL",
-                    parent_id=parent.node_id,
-                    # asset_tag=asset_tag,
+                new_panel = (
+                    self.asset_manager.create_node(
+                        name=name,
+                        node_type="PANEL",
+                        parent_id=parent_id,
+                        asset_tag=asset_tag
+                    )
                 )
 
             except ValueError as error:
@@ -1544,17 +1759,30 @@ class AssetView(QWidget):
                 QMessageBox.warning(
                     self,
                     "Cannot Create Panel",
-                    str(error),
+                    str(error)
                 )
 
                 return
 
+            # =================================================
+            # REFRESH WHILE PRESERVING TREE STATE
+            # =================================================
+
             self.refresh_tree()
+
+            if new_panel is not None:
+
+                self.select_tree_node(
+                    new_panel.node_id
+                )
+
+                self.display_selected_components()
+
+            self._update_button_states()
 
         finally:
 
             self._creating_panel = False
-
     # =================================================
     # AVAILABLE PANELS
     # =================================================

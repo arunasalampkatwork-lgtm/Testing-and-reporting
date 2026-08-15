@@ -84,7 +84,7 @@
     },
     {
         "node_id": "AST-B8AD5FF3",
-        "name": "SS-2",
+        "name": "REF-III SS-2",
         "node_type": "SUBSTATION",
         "parent_id": null
     },
@@ -105,6 +105,96 @@
         "relay_count": 1,
         "aux_count": 2,
         "asset_id": "ASSET-80E4E1A7EA",
+        "linked_asset_id": null
+    },
+    {
+        "node_id": "AST-84823118",
+        "name": "P-02",
+        "node_type": "PANEL",
+        "parent_id": "AST-42B83DCE",
+        "equipment_name": "",
+        "equipment_type": "",
+        "ct_count": 0,
+        "relay_count": 0,
+        "aux_count": 0,
+        "asset_id": "ASSET-495DC3B451",
+        "linked_asset_id": null
+    },
+    {
+        "node_id": "AST-B7F9DEA0",
+        "name": "P-04",
+        "node_type": "PANEL",
+        "parent_id": "AST-42B83DCE",
+        "equipment_name": "",
+        "equipment_type": "",
+        "ct_count": 0,
+        "relay_count": 0,
+        "aux_count": 0,
+        "asset_id": "ASSET-0D8C9696F4",
+        "linked_asset_id": null
+    },
+    {
+        "node_id": "AST-07A135F8",
+        "name": "REF-3 EURO-IV",
+        "node_type": "SUBSTATION",
+        "parent_id": null
+    },
+    {
+        "node_id": "AST-A823540B",
+        "name": "HV-207A",
+        "node_type": "SWITCHBOARD",
+        "parent_id": "AST-07A135F8"
+    },
+    {
+        "node_id": "AST-68E7D63F",
+        "name": "P-03",
+        "node_type": "PANEL",
+        "parent_id": "AST-42B83DCE",
+        "equipment_name": "",
+        "equipment_type": "",
+        "ct_count": 0,
+        "relay_count": 0,
+        "aux_count": 0,
+        "asset_id": "ASSET-3FA86F5D47",
+        "linked_asset_id": null
+    },
+    {
+        "node_id": "AST-906705DF",
+        "name": "P-04",
+        "node_type": "PANEL",
+        "parent_id": "AST-663B8E1F",
+        "equipment_name": "",
+        "equipment_type": "",
+        "ct_count": 0,
+        "relay_count": 0,
+        "aux_count": 0,
+        "asset_id": "ASSET-A2B3DD2E77",
+        "linked_asset_id": null
+    },
+    {
+        "node_id": "AST-ECC61B2B",
+        "name": "P-05",
+        "node_type": "PANEL",
+        "parent_id": "AST-663B8E1F",
+        "equipment_name": "",
+        "equipment_type": "",
+        "ct_count": 0,
+        "relay_count": 0,
+        "aux_count": 0,
+        "asset_id": "ASSET-331928B0B2",
+        "linked_asset_id": null
+    },
+    {
+        "node_id": "AST-A5E5A029",
+        "name": "P-05",
+        "node_type": "PANEL",
+        "parent_id": "AST-42B83DCE",
+        "equipment_name": "",
+        "equipment_type": "",
+        "ct_count": 0,
+        "relay_count": 0,
+        "aux_count": 0,
+        "asset_id": "ASSET-05AEDA2D26",
         "linked_asset_id": null
     }
 ]

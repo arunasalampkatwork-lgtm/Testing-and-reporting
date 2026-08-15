@@ -468,7 +468,7 @@
         "asset_id": "ASSET-7C17AC0948",
         "asset_type": "SUBSTATION",
         "asset_tag": "SS-2",
-        "name": "SS-2",
+        "name": "REF-III SS-2",
         "description": "",
         "serial_number": "",
         "manufacturer": "",
@@ -485,7 +485,7 @@
         "manufacturer": "",
         "model": "",
         "metadata": {
-            "parent_asset_id": "ASSET-7C17AC0948"
+            "parent_asset_id": "ASSET-36197DAD60"
         }
     },
     {
@@ -626,5 +626,118 @@
         "ct_count": 3,
         "relay_count": 1,
         "aux_count": 2
+    },
+    {
+        "asset_id": "ASSET-36197DAD60",
+        "asset_type": "SUBSTATION",
+        "asset_tag": "REF-III SS-2",
+        "name": "REF-III SS-2",
+        "description": "",
+        "serial_number": "",
+        "manufacturer": "",
+        "model": "",
+        "metadata": {}
+    },
+    {
+        "asset_id": "ASSET-495DC3B451",
+        "asset_type": "PANEL",
+        "asset_tag": "P-02",
+        "name": "P-02",
+        "description": "",
+        "serial_number": "",
+        "manufacturer": "",
+        "model": "",
+        "metadata": {
+            "parent_asset_id": "ASSET-4D27D5265F"
+        }
+    },
+    {
+        "asset_id": "ASSET-0D8C9696F4",
+        "asset_type": "PANEL",
+        "asset_tag": "P-04",
+        "name": "P-04",
+        "description": "",
+        "serial_number": "",
+        "manufacturer": "",
+        "model": "",
+        "metadata": {
+            "parent_asset_id": "ASSET-4D27D5265F"
+        }
+    },
+    {
+        "asset_id": "ASSET-834AC63C1C",
+        "asset_type": "SUBSTATION",
+        "asset_tag": "REF-3 EURO-IV",
+        "name": "REF-3 EURO-IV",
+        "description": "",
+        "serial_number": "",
+        "manufacturer": "",
+        "model": "",
+        "metadata": {}
+    },
+    {
+        "asset_id": "ASSET-3E31AC5684",
+        "asset_type": "SWITCHBOARD",
+        "asset_tag": "HV-207A",
+        "name": "HV-207A",
+        "description": "",
+        "serial_number": "",
+        "manufacturer": "",
+        "model": "",
+        "metadata": {
+            "parent_asset_id": "ASSET-834AC63C1C"
+        }
+    },
+    {
+        "asset_id": "ASSET-3FA86F5D47",
+        "asset_type": "PANEL",
+        "asset_tag": "REF-III-SS-2-HV-203A-PANEL",
+        "name": "P-03",
+        "description": "",
+        "serial_number": "",
+        "manufacturer": "",
+        "model": "",
+        "metadata": {
+            "parent_asset_id": "ASSET-4D27D5265F"
+        }
+    },
+    {
+        "asset_id": "ASSET-A2B3DD2E77",
+        "asset_type": "PANEL",
+        "asset_tag": "REF-3-SS-1-HV-201A-P-04",
+        "name": "P-04",
+        "description": "",
+        "serial_number": "",
+        "manufacturer": "",
+        "model": "",
+        "metadata": {
+            "parent_asset_id": "ASSET-7073BC369A"
+        }
+    },
+    {
+        "asset_id": "ASSET-331928B0B2",
+        "asset_type": "PANEL",
+        "asset_tag": "REF-3-SS-1-HV-201A-P-05",
+        "name": "P-05",
+        "description": "",
+        "serial_number": "",
+        "manufacturer": "",
+        "model": "",
+        "metadata": {
+            "parent_asset_id": "ASSET-7073BC369A"
+        }
+    },
+    {
+        "asset_id": "ASSET-05AEDA2D26",
+        "asset_type": "PANEL",
+        "asset_tag": "REF-III-SS-2-HV-203A-P-05",
+        "name": "P-05",
+        "description": "",
+        "serial_number": "",
+        "manufacturer": "",
+        "model": "",
+        "metadata": {
+            "parent_asset_id": "ASSET-4D27D5265F"
+        }
     }
 ]
