@@ -32,6 +32,7 @@ from app.ui.aux_relay_testing_dialog import AuxRelayTestingDialog
 
 from app.ui.test_history_view import TestHistoryView
 from app.ui.asset_link_dialog import AssetLinkDialog
+from app.ui.asset_edit_dialog import AssetEditDialog
 
 
 class PanelAssetDialog(QDialog):
@@ -199,7 +200,7 @@ class AssetView(QWidget):
         # =================================================
 
         self.configure_component = QPushButton(
-            "Configure Component"
+            "Edit Component"
         )
 
         layout.addWidget(self.configure_component)
@@ -209,7 +210,7 @@ class AssetView(QWidget):
         # =================================================
 
         self.configure_protection = QPushButton(
-            "Configure Protection Functions"
+            "Edit Protection Functions"
         )
 
         layout.addWidget(self.configure_protection)
@@ -245,7 +246,7 @@ class AssetView(QWidget):
         )
 
         self.configure_panel = QPushButton(
-            "Configure Panel"
+            "Edit Panel Configuration"
         )
 
         self.open_testing = QPushButton(
@@ -255,20 +256,53 @@ class AssetView(QWidget):
         self.test_history_button = QPushButton(
             "Test History"
         )
+        self.edit_asset_button = QPushButton(
+            "Edit Asset"
+        )
 
         # Backward-compatible alias for code that may
         # still refer to self.test_history.
         self.test_history = self.test_history_button
 
-        buttons.addWidget(self.add_substation)
-        buttons.addWidget(self.link_substation)
-        buttons.addWidget(self.add_switchboard)
-        buttons.addWidget(self.link_switchboard)
-        buttons.addWidget(self.add_panel)
-        buttons.addWidget(self.link_panel)
-        buttons.addWidget(self.configure_panel)
-        buttons.addWidget(self.open_testing)
-        buttons.addWidget(self.test_history_button)
+        buttons.addWidget(
+            self.add_substation
+        )
+
+        buttons.addWidget(
+            self.link_substation
+        )
+
+        buttons.addWidget(
+            self.add_switchboard
+        )
+
+        buttons.addWidget(
+            self.link_switchboard
+        )
+
+        buttons.addWidget(
+            self.add_panel
+        )
+
+        buttons.addWidget(
+            self.link_panel
+        )
+
+        buttons.addWidget(
+            self.edit_asset_button
+        )
+
+        buttons.addWidget(
+            self.configure_panel
+        )
+
+        buttons.addWidget(
+            self.open_testing
+        )
+
+        buttons.addWidget(
+            self.test_history_button
+        )
 
         layout.addLayout(buttons)
 
@@ -327,6 +361,9 @@ class AssetView(QWidget):
         self.test_history_button.clicked.connect(
             self.open_test_history
         )
+        self.edit_asset_button.clicked.connect(
+            self.edit_selected_asset
+        )
 
         # =================================================
         # INITIAL STATE
@@ -355,6 +392,82 @@ class AssetView(QWidget):
         self.tree.expandAll()
 
         self._update_button_states()
+    # =================================================
+    # SELECT TREE NODE
+    # =================================================
+
+    def select_tree_node(
+        self,
+        node_id,
+    ):
+
+        def find_item(
+            parent_item,
+        ):
+
+            for index in range(
+                parent_item.childCount()
+            ):
+
+                child = (
+                    parent_item.child(index)
+                )
+
+                child_id = child.data(
+                    0,
+                    Qt.ItemDataRole.UserRole,
+                )
+
+                if child_id == node_id:
+
+                    return child
+
+                result = find_item(
+                    child
+                )
+
+                if result is not None:
+
+                    return result
+
+            return None
+
+        for index in range(
+            self.tree.topLevelItemCount()
+        ):
+
+            item = (
+                self.tree.topLevelItem(
+                    index
+                )
+            )
+
+            item_id = item.data(
+                0,
+                Qt.ItemDataRole.UserRole,
+            )
+
+            if item_id == node_id:
+
+                self.tree.setCurrentItem(
+                    item
+                )
+
+                return True
+
+            result = find_item(
+                item
+            )
+
+            if result is not None:
+
+                self.tree.setCurrentItem(
+                    result
+                )
+
+                return True
+
+        return False
 
     def _create_tree_item(
         self,
@@ -622,6 +735,17 @@ class AssetView(QWidget):
 
         self.test_history_button.setEnabled(
             panel_selected
+        )
+        physical_asset_selected = (
+            node_type in (
+                "SUBSTATION",
+                "SWITCHBOARD",
+                "PANEL",
+            )
+        )
+
+        self.edit_asset_button.setEnabled(
+            physical_asset_selected
         )
 
     # Compatibility name used by older versions.
@@ -1842,3 +1966,143 @@ class AssetView(QWidget):
     def refresh_component_view(self):
 
         self.display_selected_components()
+
+    # =================================================
+    # EDIT PHYSICAL ASSET
+    # =================================================
+
+    def edit_selected_asset(self):
+
+        node = self.get_selected_node()
+
+        if node is None:
+
+            QMessageBox.warning(
+                self,
+                "No Asset Selected",
+                "Please select a substation, "
+                "switchboard or panel first.",
+            )
+
+            return
+
+        node_type = str(
+            getattr(
+                node,
+                "node_type",
+                "",
+            )
+        ).upper()
+
+        if node_type not in (
+            "SUBSTATION",
+            "SWITCHBOARD",
+            "PANEL",
+        ):
+
+            QMessageBox.warning(
+                self,
+                "Invalid Selection",
+                "This asset cannot be edited here.",
+            )
+
+            return
+
+        # =================================================
+        # LOAD GLOBAL ASSET
+        # =================================================
+
+        global_asset = None
+
+        asset_id = getattr(
+            node,
+            "asset_id",
+            None,
+        )
+
+        if asset_id:
+
+            try:
+
+                self.asset_manager.asset_library.load()
+
+                global_asset = (
+                    self.asset_manager
+                    .asset_library
+                    .get_asset(
+                        asset_id
+                    )
+                )
+
+            except Exception:
+
+                global_asset = None
+
+        # =================================================
+        # OPEN EDIT DIALOG
+        # =================================================
+
+        dialog = AssetEditDialog(
+            node=node,
+            global_asset=global_asset,
+            parent=self,
+        )
+
+        if (
+            dialog.exec()
+            != QDialog.DialogCode.Accepted
+        ):
+
+            return
+
+        values = (
+            dialog.get_values()
+        )
+
+        # =================================================
+        # SAVE
+        # =================================================
+
+        try:
+
+            updated_node = (
+                self.asset_manager
+                .update_asset_details(
+                    node_id=node.node_id,
+                    name=values["name"],
+                    asset_tag=values["asset_tag"],
+                    manufacturer=values["manufacturer"],
+                    model=values["model"],
+                    serial_number=values["serial_number"],
+                )
+            )
+
+            self.refresh_tree()
+
+            # Try to restore the selection after refresh.
+            self.select_tree_node(
+                updated_node.node_id
+            )
+
+            QMessageBox.information(
+                self,
+                "Asset Updated",
+                f"{updated_node.name} "
+                "has been updated successfully.",
+            )
+
+        except ValueError as error:
+
+            QMessageBox.warning(
+                self,
+                "Cannot Update Asset",
+                str(error),
+            )
+
+        except Exception as error:
+
+            QMessageBox.critical(
+                self,
+                "Update Failed",
+                str(error),
+            )
