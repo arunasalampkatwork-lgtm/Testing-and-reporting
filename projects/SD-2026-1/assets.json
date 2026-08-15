@@ -21,6 +21,7 @@
         "ct_count": 0,
         "relay_count": 0,
         "aux_count": 0,
+        "meter_count": 0,
         "asset_id": "ASSET-A8F8D13E77",
         "linked_asset_id": "ASSET-A8F8D13E77"
     },
@@ -46,6 +47,7 @@
         "ct_count": 3,
         "relay_count": 1,
         "aux_count": 2,
+        "meter_count": 0,
         "asset_id": "ASSET-80E4E1A7EA",
         "linked_asset_id": "ASSET-80E4E1A7EA"
     },
@@ -71,6 +73,7 @@
         "ct_count": 3,
         "relay_count": 1,
         "aux_count": 2,
+        "meter_count": 0,
         "asset_id": "ASSET-349CA904CB",
         "linked_asset_id": null
     }
