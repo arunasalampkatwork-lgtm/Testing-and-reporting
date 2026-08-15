@@ -1,6 +1,9 @@
 from pathlib import Path
 
 from PySide6.QtCore import Qt
+from PySide6.QtCore import (
+    QDate
+)
 from PySide6.QtWidgets import (
     QWidget,
     QVBoxLayout,
@@ -17,6 +20,7 @@ from PySide6.QtWidgets import (
     QDialog,
     QLineEdit,
     QDialogButtonBox,
+    QDateEdit,
 )
 
 from app.services.asset_manager import AssetManager
@@ -33,6 +37,9 @@ from app.ui.aux_relay_testing_dialog import AuxRelayTestingDialog
 from app.ui.test_history_view import TestHistoryView
 from app.ui.asset_link_dialog import AssetLinkDialog
 from app.ui.asset_edit_dialog import AssetEditDialog
+from app.services.panel_report_service import (
+    PanelReportService
+)
 
 
 class PanelAssetDialog(QDialog):
@@ -256,6 +263,9 @@ class AssetView(QWidget):
         self.test_history_button = QPushButton(
             "Test History"
         )
+        self.panel_report_button = QPushButton(
+            "Panel Report"
+        )
         self.edit_asset_button = QPushButton(
             "Edit Asset"
         )
@@ -302,6 +312,9 @@ class AssetView(QWidget):
 
         buttons.addWidget(
             self.test_history_button
+        )
+        buttons.addWidget(
+            self.panel_report_button
         )
 
         layout.addLayout(buttons)
@@ -363,6 +376,9 @@ class AssetView(QWidget):
         )
         self.edit_asset_button.clicked.connect(
             self.edit_selected_asset
+        )
+        self.panel_report_button.clicked.connect(
+            self.generate_panel_report
         )
 
         # =================================================
@@ -734,6 +750,9 @@ class AssetView(QWidget):
         )
 
         self.test_history_button.setEnabled(
+            panel_selected
+        )
+        self.panel_report_button.setEnabled(
             panel_selected
         )
         physical_asset_selected = (
@@ -2166,3 +2185,411 @@ class AssetView(QWidget):
                 "Update Failed",
                 str(error),
             )
+
+    # =====================================================
+    # PANEL REPORT
+    # =====================================================
+
+# =====================================================
+# PANEL REPORT
+# =====================================================
+
+    def generate_panel_report(
+        self
+    ):
+
+        panel = self.get_selected_panel()
+
+        if panel is None:
+
+            QMessageBox.warning(
+                self,
+                "No Panel Selected",
+                "Please select a panel first."
+            )
+
+            return
+
+        project_id = getattr(
+            self.project,
+            "project_id",
+            None
+        )
+
+        if project_id is None:
+
+            QMessageBox.warning(
+                self,
+                "Project Error",
+                "Unable to determine project ID."
+            )
+
+            return
+
+        panel_id = getattr(
+            panel,
+            "node_id",
+            None
+        )
+
+        if panel_id is None:
+
+            QMessageBox.warning(
+                self,
+                "Panel Error",
+                "Unable to determine panel ID."
+            )
+
+            return
+
+        # =================================================
+        # SELECT REPORT DATE
+        # =================================================
+
+        report_date = (
+            self.select_panel_report_date()
+        )
+
+        if not report_date:
+
+            return
+
+        try:
+
+            # =================================================
+            # COMPONENTS
+            # =================================================
+
+            components = (
+                self.component_manager
+                .get_panel_components(
+                    panel_id
+                )
+            )
+
+            # =================================================
+            # PROTECTION TESTS
+            # =================================================
+
+            protection_rows = (
+                self.test_service
+                .get_all_tests()
+            )
+
+            protection_tests = []
+
+            for row in protection_rows:
+
+                # ---------------------------------------------
+                # Expected:
+                #
+                # 0 test_id
+                # 1 project_id
+                # 2 panel_id
+                # 3 relay_id
+                # 4 protection_code
+                # 5 test_date
+                # 6 result
+                # 7 remarks
+                # ---------------------------------------------
+
+                if row[1] != project_id:
+                    continue
+
+                if row[2] != panel_id:
+                    continue
+
+                test = (
+                    self.test_service
+                    .get_test(
+                        row[0]
+                    )
+                )
+
+                if test is None:
+                    continue
+
+                if not self.test_matches_date(
+                    test.get(
+                        "test_date"
+                    ),
+                    report_date
+                ):
+                    continue
+
+                protection_tests.append(
+                    test
+                )
+
+            # =================================================
+            # COMPONENT TESTS
+            # =================================================
+
+            component_rows = (
+                self.test_service
+                .get_all_component_tests()
+            )
+
+            component_tests = []
+
+            for row in component_rows:
+
+                # ---------------------------------------------
+                # Expected:
+                #
+                # 0 test_id
+                # 1 project_id
+                # 2 panel_id
+                # 3 component_id
+                # 4 test_type
+                # 5 test_date
+                # 6 result
+                # 7 remarks
+                # ---------------------------------------------
+
+                if row[1] != project_id:
+                    continue
+
+                if row[2] != panel_id:
+                    continue
+
+                test = (
+                    self.test_service
+                    .get_component_test(
+                        row[0]
+                    )
+                )
+
+                if test is None:
+                    continue
+
+                if not self.test_matches_date(
+                    test.get(
+                        "test_date"
+                    ),
+                    report_date
+                ):
+                    continue
+
+                component_tests.append(
+                    test
+                )
+
+            # =================================================
+            # NOTHING TESTED ON SELECTED DATE
+            # =================================================
+
+            if not protection_tests and not component_tests:
+
+                QMessageBox.information(
+                    self,
+                    "No Tests Found",
+                    (
+                        "No tests were conducted on "
+                        f"{report_date} for panel "
+                        f"{getattr(panel, 'name', panel_id)}."
+                    )
+                )
+
+                return
+
+            # =================================================
+            # GENERATE REPORT
+            # =================================================
+
+            service = PanelReportService(
+                self.project_folder
+            )
+
+            service.generate_report(
+
+                panel=panel,
+
+                components=components,
+
+                protection_tests=(
+                    protection_tests
+                ),
+
+                component_tests=(
+                    component_tests
+                ),
+
+                report_date=report_date,
+
+                parent=self
+            )
+
+        except Exception as error:
+
+            QMessageBox.critical(
+                self,
+                "Panel Report Failed",
+                str(error)
+            )
+
+
+    # =====================================================
+    # SELECT REPORT DATE
+    # =====================================================
+
+    def select_panel_report_date(
+        self
+    ):
+
+        dialog = QDialog(
+            self
+        )
+
+        dialog.setWindowTitle(
+            "Panel Report Date"
+        )
+
+        dialog.resize(
+            350,
+            150
+        )
+
+        layout = QVBoxLayout(
+            dialog
+        )
+
+        label = QLabel(
+            "Select the date for which the panel report "
+            "shall be generated:"
+        )
+
+        label.setWordWrap(
+            True
+        )
+
+        layout.addWidget(
+            label
+        )
+
+        date_edit = QDateEdit()
+
+        date_edit.setCalendarPopup(
+            True
+        )
+
+        date_edit.setDisplayFormat(
+            "dd-MM-yyyy"
+        )
+
+        date_edit.setDate(
+            QDate.currentDate()
+        )
+
+        layout.addWidget(
+            date_edit
+        )
+
+        buttons = QHBoxLayout()
+
+        cancel_button = QPushButton(
+            "Cancel"
+        )
+
+        generate_button = QPushButton(
+            "Generate"
+        )
+
+        buttons.addStretch()
+
+        buttons.addWidget(
+            cancel_button
+        )
+
+        buttons.addWidget(
+            generate_button
+        )
+
+        layout.addLayout(
+            buttons
+        )
+
+        cancel_button.clicked.connect(
+            dialog.reject
+        )
+
+        generate_button.clicked.connect(
+            dialog.accept
+        )
+
+        if (
+            dialog.exec()
+            != QDialog.DialogCode.Accepted
+        ):
+
+            return None
+
+        return (
+            date_edit
+            .date()
+            .toString(
+                "yyyy-MM-dd"
+            )
+        )
+
+
+    # =====================================================
+    # TEST DATE MATCH
+    # =====================================================
+
+    @staticmethod
+    def test_matches_date(
+        test_date,
+        report_date
+    ):
+
+        if not test_date:
+            return False
+
+        test_date = str(
+            test_date
+        ).strip()
+
+        report_date = str(
+            report_date
+        ).strip()
+
+        # -------------------------------------------------
+        # ISO datetime
+        #
+        # 2026-08-15T16:42:32
+        #
+        # becomes
+        #
+        # 2026-08-15
+        # -------------------------------------------------
+
+        if "T" in test_date:
+
+            test_date = (
+                test_date
+                .split("T")[0]
+            )
+
+        # -------------------------------------------------
+        # ISO datetime with space
+        #
+        # 2026-08-15 16:42:32
+        # -------------------------------------------------
+
+        elif " " in test_date:
+
+            test_date = (
+                test_date
+                .split(" ")[0]
+            )
+
+        # -------------------------------------------------
+        # Already YYYY-MM-DD
+        # -------------------------------------------------
+
+        return (
+            test_date
+            ==
+            report_date
+        )

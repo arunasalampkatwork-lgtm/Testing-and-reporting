@@ -12,7 +12,9 @@ from PySide6.QtWidgets import (
 from app.ui.test_detail_view import (
     TestDetailView
 )
-
+from app.ui.aux_relay_test_detail_view import (
+    AuxRelayTestDetailView
+)
 
 class TestHistoryView(QDialog):
 
@@ -651,6 +653,59 @@ class TestHistoryView(QDialog):
                 f"{test_id}"
             )
         )
+        component_test = (
+            self.test_service
+            .get_component_test(
+                test_id
+            )
+        )
+
+        if component_test is not None:
+
+            test_type = str(
+                component_test.get(
+                    "test_type",
+                    ""
+                )
+            ).upper()
+
+            if test_type == "CT":
+
+                self.test_detail_view = (
+                    CTTestDetailView(
+                        test_service=self.test_service,
+                        test_id=test_id,
+                        project_folder=self.project_folder,
+                        parent=self
+                    )
+                )
+
+            elif test_type == "AUX_RELAY":
+
+                self.test_detail_view = (
+                    AuxRelayTestDetailView(
+                        test_service=self.test_service,
+                        test_id=test_id,
+                        project_folder=self.project_folder,
+                        parent=self
+                    )
+                )
+
+            else:
+
+                # Existing generic component detail view
+                self.test_detail_view = TestDetailView(
+                    test_service=self.test_service,
+                    test_id=test_id,
+                    project_folder=self.project_folder,
+                    parent=self
+                )
+
+            self.test_detail_view.exec()
+
+            self.load_tests()
+
+            return
 
     # =====================================================
     # COMPONENT TEST DETAIL
