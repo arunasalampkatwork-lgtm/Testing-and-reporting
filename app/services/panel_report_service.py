@@ -32,6 +32,8 @@ class PanelReportService:
         protection_tests,
         component_tests,
         report_date=None,
+        substation_name="",
+        switchboard_name="",
         parent=None
     ):
 
@@ -41,12 +43,47 @@ class PanelReportService:
             "Panel"
         )
 
+        # =================================================
+        # REPORT FILE NAME
+        #
+        # Include the complete electrical hierarchy so the
+        # report remains identifiable even outside the
+        # application.
+        #
+        # Example:
+        #
+        # REF-III SS-2 - HV-203A - P-03 -
+        # Test Report - 2026-08-15.docx
+        # =================================================
+
+        filename_parts = [
+            substation_name,
+            switchboard_name,
+            panel_name,
+            "Test Report",
+            str(report_date),
+        ]
+
+        filename_parts = [
+            str(value).strip()
+            for value in filename_parts
+            if value is not None
+            and str(value).strip()
+        ]
+
+        report_filename = (
+            " - ".join(
+                filename_parts
+            )
+            + ".docx"
+        )
+
         default_path = (
             self.project_folder
             /
             "reports"
             /
-            f"{panel_name}_Test_Report_{report_date}.docx"
+            report_filename
         )
 
         output_path, _ = (
@@ -101,17 +138,35 @@ class PanelReportService:
             "PANEL DETAILS"
         )
 
+        # =================================================
+        # LOCATION / IDENTIFICATION
+        # =================================================
+
+        # The report explicitly records the electrical
+        # hierarchy so that a report remains identifiable
+        # even when separated from the project database.
         self.add_table(
             document,
             [
 
                 (
-                    "Panel",
-                    getattr(
-                        panel,
-                        "name",
-                        ""
-                    )
+                    "Substation",
+                    substation_name
+                ),
+
+                (
+                    "Switchboard",
+                    switchboard_name
+                ),
+
+                (
+                    "Panel No.",
+                    panel_name
+                ),
+
+                (
+                    "Test Date",
+                    report_date
                 ),
 
                 (
@@ -1031,201 +1086,6 @@ class PanelReportService:
                 return True
 
         return False
-        # =====================================================
-        # PHASE TEST TABLE
-        # =====================================================
-
-        def add_phase_test_table(
-            self,
-            document,
-            phase_tests
-        ):
-
-            if not phase_tests:
-
-                return
-
-            # -------------------------------------------------
-            # Determine available fields dynamically
-            # -------------------------------------------------
-
-            all_keys = []
-
-            for phase in phase_tests:
-
-                if not isinstance(
-                    phase,
-                    dict
-                ):
-
-                    continue
-
-                for key in phase.keys():
-
-                    if key not in all_keys:
-
-                        all_keys.append(
-                            key
-                        )
-
-            if not all_keys:
-
-                return
-
-            # -------------------------------------------------
-            # Prefer these columns first
-            # -------------------------------------------------
-
-            preferred = [
-
-                "phase",
-
-                "injected_primary",
-
-                "recorded_secondary",
-
-                "measured_ratio",
-
-                "ratio_error",
-
-                "polarity",
-
-                "result",
-            ]
-
-            columns = []
-
-            for key in preferred:
-
-                if key in all_keys:
-
-                    columns.append(
-                        key
-                    )
-
-            # -------------------------------------------------
-            # Add remaining fields
-            # -------------------------------------------------
-
-            for key in all_keys:
-
-                if key not in columns:
-
-                    columns.append(
-                        key
-                    )
-
-            # -------------------------------------------------
-            # Remove columns where every value is empty
-            # -------------------------------------------------
-
-            valid_columns = []
-
-            for key in columns:
-
-                has_value = False
-
-                for phase in phase_tests:
-
-                    if not isinstance(
-                        phase,
-                        dict
-                    ):
-
-                        continue
-
-                    if not self.is_empty_value(
-                        phase.get(
-                            key
-                        )
-                    ):
-
-                        has_value = True
-
-                        break
-
-                if has_value:
-
-                    valid_columns.append(
-                        key
-                    )
-
-            if not valid_columns:
-
-                return
-
-            # -------------------------------------------------
-            # Create table
-            # -------------------------------------------------
-
-            table = document.add_table(
-                rows=1,
-                cols=len(
-                    valid_columns
-                )
-            )
-
-            table.style = (
-                "Table Grid"
-            )
-
-            # -------------------------------------------------
-            # Header
-            # -------------------------------------------------
-
-            for index, key in enumerate(
-                valid_columns
-            ):
-
-                table.rows[
-                    0
-                ].cells[
-                    index
-                ].text = (
-                    key.replace(
-                        "_",
-                        " "
-                    ).title()
-                )
-
-            # -------------------------------------------------
-            # Data
-            # -------------------------------------------------
-
-            for phase in phase_tests:
-
-                if not isinstance(
-                    phase,
-                    dict
-                ):
-
-                    continue
-
-                cells = (
-                    table
-                    .add_row()
-                    .cells
-                )
-
-                for index, key in enumerate(
-                    valid_columns
-                ):
-
-                    value = phase.get(
-                        key
-                    )
-
-                    cells[index].text = (
-
-                        ""
-                        if self.is_empty_value(
-                            value
-                        )
-
-                        else str(
-                            value
-                        )
-                    )
     # =====================================================
     # ADD PHASE-WISE CT TEST TABLE
     # =====================================================

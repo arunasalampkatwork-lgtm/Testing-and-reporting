@@ -48,5 +48,30 @@
         "aux_count": 2,
         "asset_id": "ASSET-80E4E1A7EA",
         "linked_asset_id": "ASSET-80E4E1A7EA"
+    },
+    {
+        "node_id": "AST-EC8EA8BB",
+        "name": "REF-3 EURO-IV",
+        "node_type": "SUBSTATION",
+        "parent_id": null
+    },
+    {
+        "node_id": "AST-54A8DCB0",
+        "name": "HV-207A",
+        "node_type": "SWITCHBOARD",
+        "parent_id": "AST-EC8EA8BB"
+    },
+    {
+        "node_id": "AST-A20D3930",
+        "name": "P-01",
+        "node_type": "PANEL",
+        "parent_id": "AST-54A8DCB0",
+        "equipment_name": "211-KM-3A",
+        "equipment_type": "Motor",
+        "ct_count": 3,
+        "relay_count": 1,
+        "aux_count": 2,
+        "asset_id": "ASSET-349CA904CB",
+        "linked_asset_id": null
     }
 ]

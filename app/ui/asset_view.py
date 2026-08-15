@@ -2974,6 +2974,64 @@ class AssetView(QWidget):
                 return
 
             # =================================================
+            # RESOLVE ELECTRICAL HIERARCHY
+            #
+            # Panel
+            #   -> Switchboard
+            #       -> Substation
+            #
+            # These names are passed to the report service so
+            # the generated document is self-identifying.
+            # =================================================
+
+            substation_name = ""
+            switchboard_name = ""
+
+            current_node = panel
+
+            while current_node is not None:
+
+                node_type = str(
+                    getattr(
+                        current_node,
+                        "node_type",
+                        ""
+                    )
+                ).upper()
+
+                node_name = str(
+                    getattr(
+                        current_node,
+                        "name",
+                        ""
+                    )
+                ).strip()
+
+                if node_type == "SWITCHBOARD":
+
+                    switchboard_name = node_name
+
+                elif node_type == "SUBSTATION":
+
+                    substation_name = node_name
+
+                parent_node_id = getattr(
+                    current_node,
+                    "parent_id",
+                    None
+                )
+
+                if parent_node_id is None:
+
+                    break
+
+                current_node = (
+                    self.asset_manager.get_node(
+                        parent_node_id
+                    )
+                )
+
+            # =================================================
             # GENERATE REPORT
             # =================================================
 
@@ -2996,6 +3054,14 @@ class AssetView(QWidget):
                 ),
 
                 report_date=report_date,
+
+                substation_name=(
+                    substation_name
+                ),
+
+                switchboard_name=(
+                    switchboard_name
+                ),
 
                 parent=self
             )
