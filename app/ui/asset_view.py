@@ -2008,6 +2008,7 @@ class AssetView(QWidget):
             test_service=self.test_service,
             project_id=project_id,
             panel_id=panel_id,
+            project_folder=self.project_folder,
             parent=self,
         )
 
