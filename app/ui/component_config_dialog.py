@@ -1,120 +1,116 @@
 from PySide6.QtWidgets import (
     QDialog,
+    QVBoxLayout,
     QFormLayout,
     QLineEdit,
     QPushButton,
-    QVBoxLayout,
     QHBoxLayout,
+    QComboBox,
+    QListWidget,
+    QListWidgetItem,
     QLabel,
 )
-
+from PySide6.QtCore import Qt
 
 class ComponentConfigDialog(QDialog):
+
+    METER_TYPES = [
+        "Ammeter",
+        "Voltmeter",
+        "Multifunction Meter",
+    ]
+
+    METER_FUNCTIONS = {
+        "Ammeter": [
+            "CURRENT"
+        ],
+        "Voltmeter": [
+            "VOLTAGE"
+        ],
+        "Multifunction Meter": [
+            "VOLTAGE",
+            "CURRENT",
+            "FREQUENCY",
+            "ACTIVE_POWER",
+            "REACTIVE_POWER",
+            "APPARENT_POWER",
+            "POWER_FACTOR",
+        ],
+    }
+
+    FUNCTION_LABELS = {
+        "VOLTAGE": "Voltage",
+        "CURRENT": "Current",
+        "FREQUENCY": "Frequency",
+        "ACTIVE_POWER": "Active Power",
+        "REACTIVE_POWER": "Reactive Power",
+        "APPARENT_POWER": "Apparent Power",
+        "POWER_FACTOR": "Power Factor",
+    }
 
     def __init__(
         self,
         component,
-        parent=None
+        parent=None,
     ):
 
-        super().__init__(
-            parent
-        )
+        super().__init__(parent)
 
-        self.component = (
-            component
-        )
+        self.component = component
 
-        self.component_type = (
-            str(
-                getattr(
-                    component,
-                    "component_type",
-                    ""
-                )
+        self.component_type = str(
+            getattr(
+                component,
+                "component_type",
+                ""
             )
-            .strip()
-            .upper()
-        )
-
-        self.fields = {}
+        ).strip().upper()
 
         self.setWindowTitle(
-            f"Component Configuration - "
-            f"{component.name}"
+            f"Edit Component - {component.name}"
         )
 
         self.resize(
             550,
-            550
+            600
         )
 
         self.build_ui()
-
         self.populate_existing_values()
-
-    # =====================================================
-    # BUILD UI
-    # =====================================================
 
     def build_ui(self):
 
-        layout = QVBoxLayout(
-            self
-        )
+        layout = QVBoxLayout(self)
 
         form = QFormLayout()
 
-        # =================================================
-        # NAME
-        # =================================================
-
         self.name_edit = QLineEdit()
-
-        self.name_edit.setReadOnly(
-            True
-        )
+        self.name_edit.setReadOnly(True)
 
         form.addRow(
             "Component:",
             self.name_edit
         )
 
-        # =================================================
-        # COMMON
-        # =================================================
-
-        self.manufacturer_edit = (
-            QLineEdit()
-        )
-
-        self.model_edit = (
-            QLineEdit()
-        )
-
-        self.serial_number_edit = (
-            QLineEdit()
-        )
-
-        self.description_edit = (
-            QLineEdit()
-        )
-
+        self.manufacturer_edit = QLineEdit()
         form.addRow(
             "Manufacturer:",
             self.manufacturer_edit
         )
 
+        self.model_edit = QLineEdit()
         form.addRow(
             "Model:",
             self.model_edit
         )
 
+        self.serial_number_edit = QLineEdit()
         form.addRow(
             "Serial Number:",
             self.serial_number_edit
         )
 
+        self.description_edit = QLineEdit()
         form.addRow(
             "Description:",
             self.description_edit
@@ -124,48 +120,15 @@ class ComponentConfigDialog(QDialog):
         # CT
         # =================================================
 
-        self.ct_primary_edit = (
-            QLineEdit()
-        )
-
-        self.ct_secondary_edit = (
-            QLineEdit()
-        )
-
-        self.ct_ratio_edit = (
-            QLineEdit()
-        )
-
-        self.ct_ratio_edit.setReadOnly(
-            True
-        )
-
-        self.ct_class_edit = (
-            QLineEdit()
-        )
-
-        self.burden_edit = (
-            QLineEdit()
-        )
-
-        self.core_edit = (
-            QLineEdit()
-        )
+        self.ct_ratio_edit = QLineEdit()
+        self.ct_class_edit = QLineEdit()
+        self.burden_edit = QLineEdit()
+        self.core_edit = QLineEdit()
 
         if self.component_type in (
             "CT",
-            "CURRENT TRANSFORMER",
+            "CURRENT TRANSFORMER"
         ):
-
-            form.addRow(
-                "CT Primary (A):",
-                self.ct_primary_edit
-            )
-
-            form.addRow(
-                "CT Secondary (A):",
-                self.ct_secondary_edit
-            )
 
             form.addRow(
                 "CT Ratio:",
@@ -187,29 +150,14 @@ class ComponentConfigDialog(QDialog):
                 self.core_edit
             )
 
-            self.ct_primary_edit.textChanged.connect(
-                self.update_ct_ratio
-            )
-
-            self.ct_secondary_edit.textChanged.connect(
-                self.update_ct_ratio
-            )
-
         # =================================================
         # NUMERICAL RELAY
         # =================================================
 
-        self.vt_ratio_edit = (
-            QLineEdit()
-        )
+        self.vt_ratio_edit = QLineEdit()
+        self.firmware_edit = QLineEdit()
 
-        self.firmware_edit = (
-            QLineEdit()
-        )
-
-        if self.component_type == (
-            "NUMERICAL_RELAY"
-        ):
+        if self.component_type == "NUMERICAL_RELAY":
 
             form.addRow(
                 "VT Ratio:",
@@ -225,17 +173,12 @@ class ComponentConfigDialog(QDialog):
         # AUXILIARY RELAY
         # =================================================
 
-        self.coil_voltage_edit = (
-            QLineEdit()
-        )
-
-        self.contact_configuration_edit = (
-            QLineEdit()
-        )
+        self.coil_voltage_edit = QLineEdit()
+        self.contact_configuration_edit = QLineEdit()
 
         if self.component_type in (
             "AUXILIARY_RELAY",
-            "AUX RELAY",
+            "AUX RELAY"
         ):
 
             form.addRow(
@@ -248,9 +191,54 @@ class ComponentConfigDialog(QDialog):
                 self.contact_configuration_edit
             )
 
-        layout.addLayout(
-            form
+        # =================================================
+        # METER
+        # =================================================
+
+        self.meter_type_combo = QComboBox()
+
+        self.meter_type_combo.addItem(
+            "Select meter type",
+            ""
         )
+
+        for meter_type in self.METER_TYPES:
+
+            self.meter_type_combo.addItem(
+                meter_type,
+                meter_type
+            )
+
+        self.meter_type_combo.currentIndexChanged.connect(
+            self.update_meter_functions
+        )
+
+        self.accuracy_class_edit = QLineEdit()
+
+        self.meter_function_list = QListWidget()
+
+        self.meter_function_list.setMinimumHeight(
+            150
+        )
+
+        if self.component_type == "METER":
+
+            form.addRow(
+                "Meter Type:",
+                self.meter_type_combo
+            )
+
+            form.addRow(
+                "Accuracy Class:",
+                self.accuracy_class_edit
+            )
+
+            form.addRow(
+                "Test Functions:",
+                self.meter_function_list
+            )
+
+        layout.addLayout(form)
 
         # =================================================
         # BUTTONS
@@ -258,25 +246,8 @@ class ComponentConfigDialog(QDialog):
 
         buttons = QHBoxLayout()
 
-        save_button = QPushButton(
-            "Save"
-        )
-
-        cancel_button = QPushButton(
-            "Cancel"
-        )
-
-        buttons.addWidget(
-            save_button
-        )
-
-        buttons.addWidget(
-            cancel_button
-        )
-
-        layout.addLayout(
-            buttons
-        )
+        save_button = QPushButton("Save")
+        cancel_button = QPushButton("Cancel")
 
         save_button.clicked.connect(
             self.accept
@@ -286,20 +257,17 @@ class ComponentConfigDialog(QDialog):
             self.reject
         )
 
-    # =====================================================
-    # POPULATE
-    # =====================================================
+        buttons.addWidget(save_button)
+        buttons.addWidget(cancel_button)
+
+        layout.addLayout(buttons)
 
     def populate_existing_values(self):
-
-        component = (
-            self.component
-        )
 
         self.name_edit.setText(
             str(
                 getattr(
-                    component,
+                    self.component,
                     "name",
                     ""
                 )
@@ -309,7 +277,7 @@ class ComponentConfigDialog(QDialog):
         self.manufacturer_edit.setText(
             str(
                 getattr(
-                    component,
+                    self.component,
                     "manufacturer",
                     ""
                 )
@@ -320,7 +288,7 @@ class ComponentConfigDialog(QDialog):
         self.model_edit.setText(
             str(
                 getattr(
-                    component,
+                    self.component,
                     "model",
                     ""
                 )
@@ -331,7 +299,7 @@ class ComponentConfigDialog(QDialog):
         self.serial_number_edit.setText(
             str(
                 getattr(
-                    component,
+                    self.component,
                     "serial_number",
                     ""
                 )
@@ -342,7 +310,7 @@ class ComponentConfigDialog(QDialog):
         self.description_edit.setText(
             str(
                 getattr(
-                    component,
+                    self.component,
                     "description",
                     ""
                 )
@@ -350,34 +318,10 @@ class ComponentConfigDialog(QDialog):
             )
         )
 
-        # =================================================
-        # CT
-        # =================================================
-
-        self.ct_primary_edit.setText(
-            self._display_number(
-                getattr(
-                    component,
-                    "ct_primary",
-                    0
-                )
-            )
-        )
-
-        self.ct_secondary_edit.setText(
-            self._display_number(
-                getattr(
-                    component,
-                    "ct_secondary",
-                    0
-                )
-            )
-        )
-
         self.ct_ratio_edit.setText(
             str(
                 getattr(
-                    component,
+                    self.component,
                     "ct_ratio",
                     ""
                 )
@@ -388,7 +332,7 @@ class ComponentConfigDialog(QDialog):
         self.ct_class_edit.setText(
             str(
                 getattr(
-                    component,
+                    self.component,
                     "ct_class",
                     ""
                 )
@@ -399,7 +343,7 @@ class ComponentConfigDialog(QDialog):
         self.burden_edit.setText(
             str(
                 getattr(
-                    component,
+                    self.component,
                     "burden",
                     ""
                 )
@@ -410,7 +354,7 @@ class ComponentConfigDialog(QDialog):
         self.core_edit.setText(
             str(
                 getattr(
-                    component,
+                    self.component,
                     "core",
                     ""
                 )
@@ -418,14 +362,10 @@ class ComponentConfigDialog(QDialog):
             )
         )
 
-        # =================================================
-        # RELAY
-        # =================================================
-
         self.vt_ratio_edit.setText(
             str(
                 getattr(
-                    component,
+                    self.component,
                     "vt_ratio",
                     ""
                 )
@@ -436,7 +376,7 @@ class ComponentConfigDialog(QDialog):
         self.firmware_edit.setText(
             str(
                 getattr(
-                    component,
+                    self.component,
                     "firmware",
                     ""
                 )
@@ -444,14 +384,10 @@ class ComponentConfigDialog(QDialog):
             )
         )
 
-        # =================================================
-        # AUX
-        # =================================================
-
         self.coil_voltage_edit.setText(
             str(
                 getattr(
-                    component,
+                    self.component,
                     "coil_voltage",
                     ""
                 )
@@ -462,7 +398,7 @@ class ComponentConfigDialog(QDialog):
         self.contact_configuration_edit.setText(
             str(
                 getattr(
-                    component,
+                    self.component,
                     "contact_configuration",
                     ""
                 )
@@ -470,154 +406,183 @@ class ComponentConfigDialog(QDialog):
             )
         )
 
-        self.update_ct_ratio()
+        if self.component_type == "METER":
 
-    # =====================================================
-    # CT RATIO
-    # =====================================================
+            existing_type = str(
+                getattr(
+                    self.component,
+                    "meter_type",
+                    ""
+                ) or ""
+            ).strip()
 
-    def update_ct_ratio(self):
-
-        try:
-
-            primary = float(
-                self.ct_primary_edit
-                .text()
-                .strip()
+            index = self.meter_type_combo.findData(
+                existing_type
             )
 
-            secondary = float(
-                self.ct_secondary_edit
-                .text()
-                .strip()
+            if index >= 0:
+                self.meter_type_combo.setCurrentIndex(
+                    index
+                )
+
+            self.accuracy_class_edit.setText(
+                str(
+                    getattr(
+                        self.component,
+                        "accuracy_class",
+                        ""
+                    ) or ""
+                )
             )
 
-            if (
-                primary <= 0
-                or secondary <= 0
+            self.update_meter_functions()
+
+            existing_functions = set(
+                getattr(
+                    self.component,
+                    "meter_functions",
+                    []
+                ) or []
+            )
+
+            for row in range(
+                self.meter_function_list.count()
             ):
 
-                raise ValueError
+                item = self.meter_function_list.item(
+                    row
+                )
 
-            self.ct_ratio_edit.setText(
-                f"{primary:g}/{secondary:g}"
+                code = item.data(
+                    Qt.ItemDataRole.UserRole
+                )
+
+                item.setCheckState(
+                    Qt.CheckState.Checked
+                    if code in existing_functions
+                    else Qt.CheckState.Unchecked
+                )
+    def update_meter_functions(self):
+
+        if self.component_type != "METER":
+            return
+
+        meter_type = (
+            self.meter_type_combo.currentData()
+        )
+
+        functions = (
+            self.METER_FUNCTIONS.get(
+                meter_type,
+                []
+            )
+        )
+
+        self.meter_function_list.clear()
+
+        for code in functions:
+
+            item = QListWidgetItem(
+                self.FUNCTION_LABELS.get(
+                    code,
+                    code
+                )
             )
 
-        except (
-            ValueError,
-            TypeError
-        ):
+            item.setData(
+                Qt.ItemDataRole.UserRole,
+                code
+            )
 
-            self.ct_ratio_edit.clear()
+            item.setFlags(
+                item.flags()
+                | Qt.ItemFlag.ItemIsUserCheckable
+            )
 
-    # =====================================================
-    # GET CONFIGURATION
-    # =====================================================
+            item.setCheckState(
+                Qt.CheckState.Checked
+            )
+
+            self.meter_function_list.addItem(
+                item
+            )
 
     def get_configuration(self):
 
         configuration = {
 
             "manufacturer":
-                self.manufacturer_edit
-                .text()
-                .strip(),
+                self.manufacturer_edit.text().strip(),
 
             "model":
-                self.model_edit
-                .text()
-                .strip(),
+                self.model_edit.text().strip(),
 
             "serial_number":
-                self.serial_number_edit
-                .text()
-                .strip(),
+                self.serial_number_edit.text().strip(),
 
             "description":
-                self.description_edit
-                .text()
-                .strip(),
-
-            "ct_primary":
-                self.ct_primary_edit
-                .text()
-                .strip(),
-
-            "ct_secondary":
-                self.ct_secondary_edit
-                .text()
-                .strip(),
+                self.description_edit.text().strip(),
 
             "ct_ratio":
-                self.ct_ratio_edit
-                .text()
-                .strip(),
+                self.ct_ratio_edit.text().strip(),
 
             "ct_class":
-                self.ct_class_edit
-                .text()
-                .strip(),
+                self.ct_class_edit.text().strip(),
 
             "burden":
-                self.burden_edit
-                .text()
-                .strip(),
+                self.burden_edit.text().strip(),
 
             "core":
-                self.core_edit
-                .text()
-                .strip(),
+                self.core_edit.text().strip(),
 
             "vt_ratio":
-                self.vt_ratio_edit
-                .text()
-                .strip(),
+                self.vt_ratio_edit.text().strip(),
 
             "firmware":
-                self.firmware_edit
-                .text()
-                .strip(),
+                self.firmware_edit.text().strip(),
 
             "coil_voltage":
-                self.coil_voltage_edit
-                .text()
-                .strip(),
+                self.coil_voltage_edit.text().strip(),
 
             "contact_configuration":
-                self.contact_configuration_edit
-                .text()
-                .strip(),
+                self.contact_configuration_edit.text().strip(),
         }
 
+        if self.component_type == "METER":
+
+            meter_type = (
+                self.meter_type_combo
+                .currentData()
+            )
+
+            functions = []
+
+            for row in range(
+                self.meter_function_list.count()
+            ):
+
+                item = self.meter_function_list.item(
+                    row
+                )
+
+                if item.checkState() == 2:
+
+                    functions.append(
+                        item.data(32)
+                    )
+
+            configuration.update({
+
+                "meter_type":
+                    meter_type or "",
+
+                "meter_functions":
+                    functions,
+
+                "accuracy_class":
+                    self.accuracy_class_edit
+                    .text()
+                    .strip(),
+            })
+
         return configuration
-
-    # =====================================================
-    # DISPLAY NUMBER
-    # =====================================================
-
-    @staticmethod
-    def _display_number(
-        value
-    ):
-
-        try:
-
-            number = float(
-                value or 0
-            )
-
-            if number == 0:
-
-                return ""
-
-            return f"{number:g}"
-
-        except (
-            TypeError,
-            ValueError
-        ):
-
-            return str(
-                value
-                or ""
-            )

@@ -1,109 +1,192 @@
 from pathlib import Path
+from datetime import datetime
 
 from docx import Document
 from docx.shared import Pt, Inches
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 
-from PySide6.QtWidgets import (
-    QFileDialog,
-    QMessageBox,
-)
+from PySide6.QtWidgets import QFileDialog, QMessageBox
 
 
 class PanelReportService:
+    """
+    Generates a Word report for one panel.
 
-    def __init__(
-        self,
-        project_folder
-    ):
+    The service is intentionally self-contained. Helper methods that do not
+    require instance state are static methods, so there is no accidental
+    use of undefined `self` or `cls`.
+    """
 
-        self.project_folder = Path(
-            project_folder
+    def __init__(self, project_folder=None):
+        self.project_folder = (
+            Path(project_folder)
+            if project_folder
+            else Path.cwd()
         )
 
     # =====================================================
-    # GENERATE PANEL REPORT
+    # PUBLIC ENTRY POINT
     # =====================================================
 
     def generate_report(
         self,
         panel,
-        components,
-        protection_tests,
-        component_tests,
+        components=None,
+        protection_tests=None,
+        component_tests=None,
         report_date=None,
         substation_name="",
         switchboard_name="",
-        parent=None
+        parent=None,
+        output_path=None,
     ):
+        """
+        Generate a panel test report.
 
-        panel_name = getattr(
+        `report_date` is expected to represent the selected test date.
+        Filtering should normally already be performed by AssetView, but
+        this method also filters supplied tests when a date is provided.
+        """
+
+        components = list(
+            components or []
+        )
+
+        protection_tests = list(
+            protection_tests or []
+        )
+
+        component_tests = list(
+            component_tests or []
+        )
+
+        selected_date = self.normalize_date(
+            report_date
+        )
+
+        if selected_date:
+            protection_tests = [
+                test
+                for test in protection_tests
+                if self.date_only(
+                    self.get_value(
+                        test,
+                        "test_date",
+                        ""
+                    )
+                ) == selected_date
+            ]
+
+            component_tests = [
+                test
+                for test in component_tests
+                if self.date_only(
+                    self.get_value(
+                        test,
+                        "test_date",
+                        ""
+                    )
+                ) == selected_date
+            ]
+
+        panel_name = self.get_value(
             panel,
             "name",
             "Panel"
         )
 
-        # =================================================
-        # REPORT FILE NAME
-        #
-        # Include the complete electrical hierarchy so the
-        # report remains identifiable even outside the
-        # application.
-        #
-        # Example:
-        #
-        # REF-III SS-2 - HV-203A - P-03 -
-        # Test Report - 2026-08-15.docx
-        # =================================================
-
-        filename_parts = [
-            substation_name,
-            switchboard_name,
-            panel_name,
-            "Test Report",
-            str(report_date),
-        ]
-
-        filename_parts = [
-            str(value).strip()
-            for value in filename_parts
-            if value is not None
-            and str(value).strip()
-        ]
-
-        report_filename = (
-            " - ".join(
-                filename_parts
+        if not substation_name:
+            substation_name = self.find_parent_name(
+                panel,
+                (
+                    "substation",
+                    "substation_name",
+                )
             )
+
+        if not switchboard_name:
+            switchboard_name = self.find_parent_name(
+                panel,
+                (
+                    "switchboard",
+                    "switchboard_name",
+                    "swbd",
+                    "switchboard_no",
+                )
+            )
+
+        report_date_text = (
+            selected_date
+            or
+            self.normalize_date(
+                datetime.now()
+            )
+        )
+
+        # -------------------------------------------------
+        # FILE NAME
+        # -------------------------------------------------
+
+        filename_parts = [
+            self.safe_filename_part(
+                substation_name
+            ),
+            self.safe_filename_part(
+                switchboard_name
+            ),
+            self.safe_filename_part(
+                panel_name
+            ),
+            self.safe_filename_part(
+                report_date_text
+            ),
+        ]
+
+        filename_parts = [
+            part
+            for part in filename_parts
+            if part
+        ]
+
+        if not filename_parts:
+            filename_parts = [
+                "Panel",
+                "Test Report",
+                report_date_text,
+            ]
+
+        suggested_filename = (
+            " - ".join(filename_parts)
             + ".docx"
         )
 
-        default_path = (
-            self.project_folder
-            /
-            "reports"
-            /
-            report_filename
-        )
-
-        output_path, _ = (
-            QFileDialog.getSaveFileName(
-
-                parent,
-
-                "Save Panel Test Report",
-
-                str(
-                    default_path
-                ),
-
-                "Word Document (*.docx)"
+        if output_path is None:
+            reports_folder = (
+                self.project_folder
+                / "reports"
             )
-        )
 
-        if not output_path:
+            reports_folder.mkdir(
+                parents=True,
+                exist_ok=True
+            )
 
-            return
+            default_path = (
+                reports_folder
+                / suggested_filename
+            )
+
+            output_path, _ = (
+                QFileDialog.getSaveFileName(
+                    parent,
+                    "Save Panel Test Report",
+                    str(default_path),
+                    "Word Document (*.docx)",
+                )
+            )
+
+            if not output_path:
+                return None
 
         output_path = Path(
             output_path
@@ -114,377 +197,174 @@ class PanelReportService:
             exist_ok=True
         )
 
+        # -------------------------------------------------
+        # DOCUMENT
+        # -------------------------------------------------
+
         document = Document()
 
         self.configure_document(
             document
         )
 
-        # =================================================
-        # TITLE
-        # =================================================
-
         self.add_title(
             document,
             "PANEL TEST REPORT"
         )
 
-        # =================================================
+        # -------------------------------------------------
         # PANEL DETAILS
-        # =================================================
+        # -------------------------------------------------
 
         self.add_heading(
             document,
             "PANEL DETAILS"
         )
 
-        # =================================================
-        # LOCATION / IDENTIFICATION
-        # =================================================
-
-        # The report explicitly records the electrical
-        # hierarchy so that a report remains identifiable
-        # even when separated from the project database.
-        self.add_table(
-            document,
-            [
-
-                (
-                    "Substation",
-                    substation_name
-                ),
-
-                (
-                    "Switchboard",
-                    switchboard_name
-                ),
-
-                (
-                    "Panel No.",
-                    panel_name
-                ),
-
-                (
-                    "Test Date",
-                    report_date
-                ),
-
-                (
-                    "Feed Equipment",
-                    getattr(
-                        panel,
-                        "equipment_name",
-                        ""
-                    )
-                ),
-
-                (
-                    "Equipment Type",
-                    getattr(
-                        panel,
-                        "equipment_type",
-                        ""
-                    )
-                ),
-
-                (
-                    "Number of CTs",
-                    getattr(
-                        panel,
-                        "ct_count",
-                        ""
-                    )
-                ),
-
-                (
-                    "Numerical Relays",
-                    getattr(
-                        panel,
-                        "relay_count",
-                        ""
-                    )
-                ),
-
-                (
-                    "Auxiliary Relays",
-                    getattr(
-                        panel,
-                        "aux_count",
-                        ""
-                    )
-                ),
-            ]
-        )
-
-        # =================================================
-        # INSTALLED COMPONENTS
-        # =================================================
-
-        self.add_heading(
-            document,
-            "INSTALLED TEST COMPONENTS"
-        )
-
-        table = document.add_table(
-            rows=1,
-            cols=5
-        )
-
-        table.style = "Table Grid"
-
-        headers = [
-
-            "Component",
-
-            "Type",
-
-            "Manufacturer",
-
-            "Model",
-
-            "Serial Number",
+        panel_rows = [
+            (
+                "Substation",
+                substation_name
+            ),
+            (
+                "Switchboard",
+                switchboard_name
+            ),
+            (
+                "Panel No.",
+                panel_name
+            ),
+            (
+                "Test Date",
+                report_date_text
+            ),
+            (
+                "Feed Equipment",
+                self.get_value(
+                    panel,
+                    "equipment_name",
+                    ""
+                )
+            ),
+            (
+                "Equipment Type",
+                self.get_value(
+                    panel,
+                    "equipment_type",
+                    ""
+                )
+            ),
+            (
+                "Number of CTs",
+                self.get_value(
+                    panel,
+                    "ct_count",
+                    ""
+                )
+            ),
+            (
+                "Numerical Relays",
+                self.get_value(
+                    panel,
+                    "relay_count",
+                    ""
+                )
+            ),
+            (
+                "Auxiliary Relays",
+                self.get_value(
+                    panel,
+                    "aux_count",
+                    ""
+                )
+            ),
+            (
+                "Meters",
+                self.get_value(
+                    panel,
+                    "meter_count",
+                    ""
+                )
+            ),
         ]
 
-        for index, header in enumerate(
-            headers
-        ):
+        self.add_key_value_table(
+            document,
+            self.remove_empty_rows(
+                panel_rows
+            )
+        )
 
-            table.rows[0].cells[
-                index
-            ].text = header
+        # -------------------------------------------------
+        # COMPONENTS
+        # -------------------------------------------------
 
-        for component in (
-            components or []
-        ):
+        if components:
 
-            cells = (
-                table.add_row()
-                .cells
+            self.add_heading(
+                document,
+                "INSTALLED TEST COMPONENTS"
             )
 
-            values = [
+            self.add_components_table(
+                document,
+                components
+            )
 
-                getattr(
-                    component,
-                    "name",
-                    ""
-                ),
+        # -------------------------------------------------
+        # COMPONENT NAME LOOKUP
+        # -------------------------------------------------
 
-                getattr(
-                    component,
-                    "component_type",
-                    ""
-                ),
+        component_names = {}
 
-                getattr(
-                    component,
-                    "manufacturer",
-                    ""
-                ),
+        for component in components:
 
-                getattr(
-                    component,
-                    "model",
-                    ""
-                ),
-
-                getattr(
-                    component,
-                    "serial_number",
-                    ""
-                ),
-            ]
-
-            for index, value in enumerate(
-                values
-            ):
-
-                cells[index].text = (
-                    str(
-                        value or ""
-                    )
-                )
-
-        # =================================================
-        # TEST SUMMARY
-        # =================================================
-
-        self.add_heading(
-            document,
-            "TEST SUMMARY"
-        )
-
-        summary_table = document.add_table(
-            rows=1,
-            cols=5
-        )
-
-        summary_table.style = (
-            "Table Grid"
-        )
-
-        headers = [
-
-            "Test ID",
-
-            "Date",
-
-            "Component",
-
-            "Test Type",
-
-            "Result",
-        ]
-
-        for index, header in enumerate(
-            headers
-        ):
-
-            summary_table.rows[
-                0
-            ].cells[
-                index
-            ].text = header
-
-        component_names = {
-
-            getattr(
+            component_id = self.get_value(
                 component,
                 "component_id",
                 ""
-            ):
-                getattr(
-                    component,
-                    "name",
-                    ""
+            )
+
+            component_name = self.get_value(
+                component,
+                "name",
+                ""
+            )
+
+            if component_id:
+                component_names[
+                    str(component_id)
+                ] = (
+                    component_name
+                    or
+                    component_id
                 )
 
-            for component in (
-                components or []
-            )
-        }
-
         # -------------------------------------------------
-        # COMPONENT TESTS
+        # SUMMARY
         # -------------------------------------------------
 
-        for test in (
-            component_tests or []
+        if (
+            protection_tests
+            or
+            component_tests
         ):
 
-            cells = (
-                summary_table
-                .add_row()
-                .cells
+            self.add_heading(
+                document,
+                "TEST SUMMARY"
             )
 
-            values = [
-
-                test.get(
-                    "test_id",
-                    ""
-                ),
-
-                test.get(
-                    "test_date",
-                    ""
-                ),
-
-                component_names.get(
-                    test.get(
-                        "component_id",
-                        ""
-                    ),
-
-                    test.get(
-                        "component_id",
-                        ""
-                    )
-                ),
-
-                test.get(
-                    "test_type",
-                    ""
-                ),
-
-                test.get(
-                    "result",
-                    ""
-                ),
-            ]
-
-            for index, value in enumerate(
-                values
-            ):
-
-                cells[index].text = (
-                    str(
-                        value or ""
-                    )
-                )
-
-        # -------------------------------------------------
-        # PROTECTION TESTS
-        # -------------------------------------------------
-
-        for test in (
-            protection_tests or []
-        ):
-
-            cells = (
-                summary_table
-                .add_row()
-                .cells
+            self.add_summary_table(
+                document,
+                protection_tests,
+                component_tests,
+                component_names
             )
 
-            values = [
-
-                test.get(
-                    "test_id",
-                    ""
-                ),
-
-                test.get(
-                    "test_date",
-                    ""
-                ),
-
-                component_names.get(
-                    test.get(
-                        "relay_id",
-                        ""
-                    ),
-
-                    test.get(
-                        "relay_id",
-                        ""
-                    )
-                ),
-
-                test.get(
-                    "protection_code",
-                    ""
-                ),
-
-                test.get(
-                    "result",
-                    ""
-                ),
-            ]
-
-            for index, value in enumerate(
-                values
-            ):
-
-                cells[index].text = (
-                    str(
-                        value or ""
-                    )
-                )
-
-        # =================================================
-        # DETAILED COMPONENT TEST RESULTS
-        # =================================================
+        # -------------------------------------------------
+        # COMPONENT DETAILS
+        # -------------------------------------------------
 
         if component_tests:
 
@@ -495,166 +375,15 @@ class PanelReportService:
 
             for test in component_tests:
 
-                component_name = (
-                    component_names.get(
-                        test.get(
-                            "component_id",
-                            ""
-                        ),
-
-                        test.get(
-                            "component_id",
-                            ""
-                        )
-                    )
-                )
-
-                test_type = test.get(
-                    "test_type",
-                    ""
-                )
-
-                self.add_heading(
+                self.add_component_test_detail(
                     document,
-                    (
-                        f"{component_name}"
-                        +
-                        (
-                            f" - {test_type}"
-                            if test_type
-                            else ""
-                        )
-                    )
+                    test,
+                    component_names
                 )
 
-                measurements = (
-                    test.get(
-                        "measurements",
-                        {}
-                    )
-                    or
-                    {}
-                )
-
-                # -------------------------------------------------
-                # NORMAL FIELDS
-                # -------------------------------------------------
-
-                rows = []
-
-                for key, value in (
-                    measurements.items()
-                ):
-
-                    # ---------------------------------------------
-                    # Skip nested phase data here.
-                    # CT phase data is handled separately below.
-                    # ---------------------------------------------
-
-                    if key == "phase_tests":
-
-                        continue
-
-                    # ---------------------------------------------
-                    # Skip null / empty values
-                    # ---------------------------------------------
-
-                    if self.is_empty_value(
-                        value
-                    ):
-
-                        continue
-
-                    # ---------------------------------------------
-                    # Skip dictionaries/lists
-                    # ---------------------------------------------
-
-                    if isinstance(
-                        value,
-                        (dict, list, tuple)
-                    ):
-
-                        continue
-
-                    rows.append(
-                        (
-                            key.replace(
-                                "_",
-                                " "
-                            ).title(),
-
-                            value
-                        )
-                    )
-
-                if rows:
-
-                    self.add_table(
-                        document,
-                        rows
-                    )
-
-                # -------------------------------------------------
-                # CT THREE-PHASE DATA
-                # -------------------------------------------------
-
-                phase_tests = measurements.get(
-                    "phase_tests"
-                )
-
-                if phase_tests:
-
-                    self.add_heading(
-                        document,
-                        "PHASE-WISE CT TEST RESULTS"
-                    )
-
-                    self.add_phase_test_table(
-                        document,
-                        phase_tests
-                    )
-
-                # -------------------------------------------------
-                # RESULT
-                # -------------------------------------------------
-
-                result = test.get(
-                    "result"
-                )
-
-                if not self.is_empty_value(
-                    result
-                ):
-
-                    self.add_result(
-                        document,
-                        result
-                    )
-
-                # -------------------------------------------------
-                # REMARKS
-                # -------------------------------------------------
-
-                remarks = test.get(
-                    "remarks"
-                )
-
-                if not self.is_empty_value(
-                    remarks
-                ):
-
-                    document.add_paragraph(
-                        (
-                            "Remarks: "
-                            +
-                            str(
-                                remarks
-                            )
-                        )
-                    )
-        # =================================================
-        # PROTECTION TEST DETAILS
-        # =================================================
+        # -------------------------------------------------
+        # PROTECTION DETAILS
+        # -------------------------------------------------
 
         if protection_tests:
 
@@ -665,189 +394,24 @@ class PanelReportService:
 
             for test in protection_tests:
 
-                relay_name = (
-                    component_names.get(
-                        test.get(
-                            "relay_id",
-                            ""
-                        ),
-
-                        test.get(
-                            "relay_id",
-                            ""
-                        )
-                    )
-                )
-
-                protection_code = test.get(
-                    "protection_code",
-                    ""
-                )
-
-                heading = (
-                    f"{relay_name}"
-                    +
-                    (
-                        f" - {protection_code}"
-                        if protection_code
-                        else ""
-                    )
-                )
-
-                self.add_heading(
+                self.add_protection_test_detail(
                     document,
-                    heading
+                    test,
+                    component_names
                 )
 
-                measurements = (
-                    test.get(
-                        "measurements",
-                        {}
-                    )
-                    or
-                    {}
-                )
-
-                rows = []
-
-                for key, value in (
-                    measurements.items()
-                ):
-
-                    # -------------------------------------------------
-                    # OMIT EMPTY VALUES
-                    # -------------------------------------------------
-
-                    if self.is_empty_value(
-                        value
-                    ):
-
-                        continue
-
-                    # -------------------------------------------------
-                    # OMIT COMPLEX NESTED STRUCTURES
-                    # -------------------------------------------------
-
-                    if isinstance(
-                        value,
-                        (dict, list, tuple)
-                    ):
-
-                        continue
-
-                    rows.append(
-                        (
-                            key.replace(
-                                "_",
-                                " "
-                            ).title(),
-
-                            value
-                        )
-                    )
-
-                if rows:
-
-                    self.add_table(
-                        document,
-                        rows
-                    )
-
-                # -------------------------------------------------
-                # RESULT
-                # -------------------------------------------------
-
-                result = test.get(
-                    "result"
-                )
-
-                if not self.is_empty_value(
-                    result
-                ):
-
-                    self.add_result(
-                        document,
-                        result
-                    )
-
-                # -------------------------------------------------
-                # REMARKS
-                # -------------------------------------------------
-
-                remarks = test.get(
-                    "remarks"
-                )
-
-                if not self.is_empty_value(
-                    remarks
-                ):
-
-                    document.add_paragraph(
-                        (
-                            "Remarks: "
-                            +
-                            str(
-                                remarks
-                            )
-                        )
-                    )
-        # =================================================
+        # -------------------------------------------------
         # OVERALL RESULT
-        # =================================================
-
-        results = []
-
-        for test in (
-            component_tests or []
-        ):
-
-            results.append(
-                str(
-                    test.get(
-                        "result",
-                        ""
-                    )
-                ).upper()
-            )
-
-        for test in (
-            protection_tests or []
-        ):
-
-            results.append(
-                str(
-                    test.get(
-                        "result",
-                        ""
-                    )
-                ).upper()
-            )
-
-        if not results:
-
-            overall = "NOT TESTED"
-
-        elif any(
-            result == "FAIL"
-            for result in results
-        ):
-
-            overall = "FAIL"
-
-        elif all(
-            result == "PASS"
-            for result in results
-        ):
-
-            overall = "PASS"
-
-        else:
-
-            overall = "PARTIALLY TESTED"
+        # -------------------------------------------------
 
         self.add_heading(
             document,
             "OVERALL PANEL RESULT"
+        )
+
+        overall = self.calculate_overall_result(
+            protection_tests,
+            component_tests
         )
 
         self.add_result(
@@ -855,58 +419,1203 @@ class PanelReportService:
             overall
         )
 
-        # =================================================
-        # SIGNATURE
-        # =================================================
+        # -------------------------------------------------
+        # SIGNATURES
+        # -------------------------------------------------
 
         self.add_heading(
             document,
             "TESTING / APPROVAL"
         )
 
-        signature_table = (
-            document.add_table(
-                rows=3,
-                cols=2
-            )
+        signature_table = document.add_table(
+            rows=3,
+            cols=2
         )
 
-        signature_table.style = (
-            "Table Grid"
-        )
+        signature_table.style = "Table Grid"
 
-        signature_table.rows[
-            0
-        ].cells[0].text = "Tested By"
+        signature_table.cell(
+            0, 0
+        ).text = "Tested By"
 
-        signature_table.rows[
-            1
-        ].cells[0].text = "Reviewed By"
+        signature_table.cell(
+            1, 0
+        ).text = "Reviewed By"
 
-        signature_table.rows[
-            2
-        ].cells[0].text = "Date / Signature"
+        signature_table.cell(
+            2, 0
+        ).text = "Date / Signature"
 
         document.save(
-            str(
-                output_path
-            )
+            str(output_path)
         )
 
-        QMessageBox.information(
-            parent,
-            "Report Generated",
-            (
-                "Panel test report generated "
-                "successfully.\n\n"
-                f"{output_path}"
+        if parent is not None:
+            QMessageBox.information(
+                parent,
+                "Report Generated",
+                (
+                    "Panel test report generated "
+                    "successfully.\n\n"
+                    f"{output_path}"
+                )
             )
-        )
 
         return output_path
 
     # =====================================================
-    # HELPERS
+    # COMPONENT TABLE
+    # =====================================================
+
+    @staticmethod
+    def add_components_table(
+        document,
+        components
+    ):
+
+        table = document.add_table(
+            rows=1,
+            cols=5
+        )
+
+        table.style = "Table Grid"
+
+        headers = [
+            "Component",
+            "Type",
+            "Manufacturer",
+            "Model",
+            "Serial Number",
+        ]
+
+        for index, header in enumerate(
+            headers
+        ):
+            table.cell(
+                0,
+                index
+            ).text = header
+
+        for component in components:
+
+            values = [
+                PanelReportService.get_value(
+                    component,
+                    "name",
+                    ""
+                ),
+                PanelReportService.get_value(
+                    component,
+                    "component_type",
+                    ""
+                ),
+                PanelReportService.get_value(
+                    component,
+                    "manufacturer",
+                    ""
+                ),
+                PanelReportService.get_value(
+                    component,
+                    "model",
+                    ""
+                ),
+                PanelReportService.get_value(
+                    component,
+                    "serial_number",
+                    ""
+                ),
+            ]
+
+            if all(
+                PanelReportService.is_empty_value(
+                    value
+                )
+                for value in values
+            ):
+                continue
+
+            cells = table.add_row().cells
+
+            for index, value in enumerate(
+                values
+            ):
+                cells[index].text = (
+                    ""
+                    if PanelReportService.is_empty_value(
+                        value
+                    )
+                    else str(value)
+                )
+
+    # =====================================================
+    # SUMMARY
+    # =====================================================
+
+    @staticmethod
+    def add_summary_table(
+        document,
+        protection_tests,
+        component_tests,
+        component_names
+    ):
+
+        table = document.add_table(
+            rows=1,
+            cols=5
+        )
+
+        table.style = "Table Grid"
+
+        headers = [
+            "Test ID",
+            "Date",
+            "Test Type",
+            "Component",
+            "Result",
+        ]
+
+        for index, header in enumerate(
+            headers
+        ):
+            table.cell(
+                0,
+                index
+            ).text = header
+
+        for test in component_tests:
+
+            component_id = (
+                PanelReportService.get_value(
+                    test,
+                    "component_id",
+                    ""
+                )
+            )
+
+            values = [
+                PanelReportService.get_value(
+                    test,
+                    "test_id",
+                    ""
+                ),
+                PanelReportService.date_only(
+                    PanelReportService.get_value(
+                        test,
+                        "test_date",
+                        ""
+                    )
+                ),
+                PanelReportService.get_value(
+                    test,
+                    "test_type",
+                    ""
+                ),
+                component_names.get(
+                    str(component_id),
+                    component_id
+                ),
+                PanelReportService.get_value(
+                    test,
+                    "result",
+                    ""
+                ),
+            ]
+
+            PanelReportService.add_summary_row(
+                table,
+                values
+            )
+
+        for test in protection_tests:
+
+            relay_id = (
+                PanelReportService.get_value(
+                    test,
+                    "relay_id",
+                    ""
+                )
+            )
+
+            values = [
+                PanelReportService.get_value(
+                    test,
+                    "test_id",
+                    ""
+                ),
+                PanelReportService.date_only(
+                    PanelReportService.get_value(
+                        test,
+                        "test_date",
+                        ""
+                    )
+                ),
+                PanelReportService.get_value(
+                    test,
+                    "protection_code",
+                    ""
+                ),
+                component_names.get(
+                    str(relay_id),
+                    relay_id
+                ),
+                PanelReportService.get_value(
+                    test,
+                    "result",
+                    ""
+                ),
+            ]
+
+            PanelReportService.add_summary_row(
+                table,
+                values
+            )
+
+    # =====================================================
+    # COMPONENT DETAIL
+    # =====================================================
+
+    @staticmethod
+    def add_component_test_detail(
+        document,
+        test,
+        component_names
+    ):
+
+        component_id = (
+            PanelReportService.get_value(
+                test,
+                "component_id",
+                ""
+            )
+        )
+
+        component_name = component_names.get(
+            str(component_id),
+            component_id
+        )
+
+        test_type = (
+            PanelReportService.get_value(
+                test,
+                "test_type",
+                ""
+            )
+        )
+
+        heading = str(
+            component_name
+            or
+            component_id
+            or
+            "Component"
+        )
+
+        if test_type:
+            heading += (
+                f" - {test_type}"
+            )
+
+        PanelReportService.add_heading(
+            document,
+            heading
+        )
+
+        measurements = (
+            PanelReportService.get_value(
+                test,
+                "measurements",
+                {}
+            )
+            or
+            {}
+        )
+
+        if not isinstance(
+            measurements,
+            dict
+        ):
+            measurements = {}
+
+        scalar_rows = []
+
+        for key, value in measurements.items():
+
+            if key in (
+                "phase_tests",
+                "functions",
+            ):
+                continue
+
+            if isinstance(
+                value,
+                (dict, list, tuple)
+            ):
+                continue
+
+            if PanelReportService.is_empty_value(
+                value
+            ):
+                continue
+
+            scalar_rows.append(
+                (
+                    PanelReportService.pretty_label(
+                        key
+                    ),
+                    value
+                )
+            )
+
+        PanelReportService.add_key_value_table(
+            document,
+            scalar_rows
+        )
+
+        phase_tests = measurements.get(
+            "phase_tests"
+        )
+
+        if phase_tests:
+
+            PanelReportService.add_heading(
+                document,
+                "PHASE-WISE CT TEST RESULTS"
+            )
+
+            PanelReportService.add_phase_test_table(
+                document,
+                phase_tests
+            )
+
+        functions = measurements.get(
+            "functions"
+        )
+
+        if functions:
+
+            PanelReportService.add_heading(
+                document,
+                "METER MEASUREMENT RESULTS"
+            )
+
+            PanelReportService.add_meter_function_table(
+                document,
+                functions
+            )
+
+        result = PanelReportService.get_value(
+            test,
+            "result",
+            ""
+        )
+
+        if not PanelReportService.is_empty_value(
+            result
+        ):
+
+            PanelReportService.add_result(
+                document,
+                result
+            )
+
+        remarks = PanelReportService.get_value(
+            test,
+            "remarks",
+            ""
+        )
+
+        if not PanelReportService.is_empty_value(
+            remarks
+        ):
+
+            document.add_paragraph(
+                f"Remarks: {remarks}"
+            )
+
+    # =====================================================
+    # PROTECTION DETAIL
+    # =====================================================
+
+    @staticmethod
+    def add_protection_test_detail(
+        document,
+        test,
+        component_names
+    ):
+
+        relay_id = (
+            PanelReportService.get_value(
+                test,
+                "relay_id",
+                ""
+            )
+        )
+
+        relay_name = component_names.get(
+            str(relay_id),
+            relay_id
+        )
+
+        protection_code = (
+            PanelReportService.get_value(
+                test,
+                "protection_code",
+                ""
+            )
+        )
+
+        heading = str(
+            relay_name
+            or
+            relay_id
+            or
+            "Relay"
+        )
+
+        if protection_code:
+            heading += (
+                f" - {protection_code}"
+            )
+
+        PanelReportService.add_heading(
+            document,
+            heading
+        )
+
+        measurements = (
+            PanelReportService.get_value(
+                test,
+                "measurements",
+                {}
+            )
+            or
+            {}
+        )
+
+        if not isinstance(
+            measurements,
+            dict
+        ):
+            measurements = {}
+
+        rows = []
+
+        for key, value in measurements.items():
+
+            if isinstance(
+                value,
+                (dict, list, tuple)
+            ):
+                continue
+
+            if PanelReportService.is_empty_value(
+                value
+            ):
+                continue
+
+            rows.append(
+                (
+                    PanelReportService.pretty_label(
+                        key
+                    ),
+                    value
+                )
+            )
+
+        PanelReportService.add_key_value_table(
+            document,
+            rows
+        )
+
+        result = PanelReportService.get_value(
+            test,
+            "result",
+            ""
+        )
+
+        if not PanelReportService.is_empty_value(
+            result
+        ):
+
+            PanelReportService.add_result(
+                document,
+                result
+            )
+
+        remarks = PanelReportService.get_value(
+            test,
+            "remarks",
+            ""
+        )
+
+        if not PanelReportService.is_empty_value(
+            remarks
+        ):
+
+            document.add_paragraph(
+                f"Remarks: {remarks}"
+            )
+
+    # =====================================================
+    # CT PHASE TABLE
+    # =====================================================
+
+    @staticmethod
+    def add_phase_test_table(
+        document,
+        phase_tests
+    ):
+
+        valid = [
+            item
+            for item in (
+                phase_tests or []
+            )
+            if isinstance(
+                item,
+                dict
+            )
+        ]
+
+        if not valid:
+            return
+
+        preferred = [
+            "phase",
+            "injected_primary",
+            "recorded_secondary",
+            "measured_ratio",
+            "ratio_error",
+            "polarity",
+            "polarity_result",
+            "result",
+        ]
+
+        labels = {
+            "phase":
+                "Phase",
+
+            "injected_primary":
+                "Injected Primary",
+
+            "recorded_secondary":
+                "Recorded Secondary",
+
+            "measured_ratio":
+                "Measured Ratio",
+
+            "ratio_error":
+                "Ratio Error %",
+
+            "polarity":
+                "Polarity",
+
+            "polarity_result":
+                "Polarity Result",
+
+            "result":
+                "Result",
+        }
+
+        columns = (
+            PanelReportService.get_nonempty_columns(
+                valid,
+                preferred
+            )
+        )
+
+        if not columns:
+            return
+
+        table = document.add_table(
+            rows=1,
+            cols=len(columns)
+        )
+
+        table.style = "Table Grid"
+
+        for index, key in enumerate(
+            columns
+        ):
+
+            table.cell(
+                0,
+                index
+            ).text = labels.get(
+                key,
+                PanelReportService.pretty_label(
+                    key
+                )
+            )
+
+        for phase in valid:
+
+            if all(
+                PanelReportService.is_empty_value(
+                    phase.get(key)
+                )
+                for key in columns
+            ):
+                continue
+
+            cells = table.add_row().cells
+
+            for index, key in enumerate(
+                columns
+            ):
+
+                value = phase.get(
+                    key
+                )
+
+                cells[index].text = (
+                    ""
+                    if PanelReportService.is_empty_value(
+                        value
+                    )
+                    else str(value)
+                )
+
+    # =====================================================
+    # METER FUNCTION TABLE
+    # =====================================================
+
+    @staticmethod
+    def add_meter_function_table(
+        document,
+        functions
+    ):
+
+        valid = [
+            item
+            for item in (
+                functions or []
+            )
+            if isinstance(
+                item,
+                dict
+            )
+        ]
+
+        if not valid:
+            return
+
+        preferred = [
+            "measurement",
+            "applied_value",
+            "meter_reading",
+            "tolerance_percent",
+            "error_percent",
+            "result",
+        ]
+
+        labels = {
+            "measurement":
+                "Function",
+
+            "applied_value":
+                "Applied Value",
+
+            "meter_reading":
+                "Recorded Value",
+
+            "tolerance_percent":
+                "Tolerance %",
+
+            "error_percent":
+                "Error %",
+
+            "result":
+                "Result",
+        }
+
+        columns = (
+            PanelReportService.get_nonempty_columns(
+                valid,
+                preferred
+            )
+        )
+
+        if not columns:
+            return
+
+        table = document.add_table(
+            rows=1,
+            cols=len(columns)
+        )
+
+        table.style = "Table Grid"
+
+        for index, key in enumerate(
+            columns
+        ):
+
+            table.cell(
+                0,
+                index
+            ).text = labels.get(
+                key,
+                PanelReportService.pretty_label(
+                    key
+                )
+            )
+
+        for item in valid:
+
+            if all(
+                PanelReportService.is_empty_value(
+                    item.get(key)
+                )
+                for key in columns
+            ):
+                continue
+
+            cells = table.add_row().cells
+
+            for index, key in enumerate(
+                columns
+            ):
+
+                value = item.get(
+                    key
+                )
+
+                cells[index].text = (
+                    ""
+                    if PanelReportService.is_empty_value(
+                        value
+                    )
+                    else str(value)
+                )
+
+    # =====================================================
+    # KEY / VALUE TABLE
+    # =====================================================
+
+    @staticmethod
+    def add_key_value_table(
+        document,
+        rows
+    ):
+
+        rows = (
+            PanelReportService.remove_empty_rows(
+                rows
+            )
+        )
+
+        if not rows:
+            return
+
+        table = document.add_table(
+            rows=1,
+            cols=2
+        )
+
+        table.style = "Table Grid"
+
+        table.cell(
+            0,
+            0
+        ).text = "Parameter"
+
+        table.cell(
+            0,
+            1
+        ).text = "Value"
+
+        for label, value in rows:
+
+            cells = table.add_row().cells
+
+            cells[0].text = str(
+                label
+            )
+
+            cells[1].text = str(
+                value
+            )
+
+    # =====================================================
+    # GENERAL HELPERS
+    # =====================================================
+
+    @staticmethod
+    def get_value(
+        obj,
+        key,
+        default=None
+    ):
+
+        if obj is None:
+            return default
+
+        if isinstance(
+            obj,
+            dict
+        ):
+            return obj.get(
+                key,
+                default
+            )
+
+        return getattr(
+            obj,
+            key,
+            default
+        )
+
+    @staticmethod
+    def is_empty_value(
+        value
+    ):
+
+        if value is None:
+            return True
+
+        if isinstance(
+            value,
+            str
+        ):
+
+            return (
+                value.strip().lower()
+                in (
+                    "",
+                    "null",
+                    "none",
+                    "n/a",
+                    "na",
+                    "-"
+                )
+            )
+
+        return False
+
+    @staticmethod
+    def remove_empty_rows(
+        rows
+    ):
+
+        return [
+            (
+                label,
+                value
+            )
+            for label, value in (
+                rows or []
+            )
+            if not PanelReportService.is_empty_value(
+                value
+            )
+        ]
+
+    @staticmethod
+    def add_summary_row(
+        table,
+        values
+    ):
+
+        if all(
+            PanelReportService.is_empty_value(
+                value
+            )
+            for value in values
+        ):
+            return
+
+        cells = table.add_row().cells
+
+        for index, value in enumerate(
+            values
+        ):
+
+            cells[index].text = (
+                ""
+                if PanelReportService.is_empty_value(
+                    value
+                )
+                else str(value)
+            )
+
+    @staticmethod
+    def get_nonempty_columns(
+        rows,
+        preferred
+    ):
+
+        available = []
+
+        for row in rows:
+
+            for key in row.keys():
+
+                if key not in available:
+                    available.append(
+                        key
+                    )
+
+        columns = [
+            key
+            for key in preferred
+            if key in available
+            and any(
+                not PanelReportService.is_empty_value(
+                    row.get(key)
+                )
+                for row in rows
+            )
+        ]
+
+        columns.extend(
+            key
+            for key in available
+            if key not in columns
+            and any(
+                not PanelReportService.is_empty_value(
+                    row.get(key)
+                )
+                for row in rows
+            )
+        )
+
+        return columns
+
+    @staticmethod
+    def pretty_label(
+        value
+    ):
+
+        return (
+            str(value)
+            .replace(
+                "_",
+                " "
+            )
+            .replace(
+                "-",
+                " "
+            )
+            .strip()
+            .title()
+        )
+
+    @staticmethod
+    def date_only(
+        value
+    ):
+
+        if value is None:
+            return ""
+
+        if isinstance(
+            value,
+            datetime
+        ):
+            return value.strftime(
+                "%Y-%m-%d"
+            )
+
+        text = str(
+            value
+        ).strip()
+
+        if not text:
+            return ""
+
+        if "T" in text:
+            return text.split(
+                "T",
+                1
+            )[0]
+
+        if " " in text:
+            return text.split(
+                " ",
+                1
+            )[0]
+
+        return text
+
+    @staticmethod
+    def normalize_date(
+        value
+    ):
+
+        if value is None:
+            return ""
+
+        if isinstance(
+            value,
+            datetime
+        ):
+            return value.strftime(
+                "%Y-%m-%d"
+            )
+
+        text = str(
+            value
+        ).strip()
+
+        if not text:
+            return ""
+
+        # Common Qt / ISO date representations.
+        if "T" in text:
+            text = text.split(
+                "T",
+                1
+            )[0]
+
+        elif " " in text:
+            text = text.split(
+                " ",
+                1
+            )[0]
+
+        for fmt in (
+            "%Y-%m-%d",
+            "%d-%m-%Y",
+            "%d/%m/%Y",
+            "%d.%m.%Y",
+            "%Y/%m/%d",
+        ):
+
+            try:
+
+                return datetime.strptime(
+                    text,
+                    fmt
+                ).strftime(
+                    "%Y-%m-%d"
+                )
+
+            except ValueError:
+                pass
+
+        return text
+
+    @staticmethod
+    def safe_filename_part(
+        value
+    ):
+
+        if value is None:
+            return ""
+
+        text = str(
+            value
+        ).strip()
+
+        if not text:
+            return ""
+
+        invalid = (
+            "<",
+            ">",
+            ":",
+            '"',
+            "/",
+            "\\",
+            "|",
+            "?",
+            "*",
+        )
+
+        for character in invalid:
+            text = text.replace(
+                character,
+                "-"
+            )
+
+        return text
+
+    @staticmethod
+    def find_parent_name(
+        node,
+        attributes
+    ):
+
+        current = node
+
+        for _ in range(4):
+
+            if current is None:
+                break
+
+            for attribute in attributes:
+
+                value = getattr(
+                    current,
+                    attribute,
+                    None
+                )
+
+                if value:
+                    return str(
+                        value
+                    )
+
+            current = getattr(
+                current,
+                "parent",
+                None
+            )
+
+        return ""
+
+    @staticmethod
+    def calculate_overall_result(
+        protection_tests,
+        component_tests
+    ):
+
+        results = []
+
+        for test in (
+            list(
+                protection_tests or []
+            )
+            +
+            list(
+                component_tests or []
+            )
+        ):
+
+            result = str(
+                PanelReportService.get_value(
+                    test,
+                    "result",
+                    ""
+                )
+                or ""
+            ).strip().upper()
+
+            if result:
+                results.append(
+                    result
+                )
+
+        if not results:
+            return "NOT TESTED"
+
+        if any(
+            result == "FAIL"
+            for result in results
+        ):
+            return "FAIL"
+
+        if all(
+            result == "PASS"
+            for result in results
+        ):
+            return "PASS"
+
+        return "PARTIALLY TESTED"
+
+    # =====================================================
+    # DOCUMENT FORMATTING
     # =====================================================
 
     @staticmethod
@@ -914,9 +1623,7 @@ class PanelReportService:
         document
     ):
 
-        section = (
-            document.sections[0]
-        )
+        section = document.sections[0]
 
         section.top_margin = Inches(
             0.6
@@ -934,13 +1641,15 @@ class PanelReportService:
             0.6
         )
 
-        document.styles[
+        normal_style = document.styles[
             "Normal"
-        ].font.name = "Arial"
+        ]
 
-        document.styles[
-            "Normal"
-        ].font.size = Pt(
+        normal_style.font.name = (
+            "Arial"
+        )
+
+        normal_style.font.size = Pt(
             9
         )
 
@@ -950,20 +1659,17 @@ class PanelReportService:
         text
     ):
 
-        paragraph = (
-            document.add_paragraph()
-        )
+        paragraph = document.add_paragraph()
 
         paragraph.alignment = (
             WD_ALIGN_PARAGRAPH.CENTER
         )
 
         run = paragraph.add_run(
-            text
+            str(text)
         )
 
         run.bold = True
-
         run.font.size = Pt(
             18
         )
@@ -974,62 +1680,16 @@ class PanelReportService:
         text
     ):
 
-        paragraph = (
-            document.add_paragraph()
-        )
+        paragraph = document.add_paragraph()
 
         run = paragraph.add_run(
-            text
+            str(text)
         )
 
         run.bold = True
-
         run.font.size = Pt(
             12
         )
-
-    @staticmethod
-    def add_table(
-        document,
-        rows
-    ):
-
-        if not rows:
-
-            return
-
-        table = document.add_table(
-            rows=1,
-            cols=2
-        )
-
-        table.style = "Table Grid"
-
-        table.rows[0].cells[0].text = (
-            "Parameter"
-        )
-
-        table.rows[0].cells[1].text = (
-            "Value"
-        )
-
-        for label, value in rows:
-
-            cells = (
-                table
-                .add_row()
-                .cells
-            )
-
-            cells[0].text = (
-                str(label)
-            )
-
-            cells[1].text = (
-                ""
-                if value is None
-                else str(value)
-            )
 
     @staticmethod
     def add_result(
@@ -1037,269 +1697,13 @@ class PanelReportService:
         result
     ):
 
-        paragraph = (
-            document.add_paragraph()
-        )
+        paragraph = document.add_paragraph()
 
         run = paragraph.add_run(
             f"Result: {result}"
         )
 
         run.bold = True
-
         run.font.size = Pt(
             11
         )
-    # =====================================================
-    # EMPTY VALUE CHECK
-    # =====================================================
-
-    @staticmethod
-    def is_empty_value(
-        value
-    ):
-
-        if value is None:
-
-            return True
-
-        if isinstance(
-            value,
-            str
-        ):
-
-            cleaned = (
-                value
-                .strip()
-                .lower()
-            )
-
-            if cleaned in (
-                "",
-                "null",
-                "none",
-                "n/a",
-                "na",
-                "-"
-            ):
-
-                return True
-
-        return False
-    # =====================================================
-    # ADD PHASE-WISE CT TEST TABLE
-    # =====================================================
-
-    def add_phase_test_table(
-        self,
-        document,
-        phase_tests
-    ):
-        """
-        Add phase-wise CT test results to the report.
-
-        Expected structure:
-
-        phase_tests = [
-            {
-                "phase": "R",
-                "injected_primary": "1000",
-                "recorded_secondary": "1.002",
-                "measured_ratio": "998.00",
-                "ratio_error": "-0.20",
-                "result": "PASS"
-            },
-            ...
-        ]
-        """
-
-        if not phase_tests:
-            return
-
-        # -------------------------------------------------
-        # Make sure we have dictionaries
-        # -------------------------------------------------
-
-        valid_phases = []
-
-        for phase in phase_tests:
-
-            if not isinstance(
-                phase,
-                dict
-            ):
-                continue
-
-            valid_phases.append(
-                phase
-            )
-
-        if not valid_phases:
-            return
-
-        # -------------------------------------------------
-        # Preferred column order
-        # -------------------------------------------------
-
-        preferred_columns = [
-
-            "phase",
-
-            "injected_primary",
-
-            "recorded_secondary",
-
-            "measured_ratio",
-
-            "ratio_error",
-
-            "polarity",
-
-            "polarity_result",
-
-            "result",
-
-        ]
-
-        # -------------------------------------------------
-        # Find all available keys
-        # -------------------------------------------------
-
-        all_keys = []
-
-        for phase in valid_phases:
-
-            for key in phase.keys():
-
-                if key not in all_keys:
-
-                    all_keys.append(
-                        key
-                    )
-
-        # -------------------------------------------------
-        # Build column order
-        # -------------------------------------------------
-
-        columns = []
-
-        for key in preferred_columns:
-
-            if key in all_keys:
-
-                columns.append(
-                    key
-                )
-
-        # -------------------------------------------------
-        # Add any additional fields
-        # -------------------------------------------------
-
-        for key in all_keys:
-
-            if key not in columns:
-
-                columns.append(
-                    key
-                )
-
-        # -------------------------------------------------
-        # Remove completely empty columns
-        # -------------------------------------------------
-
-        final_columns = []
-
-        for key in columns:
-
-            has_value = False
-
-            for phase in valid_phases:
-
-                value = phase.get(
-                    key
-                )
-
-                if not self.is_empty_value(
-                    value
-                ):
-
-                    has_value = True
-
-                    break
-
-            if has_value:
-
-                final_columns.append(
-                    key
-                )
-
-        if not final_columns:
-            return
-
-        # -------------------------------------------------
-        # Create table
-        # -------------------------------------------------
-
-        table = document.add_table(
-            rows=1,
-            cols=len(
-                final_columns
-            )
-        )
-
-        table.style = "Table Grid"
-
-        # -------------------------------------------------
-        # Header
-        # -------------------------------------------------
-
-        header_cells = (
-            table
-            .rows[0]
-            .cells
-        )
-
-        for index, key in enumerate(
-            final_columns
-        ):
-
-            header_cells[index].text = (
-                key
-                .replace(
-                    "_",
-                    " "
-                )
-                .title()
-            )
-
-        # -------------------------------------------------
-        # Rows
-        # -------------------------------------------------
-
-        for phase in valid_phases:
-
-            cells = (
-                table
-                .add_row()
-                .cells
-            )
-
-            for index, key in enumerate(
-                final_columns
-            ):
-
-                value = phase.get(
-                    key
-                )
-
-                if self.is_empty_value(
-                    value
-                ):
-
-                    cells[index].text = ""
-
-                else:
-
-                    cells[index].text = str(
-                        value
-                    )

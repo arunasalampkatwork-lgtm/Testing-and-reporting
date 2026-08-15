@@ -9,12 +9,11 @@ from PySide6.QtWidgets import (
     QLabel,
 )
 
-from app.ui.test_detail_view import (
-    TestDetailView
-)
+from app.ui.test_detail_view import TestDetailView
 from app.ui.aux_relay_test_detail_view import (
     AuxRelayTestDetailView
 )
+
 
 class TestHistoryView(QDialog):
 
@@ -27,71 +26,28 @@ class TestHistoryView(QDialog):
         parent=None
     ):
 
-        super().__init__(
-            parent
-        )
+        super().__init__(parent)
 
-        # =================================================
-        # REFERENCES
-        # =================================================
+        self.test_service = test_service
+        self.project_id = project_id
+        self.panel_id = panel_id
+        self.project_folder = project_folder
 
-        self.test_service = (
-            test_service
-        )
-
-        self.project_id = (
-            project_id
-        )
-
-        self.panel_id = (
-            panel_id
-        )
-
-        self.project_folder = (
-            project_folder
-        )
-
-        # =================================================
-        # WINDOW
-        # =================================================
-
-        self.setWindowTitle(
-            "Test History"
-        )
-
-        self.resize(
-            1100,
-            650
-        )
-
-        # =================================================
-        # UI
-        # =================================================
+        self.setWindowTitle("Test History")
+        self.resize(1100, 650)
 
         self.build_ui()
-
         self.load_tests()
 
     # =====================================================
-    # BUILD UI
+    # UI
     # =====================================================
 
-    def build_ui(
-        self
-    ):
+    def build_ui(self):
 
-        layout = QVBoxLayout(
-            self
-        )
+        layout = QVBoxLayout(self)
 
-        # =================================================
-        # HEADER
-        # =================================================
-
-        header = QLabel(
-            "Test History"
-        )
-
+        header = QLabel("Test History")
         header.setStyleSheet(
             """
             QLabel {
@@ -100,142 +56,75 @@ class TestHistoryView(QDialog):
             }
             """
         )
-
-        layout.addWidget(
-            header
-        )
-
-        # =================================================
-        # TABLE
-        # =================================================
+        layout.addWidget(header)
 
         self.table = QTableWidget()
-
-        self.table.setColumnCount(
-            7
-        )
-
+        self.table.setColumnCount(7)
         self.table.setHorizontalHeaderLabels(
             [
                 "Test ID",
                 "Date",
                 "Test Type",
                 "Protection / Component",
+                "Test / Function",
                 "Result",
                 "Remarks",
-                "Record Type",
             ]
         )
 
         self.table.setSelectionBehavior(
-            QTableWidget
-            .SelectionBehavior
-            .SelectRows
+            QTableWidget.SelectionBehavior.SelectRows
         )
-
         self.table.setSelectionMode(
-            QTableWidget
-            .SelectionMode
-            .SingleSelection
+            QTableWidget.SelectionMode.SingleSelection
         )
-
         self.table.setEditTriggers(
-            QTableWidget
-            .EditTrigger
-            .NoEditTriggers
+            QTableWidget.EditTrigger.NoEditTriggers
         )
-
-        self.table.setAlternatingRowColors(
-            True
-        )
-
-        # -------------------------------------------------
-        # SINGLE DOUBLE-CLICK CONNECTION
-        # -------------------------------------------------
+        self.table.setAlternatingRowColors(True)
 
         self.table.cellDoubleClicked.connect(
             self.open_test_detail
         )
 
-        layout.addWidget(
-            self.table
-        )
-
-        # =================================================
-        # BUTTONS
-        # =================================================
+        layout.addWidget(self.table)
 
         buttons = QHBoxLayout()
 
-        self.refresh_button = QPushButton(
-            "Refresh"
-        )
-
-        self.edit_button = QPushButton(
-            "View / Edit Test"
-        )
-
-        self.close_button = QPushButton(
-            "Close"
-        )
+        self.refresh_button = QPushButton("Refresh")
+        self.edit_button = QPushButton("View / Edit Test")
+        self.close_button = QPushButton("Close")
 
         self.refresh_button.clicked.connect(
             self.load_tests
         )
-
         self.edit_button.clicked.connect(
             self.open_selected_test
         )
-
         self.close_button.clicked.connect(
             self.accept
         )
 
-        buttons.addWidget(
-            self.refresh_button
-        )
-
-        buttons.addWidget(
-            self.edit_button
-        )
-
+        buttons.addWidget(self.refresh_button)
+        buttons.addWidget(self.edit_button)
         buttons.addStretch()
+        buttons.addWidget(self.close_button)
 
-        buttons.addWidget(
-            self.close_button
-        )
-
-        layout.addLayout(
-            buttons
-        )
+        layout.addLayout(buttons)
 
     # =====================================================
-    # LOAD ALL TESTS
+    # LOAD
     # =====================================================
 
-    def load_tests(
-        self
-    ):
+    def load_tests(self):
 
-        self.table.setRowCount(
-            0
-        )
+        self.table.setRowCount(0)
 
         try:
 
-            # -------------------------------------------------
-            # PROTECTION TESTS
-            # -------------------------------------------------
-
             protection_tests = (
-                self.test_service
-                .get_all_tests()
+                self.test_service.get_all_tests()
             )
-
-            # -------------------------------------------------
-            # COMPONENT TESTS
-            # CT / AUX RELAY
-            # -------------------------------------------------
 
             component_tests = (
                 self.test_service
@@ -249,28 +138,12 @@ class TestHistoryView(QDialog):
                 "Database Error",
                 str(error)
             )
-
             return
-
-        # =================================================
-        # COMBINE
-        # =================================================
 
         history = []
 
         # -------------------------------------------------
         # PROTECTION TESTS
-        #
-        # Structure:
-        #
-        # 0 test_id
-        # 1 project_id
-        # 2 panel_id
-        # 3 relay_id
-        # 4 protection_code
-        # 5 test_date
-        # 6 result
-        # 7 remarks
         # -------------------------------------------------
 
         for row in protection_tests:
@@ -281,48 +154,19 @@ class TestHistoryView(QDialog):
             if row[2] != self.panel_id:
                 continue
 
-            history.append(
-                {
-                    "test_id":
-                        row[0],
-
-                    "date":
-                        row[5],
-
-                    "test_type":
-                        "PROTECTION",
-
-                    "protection_component":
-                        row[4],
-
-                    "component_id":
-                        row[3],
-
-                    "result":
-                        row[6],
-
-                    "remarks":
-                        row[7],
-
-                    "record_type":
-                        "PROTECTION",
-                }
-            )
+            history.append({
+                "test_id": row[0],
+                "date": row[5],
+                "test_type": "PROTECTION",
+                "component": row[3],
+                "test": row[4],
+                "result": row[6],
+                "remarks": row[7],
+                "record_type": "PROTECTION",
+            })
 
         # -------------------------------------------------
         # COMPONENT TESTS
-        #
-        # Structure:
-        #
-        # 0 test_id
-        # 1 project_id
-        # 2 panel_id
-        # 3 component_id
-        # 4 test_type
-        # 5 test_date
-        # 6 measurements_json
-        # 7 result
-        # 8 remarks
         # -------------------------------------------------
 
         for row in component_tests:
@@ -333,130 +177,112 @@ class TestHistoryView(QDialog):
             if row[2] != self.panel_id:
                 continue
 
-            history.append(
-                {
-                    "test_id":
-                        row[0],
+            test_id = row[0]
+            test_type = str(row[4] or "").upper()
 
-                    "date":
-                        row[5],
+            # Get full record so METER functions can be
+            # represented as individual history rows.
+            try:
+                record = (
+                    self.test_service
+                    .get_component_test(test_id)
+                )
+            except Exception:
+                record = None
 
-                    "test_type":
-                        row[4],
+            component_id = row[3]
+            result = row[7]
+            remarks = row[8]
 
-                    "protection_component":
-                        row[3],
+            if test_type == "METER" and record:
 
-                    "component_id":
-                        row[3],
+                measurements = (
+                    record.get("measurements", {})
+                    or {}
+                )
 
-                    "result":
-                        row[7],
+                functions = (
+                    measurements.get("functions", [])
+                    or []
+                )
 
-                    "remarks":
-                        row[8],
+                if functions:
 
-                    "record_type":
-                        "COMPONENT",
-                }
-            )
+                    for function in functions:
 
-        # =================================================
-        # SORT BY DATE
-        # =================================================
+                        if not isinstance(function, dict):
+                            continue
+
+                        measurement = str(
+                            function.get(
+                                "measurement",
+                                ""
+                            )
+                        )
+
+                        history.append({
+                            "test_id": test_id,
+                            "date": row[5],
+                            "test_type": "METER",
+                            "component": component_id,
+                            "test": measurement,
+                            "result": function.get(
+                                "result",
+                                result
+                            ),
+                            "remarks": remarks,
+                            "record_type": "METER",
+                        })
+
+                    continue
+
+            # CT / AUX / any other component test
+            history.append({
+                "test_id": test_id,
+                "date": row[5],
+                "test_type": test_type,
+                "component": component_id,
+                "test": test_type,
+                "result": result,
+                "remarks": remarks,
+                "record_type": "COMPONENT",
+            })
 
         history.sort(
-            key=lambda item:
-                str(
-                    item.get(
-                        "date",
-                        ""
-                    )
-                ),
+            key=lambda item: str(
+                item.get("date", "")
+            ),
             reverse=True
         )
 
-        # =================================================
-        # POPULATE TABLE
-        # =================================================
-
         for record in history:
 
-            row = (
-                self.table.rowCount()
-            )
-
-            self.table.insertRow(
-                row
-            )
+            row = self.table.rowCount()
+            self.table.insertRow(row)
 
             values = [
-
-                record.get(
-                    "test_id",
-                    ""
-                ),
-
-                record.get(
-                    "date",
-                    ""
-                ),
-
-                record.get(
-                    "test_type",
-                    ""
-                ),
-
-                record.get(
-                    "protection_component",
-                    ""
-                ),
-
-                record.get(
-                    "result",
-                    ""
-                ),
-
-                record.get(
-                    "remarks",
-                    ""
-                ),
-
-                record.get(
-                    "record_type",
-                    ""
-                ),
+                record.get("test_id", ""),
+                record.get("date", ""),
+                record.get("test_type", ""),
+                record.get("component", ""),
+                record.get("test", ""),
+                record.get("result", ""),
+                record.get("remarks", ""),
             ]
 
-            for column, value in enumerate(
-                values
-            ):
-
-                item = QTableWidgetItem(
-                    str(
-                        value
-                        if value is not None
-                        else ""
-                    )
-                )
+            for column, value in enumerate(values):
 
                 self.table.setItem(
                     row,
                     column,
-                    item
+                    QTableWidgetItem(
+                        str(
+                            value
+                            if value is not None
+                            else ""
+                        )
+                    )
                 )
-
-        # =================================================
-        # HIDE RECORD TYPE COLUMN
-        #
-        # We keep it internally because later we need it
-        # to decide which detail view to open.
-        # =================================================
-
-        self.table.setColumnHidden(
-            6,
-            True
-        )
 
         self.table.resizeColumnsToContents()
 
@@ -464,52 +290,29 @@ class TestHistoryView(QDialog):
     # SELECTED TEST
     # =====================================================
 
-    def get_selected_test_id(
-        self
-    ):
+    def get_selected_test_id(self):
 
-        row = (
-            self.table.currentRow()
-        )
+        row = self.table.currentRow()
 
         if row < 0:
-
             return None
 
-        item = (
-            self.table.item(
-                row,
-                0
-            )
-        )
+        item = self.table.item(row, 0)
 
         if item is None:
-
             return None
 
-        test_id = (
-            item
-            .text()
-            .strip()
-        )
+        value = item.text().strip()
 
-        if not test_id:
-
-            return None
-
-        return test_id
+        return value or None
 
     # =====================================================
-    # OPEN SELECTED TEST
+    # OPEN
     # =====================================================
 
-    def open_selected_test(
-        self
-    ):
+    def open_selected_test(self):
 
-        test_id = (
-            self.get_selected_test_id()
-        )
+        test_id = self.get_selected_test_id()
 
         if not test_id:
 
@@ -518,16 +321,9 @@ class TestHistoryView(QDialog):
                 "No Test Selected",
                 "Select a test first."
             )
-
             return
 
-        self.show_test_detail(
-            test_id
-        )
-
-    # =====================================================
-    # DOUBLE CLICK
-    # =====================================================
+        self.show_test_detail(test_id)
 
     def open_test_detail(
         self,
@@ -535,197 +331,74 @@ class TestHistoryView(QDialog):
         column
     ):
 
-        item = (
-            self.table.item(
-                row,
-                0
-            )
-        )
+        item = self.table.item(row, 0)
 
         if item is None:
-
             return
 
-        test_id = (
-            item
-            .text()
-            .strip()
-        )
+        test_id = item.text().strip()
 
-        if not test_id:
-
-            return
-
-        self.show_test_detail(
-            test_id
-        )
+        if test_id:
+            self.show_test_detail(test_id)
 
     # =====================================================
-    # SHOW DETAIL
+    # DETAIL ROUTING
     # =====================================================
 
-    def show_test_detail(
-        self,
-        test_id
-    ):
+    def show_test_detail(self, test_id):
 
-        # -------------------------------------------------
-        # Determine record type.
-        #
-        # We cannot assume every TEST-XXXXXXXX belongs
-        # to protection_tests.
-        # -------------------------------------------------
-
+        # Protection test
         try:
-
             protection_record = (
-                self.test_service
-                .get_test(
-                    test_id
-                )
+                self.test_service.get_test(test_id)
             )
-
         except Exception:
-
             protection_record = None
 
         if protection_record is not None:
 
-            self.test_detail_view = (
-                TestDetailView(
-
-                    test_service=(
-                        self.test_service
-                    ),
-
-                    test_id=(
-                        test_id
-                    ),
-
-                    project_folder=(
-                        self.project_folder
-                    ),
-
-                    parent=self
-                )
+            self.test_detail_view = TestDetailView(
+                test_service=self.test_service,
+                test_id=test_id,
+                project_folder=self.project_folder,
+                parent=self
             )
 
             self.test_detail_view.exec()
-
             self.load_tests()
-
             return
 
-        # -------------------------------------------------
-        # COMPONENT TEST
-        # -------------------------------------------------
-
+        # Component test
         try:
-
             component_record = (
                 self.test_service
-                .get_component_test(
-                    test_id
-                )
+                .get_component_test(test_id)
             )
-
         except Exception:
-
             component_record = None
 
-        if component_record is not None:
+        if component_record is None:
 
-            self.show_component_test_detail(
-                component_record
+            QMessageBox.warning(
+                self,
+                "Test Not Found",
+                f"Unable to find test record:\n\n{test_id}"
             )
-
             return
 
-        # -------------------------------------------------
-        # NOT FOUND
-        # -------------------------------------------------
-
-        QMessageBox.warning(
-            self,
-            "Test Not Found",
-            (
-                f"Unable to find test record:\n\n"
-                f"{test_id}"
-            )
-        )
-        component_test = (
-            self.test_service
-            .get_component_test(
-                test_id
-            )
+        self.show_component_test_detail(
+            component_record
         )
 
-        if component_test is not None:
-
-            test_type = str(
-                component_test.get(
-                    "test_type",
-                    ""
-                )
-            ).upper()
-
-            if test_type == "CT":
-
-                self.test_detail_view = (
-                    CTTestDetailView(
-                        test_service=self.test_service,
-                        test_id=test_id,
-                        project_folder=self.project_folder,
-                        parent=self
-                    )
-                )
-
-            elif test_type == "AUX_RELAY":
-
-                self.test_detail_view = (
-                    AuxRelayTestDetailView(
-                        test_service=self.test_service,
-                        test_id=test_id,
-                        project_folder=self.project_folder,
-                        parent=self
-                    )
-                )
-
-            else:
-
-                # Existing generic component detail view
-                self.test_detail_view = TestDetailView(
-                    test_service=self.test_service,
-                    test_id=test_id,
-                    project_folder=self.project_folder,
-                    parent=self
-                )
-
-            self.test_detail_view.exec()
-
-            self.load_tests()
-
-            return
-
     # =====================================================
-    # COMPONENT TEST DETAIL
+    # COMPONENT DETAIL ROUTING
     # =====================================================
 
-    def show_component_test_detail(
-        self,
-        record
-    ):
+    def show_component_test_detail(self, record):
 
         test_type = str(
-            record.get(
-                "test_type",
-                ""
-            )
+            record.get("test_type", "")
         ).strip().upper()
-
-        # -------------------------------------------------
-        # CT
-        # -------------------------------------------------
 
         if test_type == "CT":
 
@@ -737,122 +410,15 @@ class TestHistoryView(QDialog):
 
                 self.component_test_detail_view = (
                     CTTestDetailView(
-
-                        test_service=(
-                            self.test_service
-                        ),
-
-                        test_id=(
-                            record.get(
-                                "test_id"
-                            )
-                        ),
-
-                        project_folder=(
-                            self.project_folder
-                        ),
-
+                        test_service=self.test_service,
+                        test_id=record.get("test_id"),
+                        project_folder=self.project_folder,
                         parent=self
                     )
                 )
 
                 self.component_test_detail_view.exec()
-
                 self.load_tests()
-
-                return
-
-            except ImportError:
-
-                pass
-
-        # -------------------------------------------------
-        # FALLBACK
-        # -------------------------------------------------
-        #
-        # Until CTTestDetailView exists, display the
-        # stored component-test data instead of crashing.
-        # -------------------------------------------------
-
-        measurements = (
-            record.get(
-                "measurements",
-                {}
-            )
-        )
-
-        text = (
-            f"Test ID: "
-            f"{record.get('test_id', '')}\n\n"
-
-            f"Test Type: "
-            f"{record.get('test_type', '')}\n\n"
-
-            f"Component ID: "
-            f"{record.get('component_id', '')}\n\n"
-
-            f"Date: "
-            f"{record.get('test_date', '')}\n\n"
-
-            f"Result: "
-            f"{record.get('result', '')}\n\n"
-
-            f"Remarks: "
-            f"{record.get('remarks', '')}\n\n"
-
-            f"Measurements:\n"
-            f"{measurements}"
-        )
-
-    def show_component_test_detail(
-        self,
-        record
-    ):
-
-        test_type = str(
-            record.get(
-                "test_type",
-                ""
-            )
-        ).strip().upper()
-
-        # =================================================
-        # CT TEST
-        # =================================================
-
-        if test_type == "CT":
-
-            try:
-
-                from app.ui.ct_test_detail_view import (
-                    CTTestDetailView
-                )
-
-                self.component_test_detail_view = (
-                    CTTestDetailView(
-
-                        test_service=(
-                            self.test_service
-                        ),
-
-                        test_id=(
-                            record.get(
-                                "test_id"
-                            )
-                        ),
-
-                        project_folder=(
-                            self.project_folder
-                        ),
-
-                        parent=self
-                    )
-                )
-
-                self.component_test_detail_view.exec()
-
-                self.load_tests()
-
                 return
 
             except Exception as error:
@@ -862,21 +428,72 @@ class TestHistoryView(QDialog):
                     "CT Test Detail Error",
                     str(error)
                 )
-
                 return
 
-        # =================================================
-        # UNKNOWN COMPONENT TEST
-        # =================================================
+        if test_type == "AUX_RELAY":
 
-        QMessageBox.information(
-            self,
-            "Component Test",
-            (
-                "Detailed view is not yet available "
-                "for component test type:\n\n"
-                f"{test_type}"
-            )
+            try:
+
+                self.component_test_detail_view = (
+                    AuxRelayTestDetailView(
+                        test_service=self.test_service,
+                        test_id=record.get("test_id"),
+                        project_folder=self.project_folder,
+                        parent=self
+                    )
+                )
+
+                self.component_test_detail_view.exec()
+                self.load_tests()
+                return
+
+            except Exception as error:
+
+                QMessageBox.critical(
+                    self,
+                    "Auxiliary Relay Detail Error",
+                    str(error)
+                )
+                return
+
+        if test_type == "METER":
+
+            try:
+
+                from app.ui.meter_test_detail_view import (
+                    MeterTestDetailView
+                )
+
+                self.component_test_detail_view = (
+                    MeterTestDetailView(
+                        test_service=self.test_service,
+                        test_id=record.get("test_id"),
+                        project_folder=self.project_folder,
+                        parent=self
+                    )
+                )
+
+                self.component_test_detail_view.exec()
+                self.load_tests()
+                return
+
+            except Exception as error:
+
+                QMessageBox.critical(
+                    self,
+                    "Meter Test Detail Error",
+                    str(error)
+                )
+                return
+
+        # Existing generic fallback
+
+        self.component_test_detail_view = TestDetailView(
+            test_service=self.test_service,
+            test_id=record.get("test_id"),
+            project_folder=self.project_folder,
+            parent=self
         )
 
+        self.component_test_detail_view.exec()
         self.load_tests()

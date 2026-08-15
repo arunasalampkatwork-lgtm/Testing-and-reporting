@@ -42,6 +42,9 @@ from app.ui.asset_edit_dialog import AssetEditDialog
 from app.services.panel_report_service import (
     PanelReportService
 )
+from app.ui.meter_testing_dialog import (
+    MeterTestingDialog
+)
 
 
 
@@ -2035,24 +2038,10 @@ class AssetView(QWidget):
 
             self.component_manager.generate_panel_components(
                 panel_id=panel.node_id,
-                ct_count=int(
-                    configuration.get(
-                        "ct_count",
-                        0,
-                    ) or 0
-                ),
-                relay_count=int(
-                    configuration.get(
-                        "relay_count",
-                        0,
-                    ) or 0
-                ),
-                aux_count=int(
-                    configuration.get(
-                        "aux_count",
-                        0,
-                    ) or 0
-                ),
+                ct_count=int(configuration.get("ct_count", 0) or 0),
+                relay_count=int(configuration.get("relay_count", 0) or 0),
+                aux_count=int(configuration.get("aux_count", 0) or 0),
+                meter_count=int(configuration.get("meter_count", 0) or 0),
             )
 
             self.display_selected_components()
@@ -2507,6 +2496,25 @@ class AssetView(QWidget):
                 panel_id=panel_id,
                 component=component,
                 test_service=self.test_service,
+                parent=self,
+            )
+        elif component_type in (
+            "METER",
+            "AMMETER",
+            "VOLTMETER",
+            "MULTIFUNCTION_METER",
+        ):
+
+            self.testing_dialog = MeterTestingDialog(
+
+                project_id=project_id,
+
+                panel_id=panel_id,
+
+                component=component,
+
+                test_service=self.test_service,
+
                 parent=self,
             )
 

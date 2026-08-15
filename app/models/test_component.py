@@ -38,6 +38,13 @@ class TestComponent:
         contact_configuration="",
 
         # =================================================
+        # METERS
+        # =================================================
+        meter_type="",
+        meter_functions=None,
+        accuracy_class="",
+
+        # =================================================
         # PROTECTION FUNCTIONS
         # =================================================
 
@@ -122,7 +129,16 @@ class TestComponent:
         self.contact_configuration = (
             contact_configuration
         )
+        self.meter_type = meter_type
+        self.meter_functions = (
+            meter_functions
+            if meter_functions is not None
+            else []
+        )
 
+        self.accuracy_class = (
+            accuracy_class
+        )
         # =================================================
         # PROTECTION FUNCTIONS
         # =================================================
