@@ -2037,6 +2037,11 @@ class AssetView(QWidget):
             except Exception:
 
                 global_asset = None
+        dialog = AssetEditDialog(
+            node=node,
+            global_asset=global_asset,
+            parent=self,
+        )
 
         # =================================================
         # OPEN EDIT DIALOG

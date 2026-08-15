@@ -34,7 +34,7 @@ class AssetEditDialog(QDialog):
                 "node_type",
                 "ASSET",
             )
-        ).upper()
+        ).strip().upper()
 
         label = (
             node_type
@@ -53,12 +53,34 @@ class AssetEditDialog(QDialog):
             350,
         )
 
-        # =================================================
-        # LAYOUT
-        # =================================================
+        self.build_ui()
+
+        # IMPORTANT:
+        # Populate the fields AFTER the widgets exist.
+        self.populate_existing_values()
+
+    # =====================================================
+    # BUILD UI
+    # =====================================================
+
+    def build_ui(self):
 
         layout = QVBoxLayout(
             self
+        )
+
+        node_type = str(
+            getattr(
+                self.node,
+                "node_type",
+                "ASSET",
+            )
+        ).strip().upper()
+
+        label = (
+            node_type
+            .replace("_", " ")
+            .title()
         )
 
         title = QLabel(
@@ -79,119 +101,65 @@ class AssetEditDialog(QDialog):
             title
         )
 
+        # =================================================
+        # FORM
+        # =================================================
+
         form = QFormLayout()
 
-        # =================================================
+        # -------------------------------------------------
         # NAME
-        # =================================================
+        # -------------------------------------------------
 
         self.name_edit = QLineEdit()
 
-        self.name_edit.setText(
-            str(
-                getattr(
-                    node,
-                    "name",
-                    "",
-                )
-            )
-        )
-
         form.addRow(
             "Name:",
-            self.name_edit,
+            self.name_edit
         )
 
-        # =================================================
+        # -------------------------------------------------
         # ASSET TAG
-        # =================================================
-
-        asset_tag = (
-            self.global_asset.get(
-                "asset_tag",
-                "",
-            )
-        )
-
-        if not asset_tag:
-
-            asset_tag = getattr(
-                node,
-                "name",
-                "",
-            )
+        # -------------------------------------------------
 
         self.asset_tag_edit = QLineEdit()
 
-        self.asset_tag_edit.setText(
-            str(
-                asset_tag
-            )
-        )
-
         form.addRow(
             "Asset Tag:",
-            self.asset_tag_edit,
+            self.asset_tag_edit
         )
 
-        # =================================================
+        # -------------------------------------------------
         # MANUFACTURER
-        # =================================================
+        # -------------------------------------------------
 
         self.manufacturer_edit = QLineEdit()
 
-        self.manufacturer_edit.setText(
-            str(
-                self.global_asset.get(
-                    "manufacturer",
-                    "",
-                )
-            )
-        )
-
         form.addRow(
             "Manufacturer:",
-            self.manufacturer_edit,
+            self.manufacturer_edit
         )
 
-        # =================================================
+        # -------------------------------------------------
         # MODEL
-        # =================================================
+        # -------------------------------------------------
 
         self.model_edit = QLineEdit()
 
-        self.model_edit.setText(
-            str(
-                self.global_asset.get(
-                    "model",
-                    "",
-                )
-            )
-        )
-
         form.addRow(
             "Model:",
-            self.model_edit,
+            self.model_edit
         )
 
-        # =================================================
+        # -------------------------------------------------
         # SERIAL NUMBER
-        # =================================================
+        # -------------------------------------------------
 
         self.serial_number_edit = QLineEdit()
 
-        self.serial_number_edit.setText(
-            str(
-                self.global_asset.get(
-                    "serial_number",
-                    "",
-                )
-            )
-        )
-
         form.addRow(
             "Serial Number:",
-            self.serial_number_edit,
+            self.serial_number_edit
         )
 
         layout.addLayout(
@@ -220,7 +188,135 @@ class AssetEditDialog(QDialog):
             buttons
         )
 
+    # =====================================================
+    # POPULATE EXISTING VALUES
+    # =====================================================
+
+    def populate_existing_values(self):
+
+        node = self.node
+
+        asset = self.global_asset
+
+        # -------------------------------------------------
+        # NAME
+        #
+        # Project node is the authoritative displayed name.
+        # -------------------------------------------------
+
+        name = getattr(
+            node,
+            "name",
+            ""
+        )
+
+        if not name:
+
+            name = asset.get(
+                "name",
+                ""
+            )
+
+        # -------------------------------------------------
+        # ASSET TAG
+        # -------------------------------------------------
+
+        asset_tag = asset.get(
+            "asset_tag",
+            ""
+        )
+
+        if not asset_tag:
+
+            asset_tag = getattr(
+                node,
+                "asset_tag",
+                ""
+            )
+
+        if not asset_tag:
+
+            asset_tag = name
+
+        # -------------------------------------------------
+        # MANUFACTURER
+        # -------------------------------------------------
+
+        manufacturer = asset.get(
+            "manufacturer",
+            ""
+        )
+
+        if not manufacturer:
+
+            manufacturer = getattr(
+                node,
+                "manufacturer",
+                ""
+            )
+
+        # -------------------------------------------------
+        # MODEL
+        # -------------------------------------------------
+
+        model = asset.get(
+            "model",
+            ""
+        )
+
+        if not model:
+
+            model = getattr(
+                node,
+                "model",
+                ""
+            )
+
+        # -------------------------------------------------
+        # SERIAL NUMBER
+        # -------------------------------------------------
+
+        serial_number = asset.get(
+            "serial_number",
+            ""
+        )
+
+        if not serial_number:
+
+            serial_number = getattr(
+                node,
+                "serial_number",
+                ""
+            )
+
+        # -------------------------------------------------
+        # PUT VALUES INTO UI
+        # -------------------------------------------------
+
+        self.name_edit.setText(
+            str(name or "")
+        )
+
+        self.asset_tag_edit.setText(
+            str(asset_tag or "")
+        )
+
+        self.manufacturer_edit.setText(
+            str(manufacturer or "")
+        )
+
+        self.model_edit.setText(
+            str(model or "")
+        )
+
+        self.serial_number_edit.setText(
+            str(serial_number or "")
+        )
+
+        # Put cursor in the name field.
         self.name_edit.setFocus()
+
+        self.name_edit.selectAll()
 
     # =====================================================
     # VALIDATION
@@ -245,17 +341,17 @@ class AssetEditDialog(QDialog):
             QMessageBox.warning(
                 self,
                 "Missing Name",
-                "Asset name cannot be empty.",
+                "Asset name cannot be empty."
             )
 
             self.name_edit.setFocus()
 
             return
 
+        # Asset tag is retained internally for existing
+        # assets. If it is blank, use the asset name.
         if not asset_tag:
 
-            # For compatibility with your new-panel
-            # behaviour, use the asset name as the tag.
             asset_tag = name
 
             self.asset_tag_edit.setText(
@@ -265,7 +361,7 @@ class AssetEditDialog(QDialog):
         super().accept()
 
     # =====================================================
-    # VALUES
+    # GET VALUES
     # =====================================================
 
     def get_values(self):
