@@ -9,6 +9,8 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QHBoxLayout,
     QFormLayout,
+    QFrame,
+    QSizePolicy,
     QTreeWidget,
     QTreeWidgetItem,
     QPushButton,
@@ -173,63 +175,168 @@ class AssetView(QWidget):
         # =================================================
 
         layout = QVBoxLayout(self)
+        layout.setContentsMargins(12, 12, 12, 12)
+        layout.setSpacing(10)
 
         # =================================================
-        # ASSET TREE
+        # WORKSPACE
+        #
+        # Left  : asset hierarchy + components
+        # Right : context/action panel
         # =================================================
+
+        workspace = QHBoxLayout()
+        workspace.setSpacing(12)
+
+        # =================================================
+        # LEFT WORKSPACE
+        # =================================================
+
+        left_layout = QVBoxLayout()
+        left_layout.setSpacing(8)
+
+        # -------------------------------------------------
+        # ASSET TREE HEADER
+        # -------------------------------------------------
+
+        asset_header = QLabel(
+            "Asset Hierarchy"
+        )
+
+        asset_header.setObjectName(
+            "SectionHeader"
+        )
+
+        left_layout.addWidget(
+            asset_header
+        )
+
+        # -------------------------------------------------
+        # ASSET TREE
+        # -------------------------------------------------
 
         self.tree = QTreeWidget()
 
         self.tree.setHeaderLabel(
-            "Asset Hierarchy"
+            "Project Assets"
         )
 
-        self.tree.setMinimumHeight(250)
+        self.tree.setMinimumHeight(280)
 
-        layout.addWidget(self.tree)
+        self.tree.setSizePolicy(
+            QSizePolicy.Policy.Expanding,
+            QSizePolicy.Policy.Expanding,
+        )
 
-        # =================================================
-        # COMPONENT SECTION
-        # =================================================
+        self.tree.setIndentation(24)
+        self.tree.setAnimated(True)
+        self.tree.setUniformRowHeights(True)
+
+        left_layout.addWidget(
+            self.tree,
+            5,
+        )
+
+        # -------------------------------------------------
+        # COMPONENT HEADER
+        # -------------------------------------------------
 
         self.component_label = QLabel(
             "Test Components"
         )
 
-        layout.addWidget(self.component_label)
+        self.component_label.setObjectName(
+            "SectionHeader"
+        )
+
+        left_layout.addWidget(
+            self.component_label
+        )
+
+        # -------------------------------------------------
+        # COMPONENT LIST
+        # -------------------------------------------------
 
         self.component_list = QListWidget()
 
-        layout.addWidget(self.component_list)
+        self.component_list.setMinimumHeight(220)
 
-        # =================================================
-        # COMPONENT CONFIGURATION
-        # =================================================
-
-        self.configure_component = QPushButton(
-            "Edit Component"
+        self.component_list.setSizePolicy(
+            QSizePolicy.Policy.Expanding,
+            QSizePolicy.Policy.Expanding,
         )
 
-        layout.addWidget(self.configure_component)
+        self.component_list.setSpacing(2)
+        self.component_list.setUniformItemSizes(True)
 
-        # =================================================
-        # PROTECTION FUNCTION CONFIGURATION
-        # =================================================
-
-        self.configure_protection = QPushButton(
-            "Edit Protection Functions"
+        left_layout.addWidget(
+            self.component_list,
+            4,
         )
 
-        layout.addWidget(self.configure_protection)
-
         # =================================================
-        # BOTTOM BUTTONS
+        # RIGHT ACTION PANEL
         # =================================================
 
-        buttons = QHBoxLayout()
+        action_panel = QFrame()
+
+        action_panel.setObjectName(
+            "ActionPanel"
+        )
+
+        action_panel.setFixedWidth(
+            245
+        )
+
+        action_layout = QVBoxLayout(
+            action_panel
+        )
+
+        action_layout.setContentsMargins(
+            12,
+            12,
+            12,
+            12,
+        )
+
+        action_layout.setSpacing(7)
+
+        # -------------------------------------------------
+        # ACTION HEADER
+        # -------------------------------------------------
+
+        action_title = QLabel(
+            "Actions"
+        )
+
+        action_title.setObjectName(
+            "ActionTitle"
+        )
+
+        action_layout.addWidget(
+            action_title
+        )
+
+        action_subtitle = QLabel(
+            "Select an asset or component, then choose an action."
+        )
+
+        action_subtitle.setObjectName(
+            "ActionSubtitle"
+        )
+
+        action_subtitle.setWordWrap(True)
+
+        action_layout.addWidget(
+            action_subtitle
+        )
+
+        # -------------------------------------------------
+        # BUTTONS
+        # -------------------------------------------------
 
         self.add_substation = QPushButton(
-            "+ Substation"
+            "+  Substation"
         )
 
         self.link_substation = QPushButton(
@@ -237,7 +344,7 @@ class AssetView(QWidget):
         )
 
         self.add_switchboard = QPushButton(
-            "+ Switchboard"
+            "+  Switchboard"
         )
 
         self.link_switchboard = QPushButton(
@@ -245,11 +352,19 @@ class AssetView(QWidget):
         )
 
         self.add_panel = QPushButton(
-            "+ Panel"
+            "+  Panel"
         )
 
         self.link_panel = QPushButton(
             "Link Existing Panel"
+        )
+
+        self.configure_component = QPushButton(
+            "Edit Component"
+        )
+
+        self.configure_protection = QPushButton(
+            "Edit Protection Functions"
         )
 
         self.configure_panel = QPushButton(
@@ -263,9 +378,11 @@ class AssetView(QWidget):
         self.test_history_button = QPushButton(
             "Test History"
         )
+
         self.panel_report_button = QPushButton(
             "Panel Report"
         )
+
         self.edit_asset_button = QPushButton(
             "Edit Asset"
         )
@@ -274,50 +391,291 @@ class AssetView(QWidget):
         # still refer to self.test_history.
         self.test_history = self.test_history_button
 
-        buttons.addWidget(
-            self.add_substation
+        # -------------------------------------------------
+        # GROUP LABEL HELPER
+        # -------------------------------------------------
+
+        def add_action_group(
+            title,
+            buttons,
+        ):
+
+            group_label = QLabel(
+                title.upper()
+            )
+
+            group_label.setObjectName(
+                "ActionGroup"
+            )
+
+            action_layout.addWidget(
+                group_label
+            )
+
+            for button in buttons:
+
+                button.setMinimumHeight(
+                    38
+                )
+
+                button.setSizePolicy(
+                    QSizePolicy.Policy.Expanding,
+                    QSizePolicy.Policy.Fixed,
+                )
+
+                action_layout.addWidget(
+                    button
+                )
+
+        # -------------------------------------------------
+        # ASSET STRUCTURE
+        # -------------------------------------------------
+
+        add_action_group(
+            "Asset Structure",
+            [
+                self.add_substation,
+                self.link_substation,
+                self.add_switchboard,
+                self.link_switchboard,
+                self.add_panel,
+                self.link_panel,
+            ],
         )
 
-        buttons.addWidget(
-            self.link_substation
+        # -------------------------------------------------
+        # EDITING
+        # -------------------------------------------------
+
+        add_action_group(
+            "Editing",
+            [
+                self.edit_asset_button,
+                self.configure_panel,
+                self.configure_component,
+                self.configure_protection,
+            ],
         )
 
-        buttons.addWidget(
-            self.add_switchboard
+        # -------------------------------------------------
+        # TESTING & REPORTING
+        # -------------------------------------------------
+
+        add_action_group(
+            "Testing & Reporting",
+            [
+                self.open_testing,
+                self.test_history_button,
+                self.panel_report_button,
+            ],
         )
 
-        buttons.addWidget(
-            self.link_switchboard
+        action_layout.addStretch()
+
+        # =================================================
+        # ADD WORKSPACE
+        # =================================================
+
+        workspace.addLayout(
+            left_layout,
+            1,
         )
 
-        buttons.addWidget(
-            self.add_panel
+        workspace.addWidget(
+            action_panel
         )
 
-        buttons.addWidget(
-            self.link_panel
+        layout.addLayout(
+            workspace,
+            1,
         )
 
-        buttons.addWidget(
-            self.edit_asset_button
+        # =================================================
+        # LOCAL UI STYLING
+        # =================================================
+
+        self.setStyleSheet(
+            """
+            /* ------------------------------------------
+               SECTION HEADERS
+               ------------------------------------------ */
+
+            QLabel#SectionHeader {
+                font-size: 15px;
+                font-weight: 600;
+                padding: 8px 11px;
+                color: #f2f2f2;
+                background-color: #353535;
+                border: 1px solid #454545;
+                border-radius: 6px;
+            }
+
+            /* ------------------------------------------
+               ACTION PANEL
+               ------------------------------------------ */
+
+            QFrame#ActionPanel {
+                background-color: #242424;
+                border: 1px solid #414141;
+                border-radius: 8px;
+            }
+
+            QLabel#ActionTitle {
+                font-size: 19px;
+                font-weight: 700;
+                padding: 2px 2px 0px 2px;
+                color: #f4f4f4;
+                background: transparent;
+                border: none;
+            }
+
+            QLabel#ActionSubtitle {
+                font-size: 11px;
+                color: #999999;
+                padding: 0px 2px 6px 2px;
+                background: transparent;
+                border: none;
+            }
+
+            QLabel#ActionGroup {
+                font-size: 10px;
+                font-weight: 700;
+                letter-spacing: 1px;
+                color: #a9a9a9;
+                padding: 7px 3px 2px 3px;
+                background: transparent;
+                border: none;
+            }
+
+            /* ------------------------------------------
+               ACTION BUTTONS
+               ------------------------------------------ */
+
+            QPushButton {
+                min-height: 36px;
+                padding: 6px 11px;
+                text-align: left;
+                border-radius: 6px;
+                border: 1px solid #444444;
+                background-color: #303030;
+                color: #eeeeee;
+            }
+
+            QPushButton:hover {
+                background-color: #383838;
+                border: 1px solid #666666;
+            }
+
+            QPushButton:pressed {
+                background-color: #222222;
+                border: 1px solid #777777;
+            }
+
+            QPushButton:disabled {
+                color: #666666;
+                background-color: #272727;
+                border: 1px solid #333333;
+            }
+
+            /* Primary workflow */
+            QPushButton#OpenTestingButton {
+                min-height: 44px;
+                font-size: 13px;
+                font-weight: 700;
+                border: 1px solid #e58a18;
+                background-color: #343434;
+            }
+
+            QPushButton#OpenTestingButton:hover {
+                background-color: #3d3d3d;
+                border: 1px solid #f09a27;
+            }
+
+            QPushButton#OpenTestingButton:pressed {
+                background-color: #292929;
+            }
+
+            /* Report action */
+            QPushButton#PanelReportButton {
+                min-height: 42px;
+                font-weight: 600;
+            }
+
+            /* ------------------------------------------
+               TREE
+               ------------------------------------------ */
+
+            QTreeWidget {
+                background-color: #292929;
+                alternate-background-color: #2d2d2d;
+                border: 1px solid #3e3e3e;
+                border-radius: 6px;
+                outline: none;
+                padding: 4px;
+            }
+
+            QTreeWidget::item {
+                height: 30px;
+                padding: 3px 6px;
+                border-radius: 4px;
+            }
+
+            QTreeWidget::item:hover {
+                background-color: #353535;
+            }
+
+            QTreeWidget::item:selected {
+                background-color: #3b3b3b;
+                border-left: 2px solid #e58a18;
+            }
+
+            QHeaderView::section {
+                background-color: #333333;
+                color: #dddddd;
+                padding: 7px;
+                border: none;
+                border-bottom: 1px solid #444444;
+                font-weight: 600;
+            }
+
+            /* ------------------------------------------
+               COMPONENT LIST
+               ------------------------------------------ */
+
+            QListWidget {
+                background-color: #292929;
+                alternate-background-color: #2d2d2d;
+                border: 1px solid #3e3e3e;
+                border-radius: 6px;
+                outline: none;
+                padding: 4px;
+            }
+
+            QListWidget::item {
+                min-height: 34px;
+                padding: 4px 9px;
+                border-radius: 5px;
+            }
+
+            QListWidget::item:hover {
+                background-color: #353535;
+            }
+
+            QListWidget::item:selected {
+                background-color: #3b3b3b;
+                border-left: 2px solid #e58a18;
+            }
+            """
         )
 
-        buttons.addWidget(
-            self.configure_panel
+        # Make the primary actions visually distinct.
+        self.open_testing.setObjectName(
+            "OpenTestingButton"
         )
 
-        buttons.addWidget(
-            self.open_testing
+        self.panel_report_button.setObjectName(
+            "PanelReportButton"
         )
-
-        buttons.addWidget(
-            self.test_history_button
-        )
-        buttons.addWidget(
-            self.panel_report_button
-        )
-
-        layout.addLayout(buttons)
 
         # =================================================
         # SIGNALS
@@ -2111,12 +2469,6 @@ class AssetView(QWidget):
             except Exception:
 
                 global_asset = None
-        dialog = AssetEditDialog(
-            node=node,
-            global_asset=global_asset,
-            parent=self,
-        )
-
         # =================================================
         # OPEN EDIT DIALOG
         # =================================================

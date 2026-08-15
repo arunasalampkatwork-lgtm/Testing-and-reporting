@@ -23,5 +23,30 @@
         "aux_count": 0,
         "asset_id": "ASSET-A8F8D13E77",
         "linked_asset_id": "ASSET-A8F8D13E77"
+    },
+    {
+        "node_id": "AST-D16934BB",
+        "name": "SS-2",
+        "node_type": "SUBSTATION",
+        "parent_id": null
+    },
+    {
+        "node_id": "AST-A566D8CD",
+        "name": "HV-203A",
+        "node_type": "SWITCHBOARD",
+        "parent_id": "AST-D16934BB"
+    },
+    {
+        "node_id": "AST-DBB868F3",
+        "name": "P-01",
+        "node_type": "PANEL",
+        "parent_id": "AST-A566D8CD",
+        "equipment_name": "222-K-1B",
+        "equipment_type": "Motor",
+        "ct_count": 3,
+        "relay_count": 1,
+        "aux_count": 2,
+        "asset_id": "ASSET-80E4E1A7EA",
+        "linked_asset_id": "ASSET-80E4E1A7EA"
     }
 ]
