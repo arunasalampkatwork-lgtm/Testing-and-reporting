@@ -1,5 +1,3 @@
-import json
-
 from PySide6.QtWidgets import (
     QDialog,
     QVBoxLayout,
@@ -8,224 +6,79 @@ from PySide6.QtWidgets import (
     QFormLayout,
     QLineEdit,
     QPushButton,
+    QMessageBox,
     QScrollArea,
     QWidget,
     QGroupBox,
-    QMessageBox
 )
 
+from app.ui.test_edit_dialog import (
+    TestEditDialog
+)
+from app.services.report_service import ProtectionReportService
+from app.ui.report_dialog import ReportDialog
 
 class TestDetailView(QDialog):
 
-    def __init__(
-        self,
-        test_service,
-        test_id,
-        parent=None
-    ):
+    def __init__(self, test_service, test_id, project_folder=None, parent=None):
 
-        super().__init__(parent)
+        super().__init__(
+            parent
+        )
 
-        self.test_service = test_service
-        self.test_id = test_id
+        self.test_service = (
+            test_service
+        )
+
+        self.test_id = (
+            test_id
+        )
+
+        self.record = None
+        self.project_folder = project_folder
 
         self.setWindowTitle(
             f"Test Details - {test_id}"
         )
 
         self.resize(
-            700,
-            750
+            900,
+            700
         )
 
         self.build_ui()
+
+        self.load_test()
 
     # =====================================================
     # BUILD UI
     # =====================================================
 
-    def build_ui(self):
+    def build_ui(
+        self
+    ):
 
-        main_layout = QVBoxLayout(
+        layout = QVBoxLayout(
             self
         )
 
-        # =================================================
-        # GET TEST
-        # =================================================
-
-        test = self.test_service.get_test(
-            self.test_id
-        )
-
-        if test is None:
-
-            QMessageBox.critical(
-                self,
-                "Error",
-                "The selected test could not be found."
-            )
-
-            self.reject()
-
-            return
-
-        self.test = test
-
-        # =================================================
-        # HEADER
-        # =================================================
-
-        header = QLabel(
+        self.header = QLabel(
             "Protection Test Details"
         )
 
-        header.setStyleSheet(
+        self.header.setStyleSheet(
             """
             QLabel {
                 font-size: 20px;
                 font-weight: bold;
+                padding: 8px;
             }
             """
         )
 
-        main_layout.addWidget(
-            header
+        layout.addWidget(
+            self.header
         )
-
-        # =================================================
-        # TEST INFORMATION
-        # =================================================
-
-        information_group = QGroupBox(
-            "Test Information"
-        )
-
-        information_layout = QFormLayout()
-
-        self.add_readonly_field(
-            information_layout,
-            "Test ID",
-            test.get("test_id", "")
-        )
-
-        self.add_readonly_field(
-            information_layout,
-            "Project ID",
-            test.get("project_id", "")
-        )
-
-        self.add_readonly_field(
-            information_layout,
-            "Panel ID",
-            test.get("panel_id", "")
-        )
-
-        self.add_readonly_field(
-            information_layout,
-            "Relay / Component ID",
-            test.get("relay_id", "")
-        )
-
-        self.add_readonly_field(
-            information_layout,
-            "Protection Function",
-            test.get("protection_code", "")
-        )
-
-        self.add_readonly_field(
-            information_layout,
-            "Test Date",
-            test.get("test_date", "")
-        )
-
-        information_group.setLayout(
-            information_layout
-        )
-
-        main_layout.addWidget(
-            information_group
-        )
-
-        # =================================================
-        # SETTINGS
-        # =================================================
-
-        settings_group = QGroupBox(
-            "Test Settings"
-        )
-
-        settings_layout = QFormLayout()
-
-        settings = test.get(
-            "settings",
-            {}
-        )
-
-        if settings:
-
-            for key, value in settings.items():
-
-                self.add_readonly_field(
-                    settings_layout,
-                    self.format_label(key),
-                    value
-                )
-
-        else:
-
-            settings_layout.addRow(
-                QLabel("No settings recorded.")
-            )
-
-        settings_group.setLayout(
-            settings_layout
-        )
-
-        main_layout.addWidget(
-            settings_group
-        )
-
-        # =================================================
-        # MEASUREMENTS
-        # =================================================
-
-        measurements_group = QGroupBox(
-            "Test Measurements"
-        )
-
-        measurements_layout = QFormLayout()
-
-        measurements = test.get(
-            "measurements",
-            {}
-        )
-
-        if measurements:
-
-            for key, value in measurements.items():
-
-                self.add_readonly_field(
-                    measurements_layout,
-                    self.format_label(key),
-                    value
-                )
-
-        else:
-
-            measurements_layout.addRow(
-                QLabel(
-                    "No measurements recorded."
-                )
-            )
-
-        measurements_group.setLayout(
-            measurements_layout
-        )
-
-        # =================================================
-        # SCROLL AREA
-        # =================================================
 
         scroll = QScrollArea()
 
@@ -233,161 +86,445 @@ class TestDetailView(QDialog):
             True
         )
 
-        scroll_container = QWidget()
+        self.container = QWidget()
 
-        scroll_layout = QVBoxLayout(
-            scroll_container
-        )
-
-        scroll_layout.addWidget(
-            measurements_group
+        self.content_layout = QVBoxLayout(
+            self.container
         )
 
         scroll.setWidget(
-            scroll_container
+            self.container
         )
 
-        main_layout.addWidget(
+        layout.addWidget(
             scroll
         )
 
-        # =================================================
-        # RESULT
-        # =================================================
-
-        result_group = QGroupBox(
-            "Test Result"
-        )
-
-        result_layout = QFormLayout()
-
-        result = test.get(
-            "result",
-            ""
-        )
-
-        result_field = QLineEdit(
-            str(result)
-        )
-
-        result_field.setReadOnly(
-            True
-        )
-
-        # Highlight result
-
-        if str(result).upper() == "PASS":
-
-            result_field.setStyleSheet(
-                """
-                QLineEdit {
-                    font-weight: bold;
-                    background-color: #d4edda;
-                }
-                """
-            )
-
-        elif str(result).upper() == "FAIL":
-
-            result_field.setStyleSheet(
-                """
-                QLineEdit {
-                    font-weight: bold;
-                    background-color: #f8d7da;
-                }
-                """
-            )
-
-        result_layout.addRow(
-            "Result",
-            result_field
-        )
-
-        remarks_field = QLineEdit(
-            str(
-                test.get(
-                    "remarks",
-                    ""
-                )
-            )
-        )
-
-        remarks_field.setReadOnly(
-            True
-        )
-
-        result_layout.addRow(
-            "Remarks",
-            remarks_field
-        )
-
-        result_group.setLayout(
-            result_layout
-        )
-
-        main_layout.addWidget(
-            result_group
-        )
-
-        # =================================================
-        # CLOSE BUTTON
-        # =================================================
-
         buttons = QHBoxLayout()
 
-        close_button = QPushButton(
+        self.edit_button = QPushButton(
+            "Edit Test"
+        )
+
+        self.close_button = QPushButton(
             "Close"
         )
 
-        close_button.clicked.connect(
+        self.edit_button.clicked.connect(
+            self.edit_test
+        )
+
+        self.close_button.clicked.connect(
             self.accept
+        )
+
+        buttons.addWidget(
+            self.edit_button
         )
 
         buttons.addStretch()
 
         buttons.addWidget(
-            close_button
+            self.close_button
         )
 
-        main_layout.addLayout(
+        layout.addLayout(
             buttons
         )
 
+        self.report_button = QPushButton("Generate Report")
+        self.report_button.clicked.connect(self.generate_report)
+        buttons.addWidget(self.report_button)
+
+
     # =====================================================
-    # ADD READ ONLY FIELD
+    # LOAD
     # =====================================================
 
-    def add_readonly_field(
-        self,
-        layout,
+    def load_test(
+        self
+    ):
+
+        try:
+
+            self.record = (
+                self.test_service
+                .get_test(
+                    self.test_id
+                )
+            )
+
+        except Exception as error:
+
+            QMessageBox.critical(
+                self,
+                "Database Error",
+                str(error)
+            )
+
+            return
+
+        if self.record is None:
+
+            QMessageBox.warning(
+                self,
+                "Not Found",
+                (
+                    f"Test '{self.test_id}' "
+                    "could not be found."
+                )
+            )
+
+            return
+
+        self.render()
+
+    # =====================================================
+    # CLEAR
+    # =====================================================
+
+    def clear_content(
+        self
+    ):
+
+        while (
+            self.content_layout.count()
+        ):
+
+            item = (
+                self.content_layout
+                .takeAt(0)
+            )
+
+            widget = (
+                item.widget()
+            )
+
+            if widget is not None:
+
+                widget.deleteLater()
+
+    # =====================================================
+    # RENDER
+    # =====================================================
+
+    def render(
+        self
+    ):
+
+        self.clear_content()
+
+        record = (
+            self.record
+        )
+
+        # =================================================
+        # BASIC INFORMATION
+        # =================================================
+
+        group = QGroupBox(
+            "Test Information"
+        )
+
+        form = QFormLayout()
+
+        self.add_readonly(
+            form,
+            "Test ID",
+            record.get(
+                "test_id",
+                ""
+            )
+        )
+
+        self.add_readonly(
+            form,
+            "Project",
+            record.get(
+                "project_id",
+                ""
+            )
+        )
+
+        self.add_readonly(
+            form,
+            "Panel",
+            record.get(
+                "panel_id",
+                ""
+            )
+        )
+
+        self.add_readonly(
+            form,
+            "Relay",
+            record.get(
+                "relay_id",
+                ""
+            )
+        )
+
+        self.add_readonly(
+            form,
+            "Protection",
+            record.get(
+                "protection_code",
+                ""
+            )
+        )
+
+        self.add_readonly(
+            form,
+            "Test Date",
+            record.get(
+                "test_date",
+                ""
+            )
+        )
+
+        group.setLayout(
+            form
+        )
+
+        self.content_layout.addWidget(
+            group
+        )
+
+        # =================================================
+        # SETTINGS
+        # =================================================
+
+        settings = (
+            record.get(
+                "settings",
+                {}
+            )
+            or {}
+        )
+
+        if settings:
+
+            group = QGroupBox(
+                "CT / Test Configuration"
+            )
+
+            form = QFormLayout()
+
+            for key, value in settings.items():
+
+                self.add_readonly(
+                    form,
+                    self.pretty_name(
+                        key
+                    ),
+                    value
+                )
+
+            group.setLayout(
+                form
+            )
+
+            self.content_layout.addWidget(
+                group
+            )
+
+        # =================================================
+        # MEASUREMENTS
+        # =================================================
+
+        measurements = (
+            record.get(
+                "measurements",
+                {}
+            )
+            or {}
+        )
+
+        if measurements:
+
+            group = QGroupBox(
+                "Test Values and Calculations"
+            )
+
+            form = QFormLayout()
+
+            for key, value in measurements.items():
+
+                self.add_readonly(
+                    form,
+                    self.pretty_name(
+                        key
+                    ),
+                    value
+                )
+
+            group.setLayout(
+                form
+            )
+
+            self.content_layout.addWidget(
+                group
+            )
+
+        # =================================================
+        # RESULT
+        # =================================================
+
+        group = QGroupBox(
+            "Result"
+        )
+
+        form = QFormLayout()
+
+        self.add_readonly(
+            form,
+            "Result",
+            record.get(
+                "result",
+                ""
+            )
+        )
+
+        self.add_readonly(
+            form,
+            "Remarks",
+            record.get(
+                "remarks",
+                ""
+            )
+        )
+
+        group.setLayout(
+            form
+        )
+
+        self.content_layout.addWidget(
+            group
+        )
+
+        self.content_layout.addStretch()
+
+    # =====================================================
+    # READONLY
+    # =====================================================
+
+    @staticmethod
+    def add_readonly(
+        form,
         label,
         value
     ):
 
-        field = QLineEdit(
-            str(value)
+        widget = QLineEdit()
+
+        widget.setText(
+            str(
+                value
+                if value is not None
+                else ""
+            )
         )
 
-        field.setReadOnly(
+        widget.setReadOnly(
             True
         )
 
-        layout.addRow(
-            label,
-            field
+        form.addRow(
+            str(label),
+            widget
         )
 
     # =====================================================
-    # FORMAT LABEL
+    # EDIT TEST
     # =====================================================
 
-    def format_label(
-        self,
-        key
+    def edit_test(
+        self
+    ):
+
+        dialog = TestEditDialog(
+
+            test_service=(
+                self.test_service
+            ),
+
+            test_id=(
+                self.test_id
+            ),
+
+            parent=self
+        )
+
+        result = (
+            dialog.exec()
+        )
+
+        if result == (
+            QDialog.DialogCode.Accepted
+        ):
+
+            # Reload the updated record.
+
+            self.record = (
+                self.test_service
+                .get_test(
+                    self.test_id
+                )
+            )
+
+            self.render()
+
+    # =====================================================
+    # PRETTY NAME
+    # =====================================================
+
+    @staticmethod
+    def pretty_name(
+        value
     ):
 
         return (
-            str(key)
-            .replace("_", " ")
+            str(value)
+            .replace(
+                "_",
+                " "
+            )
             .title()
         )
+
+# Add this method to TestDetailView:
+#
+    def generate_report(self):
+
+        if not self.project_folder:
+
+            QMessageBox.warning(
+                self,
+                "Project Folder Missing",
+                "The current project folder is not available."
+            )
+
+            return
+
+        try:
+
+            report_service = ProtectionReportService(
+                test_service=self.test_service,
+                project_folder=self.project_folder
+            )
+
+            dialog = ReportDialog(
+                report_service=report_service,
+                test_id=self.test_id,
+                parent=self
+            )
+
+            dialog.exec()
+
+        except Exception as error:
+
+            QMessageBox.critical(
+                self,
+                "Report Error",
+                str(error)
+            )

@@ -133,11 +133,6 @@ class AssetManager:
             "PANEL",
         ):
 
-            if node_type == "PANEL" and not asset_tag:
-
-                raise ValueError(
-                    "Asset tag is required for a panel."
-                )
 
             global_tag = (
                 asset_tag
@@ -1276,3 +1271,163 @@ class AssetManager:
                 asset_id
             )
         )
+
+    # =========================================================
+    # UPDATE PHYSICAL ASSET
+    # =========================================================
+
+    def update_asset_details(
+        self,
+        node_id,
+        name,
+        asset_tag=None,
+        manufacturer=None,
+        model=None,
+        serial_number=None,
+    ):
+
+        node = self.nodes.get(
+            node_id
+        )
+
+        if node is None:
+
+            raise ValueError(
+                "Asset does not exist."
+            )
+
+        node_type = str(
+            getattr(
+                node,
+                "node_type",
+                "",
+            )
+        ).upper()
+
+        if node_type not in (
+            "SUBSTATION",
+            "SWITCHBOARD",
+            "PANEL",
+        ):
+
+            raise ValueError(
+                "Only substations, switchboards "
+                "and panels can be edited here."
+            )
+
+        # =================================================
+        # CLEAN VALUES
+        # =================================================
+
+        name = str(
+            name or ""
+        ).strip()
+
+        asset_tag = str(
+            asset_tag or ""
+        ).strip()
+
+        manufacturer = str(
+            manufacturer or ""
+        ).strip()
+
+        model = str(
+            model or ""
+        ).strip()
+
+        serial_number = str(
+            serial_number or ""
+        ).strip()
+
+        if not name:
+
+            raise ValueError(
+                "Asset name cannot be empty."
+            )
+
+        if not asset_tag:
+
+            asset_tag = name
+
+        # =================================================
+        # DUPLICATE CHECK
+        #
+        # Only siblings of the same type matter.
+        # =================================================
+
+        for existing in self.nodes.values():
+
+            if existing.node_id == node_id:
+                continue
+
+            if (
+                existing.parent_id
+                == node.parent_id
+                and
+                str(
+                    existing.node_type
+                ).upper()
+                == node_type
+                and
+                str(
+                    existing.name
+                ).strip().lower()
+                == name.lower()
+            ):
+
+                raise ValueError(
+                    f"{node_type.replace('_', ' ').title()} "
+                    f"'{name}' already exists at this level."
+                )
+
+        # =================================================
+        # UPDATE PROJECT NODE
+        # =================================================
+
+        node.name = name
+
+        # =================================================
+        # UPDATE GLOBAL MASTER ASSET
+        # =================================================
+
+        asset_id = getattr(
+            node,
+            "asset_id",
+            None,
+        )
+
+        if asset_id:
+
+            self.asset_library.load()
+
+            asset = (
+                self.asset_library.get_asset(
+                    asset_id
+                )
+            )
+
+            if asset is None:
+
+                raise ValueError(
+                    "The global asset linked to this "
+                    "project asset no longer exists."
+                )
+
+            self.asset_library.update_asset(
+                asset_id,
+                {
+                    "name": name,
+                    "asset_tag": asset_tag,
+                    "manufacturer": manufacturer,
+                    "model": model,
+                    "serial_number": serial_number,
+                },
+            )
+
+        # =================================================
+        # SAVE PROJECT ASSET DATABASE
+        # =================================================
+
+        self.save_assets()
+
+        return node

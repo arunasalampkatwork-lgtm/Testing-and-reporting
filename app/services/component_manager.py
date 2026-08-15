@@ -3,7 +3,13 @@ import json
 from uuid import uuid4
 
 from app.models.test_component import TestComponent
-from app.services.asset_library_manager import AssetLibraryManager
+
+try:
+    from app.services.asset_library_manager import (
+        AssetLibraryManager
+    )
+except ImportError:
+    AssetLibraryManager = None
 
 
 class ComponentManager:
@@ -13,21 +19,41 @@ class ComponentManager:
         project_folder: Path
     ):
 
-        self.project_folder = project_folder
+        self.project_folder = (
+            project_folder
+        )
 
         self.components_file = (
-            project_folder / "components.json"
+            project_folder
+            /
+            "components.json"
         )
 
         self.components = {}
 
-        self.asset_library = AssetLibraryManager()
+        # -------------------------------------------------
+        # GLOBAL ASSET LIBRARY
+        # -------------------------------------------------
+
+        self.asset_library = None
+
+        if AssetLibraryManager is not None:
+
+            try:
+
+                self.asset_library = (
+                    AssetLibraryManager()
+                )
+
+            except Exception:
+
+                self.asset_library = None
 
         self.load_components()
 
-    # =========================================================
+    # =====================================================
     # ID
-    # =========================================================
+    # =====================================================
 
     def _generate_id(self):
 
@@ -35,43 +61,9 @@ class ComponentManager:
             f"CMP-{uuid4().hex[:8].upper()}"
         )
 
-    # =========================================================
-    # CREATE COMPONENT
-    # =========================================================
-
-    def create_component(
-        self,
-        panel_id: str,
-        component_type: str,
-        name: str
-    ):
-
-        component_id = (
-            self._generate_id()
-        )
-
-        component = TestComponent(
-
-            component_id=component_id,
-
-            panel_id=panel_id,
-
-            component_type=component_type,
-
-            name=name
-        )
-
-        self.components[
-            component_id
-        ] = component
-
-        self.save_components()
-
-        return component
-
-    # =========================================================
+    # =====================================================
     # GET COMPONENT
-    # =========================================================
+    # =====================================================
 
     def get_component(
         self,
@@ -82,13 +74,47 @@ class ComponentManager:
             component_id
         )
 
-    # =========================================================
-    # GET COMPONENTS FOR PANEL
-    # =========================================================
+    # =====================================================
+    # CREATE COMPONENT
+    # =====================================================
+
+    def create_component(
+        self,
+        panel_id,
+        component_type,
+        name
+    ):
+
+        component = TestComponent(
+
+            component_id=(
+                self._generate_id()
+            ),
+
+            panel_id=panel_id,
+
+            component_type=(
+                component_type
+            ),
+
+            name=name
+        )
+
+        self.components[
+            component.component_id
+        ] = component
+
+        self.save_components()
+
+        return component
+
+    # =====================================================
+    # GET PANEL COMPONENTS
+    # =====================================================
 
     def get_panel_components(
         self,
-        panel_id: str
+        panel_id
     ):
 
         return [
@@ -98,36 +124,74 @@ class ComponentManager:
             for component
             in self.components.values()
 
-            if component.panel_id == panel_id
+            if component.panel_id
+            == panel_id
 
         ]
 
-    # =========================================================
-    # GENERATE / RECONCILE COMPONENTS
-    # =========================================================
+    # =====================================================
+    # GET PANEL CTS
+    # =====================================================
+
+    def get_panel_cts(
+        self,
+        panel_id
+    ):
+
+        components = (
+            self.get_panel_components(
+                panel_id
+            )
+        )
+
+        return [
+
+            component
+
+            for component
+            in components
+
+            if str(
+                getattr(
+                    component,
+                    "component_type",
+                    ""
+                )
+            ).strip().upper()
+            in (
+                "CT",
+                "CURRENT TRANSFORMER",
+            )
+
+        ]
+
+    # =====================================================
+    # GENERATE PANEL COMPONENTS
+    # =====================================================
 
     def generate_panel_components(
         self,
-        panel_id: str,
-        ct_count: int,
-        relay_count: int,
-        aux_count: int
+        panel_id,
+        ct_count,
+        relay_count,
+        aux_count
     ):
 
-        ct_count = max(
-            0,
-            int(ct_count or 0)
+        ct_count = int(
+            ct_count or 0
         )
 
-        relay_count = max(
-            0,
-            int(relay_count or 0)
+        relay_count = int(
+            relay_count or 0
         )
 
-        aux_count = max(
-            0,
-            int(aux_count or 0)
+        aux_count = int(
+            aux_count or 0
         )
+
+        # -------------------------------------------------
+        # Existing components
+        # -------------------------------------------------
 
         existing = (
             self.get_panel_components(
@@ -135,71 +199,71 @@ class ComponentManager:
             )
         )
 
-        # =====================================================
-        # RECONCILE EACH COMPONENT TYPE
-        # =====================================================
+        # -------------------------------------------------
+        # Maintain existing configured components
+        # wherever possible.
+        # -------------------------------------------------
 
         self._reconcile_component_type(
             panel_id,
             "CT",
-            "CT",
             ct_count,
-            existing
+            "CT"
         )
 
         self._reconcile_component_type(
             panel_id,
             "NUMERICAL_RELAY",
-            "REL",
             relay_count,
-            existing
+            "REL"
         )
 
         self._reconcile_component_type(
             panel_id,
             "AUXILIARY_RELAY",
-            "AUX",
             aux_count,
-            existing
+            "AUX"
         )
 
         self.save_components()
 
-        self._sync_panel_components_to_global(
-            panel_id
-        )
-
-    # =========================================================
+    # =====================================================
     # RECONCILE COMPONENT TYPE
-    # =========================================================
+    # =====================================================
 
     def _reconcile_component_type(
         self,
         panel_id,
         component_type,
-        prefix,
         required_count,
-        existing
+        prefix
     ):
 
         components = [
 
             component
 
-            for component in existing
+            for component
+            in self.get_panel_components(
+                panel_id
+            )
 
-            if component.component_type
-            == component_type
+            if str(
+                component.component_type
+            ).upper()
+            == str(
+                component_type
+            ).upper()
 
         ]
-
-        # -----------------------------------------------------
-        # Create missing components
-        # -----------------------------------------------------
 
         current_count = len(
             components
         )
+
+        # -------------------------------------------------
+        # CREATE MISSING
+        # -------------------------------------------------
 
         if current_count < required_count:
 
@@ -208,35 +272,27 @@ class ComponentManager:
                 required_count + 1
             ):
 
-                name = (
+                self.create_component(
+
+                    panel_id,
+
+                    component_type,
+
                     f"{prefix}-{index:02d}"
                 )
 
-                self.create_component(
-                    panel_id,
-                    component_type,
-                    name
-                )
-
-        # -----------------------------------------------------
-        # Remove excess components
-        #
-        # Remove highest-numbered/generated components first.
-        #
-        # Existing configured components are therefore retained
-        # as much as possible.
-        # -----------------------------------------------------
+        # -------------------------------------------------
+        # REMOVE EXCESS
+        # -------------------------------------------------
 
         elif current_count > required_count:
 
             excess = (
                 current_count
-                - required_count
+                -
+                required_count
             )
 
-            # Sort by component name
-            # descending so REL-05 is removed
-            # before REL-01.
             components_sorted = sorted(
 
                 components,
@@ -250,7 +306,9 @@ class ComponentManager:
             )
 
             for component in (
-                components_sorted[:excess]
+                components_sorted[
+                    :excess
+                ]
             ):
 
                 self.components.pop(
@@ -258,9 +316,9 @@ class ComponentManager:
                     None
                 )
 
-    # =========================================================
+    # =====================================================
     # COMPONENT NUMBER
-    # =========================================================
+    # =====================================================
 
     @staticmethod
     def _component_number(
@@ -281,9 +339,9 @@ class ComponentManager:
 
             return 0
 
-    # =========================================================
+    # =====================================================
     # UPDATE COMPONENT CONFIGURATION
-    # =========================================================
+    # =====================================================
 
     def update_component_configuration(
         self,
@@ -291,8 +349,10 @@ class ComponentManager:
         configuration
     ):
 
-        component = self.components.get(
-            component_id
+        component = (
+            self.components.get(
+                component_id
+            )
         )
 
         if component is None:
@@ -302,12 +362,13 @@ class ComponentManager:
             )
 
         configuration = (
-            configuration or {}
+            configuration
+            or {}
         )
 
-        # -----------------------------------------------------
-        # Common fields
-        # -----------------------------------------------------
+        # =================================================
+        # COMMON
+        # =================================================
 
         component.manufacturer = (
             configuration.get(
@@ -337,16 +398,70 @@ class ComponentManager:
             )
         )
 
-        # -----------------------------------------------------
-        # CT
-        # -----------------------------------------------------
+        # =================================================
+        # CT PRIMARY
+        # =================================================
 
-        component.ct_ratio = (
-            configuration.get(
-                "ct_ratio",
-                component.ct_ratio
+        if (
+            "ct_primary"
+            in configuration
+        ):
+
+            component.ct_primary = (
+                self._safe_float(
+                    configuration[
+                        "ct_primary"
+                    ]
+                )
             )
-        )
+
+        # =================================================
+        # CT SECONDARY
+        # =================================================
+
+        if (
+            "ct_secondary"
+            in configuration
+        ):
+
+            component.ct_secondary = (
+                self._safe_float(
+                    configuration[
+                        "ct_secondary"
+                    ]
+                )
+            )
+
+        # =================================================
+        # CT RATIO
+        # =================================================
+
+        if (
+            "ct_ratio"
+            in configuration
+        ):
+
+            component.ct_ratio = (
+                str(
+                    configuration[
+                        "ct_ratio"
+                    ]
+                    or ""
+                ).strip()
+            )
+
+        # Automatically regenerate ratio when both
+        # numerical values are available.
+
+        if (
+            component.ct_primary > 0
+            and component.ct_secondary > 0
+        ):
+
+            component.ct_ratio = (
+                f"{component.ct_primary:g}/"
+                f"{component.ct_secondary:g}"
+            )
 
         component.ct_class = (
             configuration.get(
@@ -369,9 +484,9 @@ class ComponentManager:
             )
         )
 
-        # -----------------------------------------------------
-        # Numerical relay
-        # -----------------------------------------------------
+        # =================================================
+        # NUMERICAL RELAY
+        # =================================================
 
         component.vt_ratio = (
             configuration.get(
@@ -387,9 +502,9 @@ class ComponentManager:
             )
         )
 
-        # -----------------------------------------------------
-        # Auxiliary relay
-        # -----------------------------------------------------
+        # =================================================
+        # AUXILIARY RELAY
+        # =================================================
 
         component.coil_voltage = (
             configuration.get(
@@ -405,12 +520,9 @@ class ComponentManager:
             )
         )
 
-        # -----------------------------------------------------
-        # Protection functions
-        #
-        # IMPORTANT:
-        # Do not overwrite these unless explicitly provided.
-        # -----------------------------------------------------
+        # =================================================
+        # PROTECTION FUNCTIONS
+        # =================================================
 
         if (
             "protection_functions"
@@ -418,9 +530,12 @@ class ComponentManager:
         ):
 
             component.protection_functions = (
-                configuration[
-                    "protection_functions"
-                ]
+                list(
+                    configuration[
+                        "protection_functions"
+                    ]
+                    or []
+                )
             )
 
         self.save_components()
@@ -429,9 +544,9 @@ class ComponentManager:
             component.panel_id
         )
 
-    # =========================================================
+    # =====================================================
     # UPDATE PROTECTION FUNCTIONS
-    # =========================================================
+    # =====================================================
 
     def update_protection_functions(
         self,
@@ -439,8 +554,10 @@ class ComponentManager:
         protection_functions
     ):
 
-        component = self.components.get(
-            component_id
+        component = (
+            self.components.get(
+                component_id
+            )
         )
 
         if component is None:
@@ -450,7 +567,10 @@ class ComponentManager:
             )
 
         component.protection_functions = (
-            protection_functions or []
+            list(
+                protection_functions
+                or []
+            )
         )
 
         self.save_components()
@@ -459,136 +579,426 @@ class ComponentManager:
             component.panel_id
         )
 
-    # =========================================================
-    # GLOBAL ASSET SYNCHRONIZATION
-    # =========================================================
+    # =====================================================
+    # SAFE FLOAT
+    # =====================================================
 
-    def _get_global_panel_id(self, panel_id):
+    @staticmethod
+    def _safe_float(
+        value
+    ):
 
-        assets_file = self.project_folder / "assets.json"
+        try:
+
+            return float(
+                value
+                or 0
+            )
+
+        except (
+            TypeError,
+            ValueError
+        ):
+
+            return 0.0
+
+    # =====================================================
+    # SERIALIZE PANEL COMPONENTS
+    # =====================================================
+
+    def serialize_panel_components(
+        self,
+        panel_id
+    ):
+
+        result = []
+
+        for component in (
+            self.get_panel_components(
+                panel_id
+            )
+        ):
+
+            result.append({
+
+                "component_type":
+                    component.component_type,
+
+                "name":
+                    component.name,
+
+                "manufacturer":
+                    component.manufacturer,
+
+                "model":
+                    component.model,
+
+                "serial_number":
+                    component.serial_number,
+
+                "description":
+                    component.description,
+
+                # -----------------------------------------
+                # CT
+                # -----------------------------------------
+
+                "ct_primary":
+                    getattr(
+                        component,
+                        "ct_primary",
+                        0
+                    ),
+
+                "ct_secondary":
+                    getattr(
+                        component,
+                        "ct_secondary",
+                        0
+                    ),
+
+                "ct_ratio":
+                    component.ct_ratio,
+
+                "ct_class":
+                    component.ct_class,
+
+                "burden":
+                    component.burden,
+
+                "core":
+                    component.core,
+
+                # -----------------------------------------
+                # RELAY
+                # -----------------------------------------
+
+                "vt_ratio":
+                    component.vt_ratio,
+
+                "firmware":
+                    component.firmware,
+
+                # -----------------------------------------
+                # AUX RELAY
+                # -----------------------------------------
+
+                "coil_voltage":
+                    component.coil_voltage,
+
+                "contact_configuration":
+                    component.contact_configuration,
+
+                # -----------------------------------------
+                # PROTECTION
+                # -----------------------------------------
+
+                "protection_functions":
+                    list(
+                        component.protection_functions
+                        or []
+                    ),
+            })
+
+        return result
+
+    # =====================================================
+    # CLONE PANEL COMPONENTS
+    # =====================================================
+
+    def clone_panel_components(
+        self,
+        panel_id,
+        component_data
+    ):
+
+        existing_ids = [
+
+            component_id
+
+            for component_id,
+            component
+            in self.components.items()
+
+            if component.panel_id
+            == panel_id
+
+        ]
+
+        for component_id in existing_ids:
+
+            del self.components[
+                component_id
+            ]
+
+        for data in (
+            component_data
+            or []
+        ):
+
+            component = TestComponent(
+
+                component_id=(
+                    self._generate_id()
+                ),
+
+                panel_id=panel_id,
+
+                component_type=(
+                    data.get(
+                        "component_type",
+                        ""
+                    )
+                ),
+
+                name=(
+                    data.get(
+                        "name",
+                        ""
+                    )
+                ),
+
+                manufacturer=(
+                    data.get(
+                        "manufacturer",
+                        ""
+                    )
+                ),
+
+                model=(
+                    data.get(
+                        "model",
+                        ""
+                    )
+                ),
+
+                serial_number=(
+                    data.get(
+                        "serial_number",
+                        ""
+                    )
+                ),
+
+                description=(
+                    data.get(
+                        "description",
+                        ""
+                    )
+                ),
+
+                ct_primary=(
+                    data.get(
+                        "ct_primary",
+                        0
+                    )
+                ),
+
+                ct_secondary=(
+                    data.get(
+                        "ct_secondary",
+                        0
+                    )
+                ),
+
+                ct_ratio=(
+                    data.get(
+                        "ct_ratio",
+                        ""
+                    )
+                ),
+
+                ct_class=(
+                    data.get(
+                        "ct_class",
+                        ""
+                    )
+                ),
+
+                burden=(
+                    data.get(
+                        "burden",
+                        ""
+                    )
+                ),
+
+                core=(
+                    data.get(
+                        "core",
+                        ""
+                    )
+                ),
+
+                vt_ratio=(
+                    data.get(
+                        "vt_ratio",
+                        ""
+                    )
+                ),
+
+                firmware=(
+                    data.get(
+                        "firmware",
+                        ""
+                    )
+                ),
+
+                coil_voltage=(
+                    data.get(
+                        "coil_voltage",
+                        ""
+                    )
+                ),
+
+                contact_configuration=(
+                    data.get(
+                        "contact_configuration",
+                        ""
+                    )
+                ),
+
+                protection_functions=(
+                    data.get(
+                        "protection_functions",
+                        []
+                    )
+                )
+            )
+
+            self.components[
+                component.component_id
+            ] = component
+
+        self.save_components()
+
+        return (
+            self.get_panel_components(
+                panel_id
+            )
+        )
+
+    # =====================================================
+    # GLOBAL SYNC
+    # =====================================================
+
+    def _get_global_panel_id(
+        self,
+        panel_id
+    ):
+
+        assets_file = (
+            self.project_folder
+            /
+            "assets.json"
+        )
 
         if not assets_file.exists():
+
             return None
 
         try:
+
             with open(
                 assets_file,
                 "r",
                 encoding="utf-8"
             ) as file:
-                data = json.load(file)
+
+                data = json.load(
+                    file
+                )
 
             for item in data:
-                if (
-                    item.get("node_id") == panel_id
-                    and str(
-                        item.get("node_type", "")
-                    ).upper() == "PANEL"
-                ):
-                    return item.get("asset_id")
 
-        except (json.JSONDecodeError, TypeError, OSError):
+                if (
+                    item.get("node_id")
+                    == panel_id
+                    and str(
+                        item.get(
+                            "node_type",
+                            ""
+                        )
+                    ).upper()
+                    == "PANEL"
+                ):
+
+                    return item.get(
+                        "asset_id"
+                    )
+
+        except (
+            json.JSONDecodeError,
+            TypeError,
+            OSError
+        ):
+
             return None
 
         return None
 
-    def _sync_panel_components_to_global(self, panel_id):
-
-        global_asset_id = self._get_global_panel_id(panel_id)
-
-        if not global_asset_id:
-            return
-
-        asset = self.asset_library.get_asset(
-            global_asset_id
-        )
-
-        if asset is None:
-            return
-
-        metadata = dict(
-            asset.get("metadata") or {}
-        )
-
-        components = []
-
-        for component in self.get_panel_components(panel_id):
-
-            components.append({
-                "component_type": component.component_type,
-                "name": component.name,
-                "manufacturer": getattr(component, "manufacturer", ""),
-                "model": getattr(component, "model", ""),
-                "serial_number": getattr(component, "serial_number", ""),
-                "description": getattr(component, "description", ""),
-                "ct_ratio": getattr(component, "ct_ratio", ""),
-                "ct_class": getattr(component, "ct_class", ""),
-                "burden": getattr(component, "burden", ""),
-                "core": getattr(component, "core", ""),
-                "vt_ratio": getattr(component, "vt_ratio", ""),
-                "firmware": getattr(component, "firmware", ""),
-                "coil_voltage": getattr(component, "coil_voltage", ""),
-                "contact_configuration": getattr(
-                    component,
-                    "contact_configuration",
-                    ""
-                ),
-                "protection_functions": getattr(
-                    component,
-                    "protection_functions",
-                    []
-                )
-            })
-
-        metadata["components"] = components
-
-        try:
-            self.asset_library.update_asset(
-                global_asset_id,
-                {"metadata": metadata}
-            )
-        except ValueError:
-            pass
-
-    def restore_global_panel_components(
+    def _sync_panel_components_to_global(
         self,
-        panel_id,
-        global_asset
+        panel_id
     ):
 
-        metadata = global_asset.get("metadata") or {}
-        snapshots = metadata.get("components") or []
+        if self.asset_library is None:
 
-        if not snapshots:
             return
 
-        if self.get_panel_components(panel_id):
+        global_asset_id = (
+            self._get_global_panel_id(
+                panel_id
+            )
+        )
+
+        if not global_asset_id:
+
             return
 
-        for snapshot in snapshots:
+        try:
 
-            component = self.create_component(
-                panel_id=panel_id,
-                component_type=snapshot.get(
-                    "component_type",
-                    ""
-                ),
-                name=snapshot.get(
-                    "name",
-                    ""
+            self.asset_library.load()
+
+            asset = (
+                self.asset_library.get_asset(
+                    global_asset_id
                 )
             )
 
-            self.update_component_configuration(
-                component.component_id,
-                snapshot
+            if asset is None:
+
+                return
+
+            metadata = dict(
+                asset.get(
+                    "metadata"
+                )
+                or {}
             )
 
-        self._sync_panel_components_to_global(panel_id)
+            metadata[
+                "components"
+            ] = (
+                self.serialize_panel_components(
+                    panel_id
+                )
+            )
 
-    # =========================================================
+            self.asset_library.update_asset(
+                global_asset_id,
+                {
+                    "metadata": metadata
+                }
+            )
+
+        except Exception:
+
+            # Global synchronization should never prevent
+            # local project operation.
+            pass
+
+    # =====================================================
     # SAVE
-    # =========================================================
+    # =====================================================
 
     def save_components(self):
 
@@ -599,10 +1009,6 @@ class ComponentManager:
         ):
 
             data.append({
-
-                # -------------------------------------------------
-                # Basic
-                # -------------------------------------------------
 
                 "component_id":
                     component.component_id,
@@ -628,9 +1034,23 @@ class ComponentManager:
                 "description":
                     component.description,
 
-                # -------------------------------------------------
+                # -----------------------------------------
                 # CT
-                # -------------------------------------------------
+                # -----------------------------------------
+
+                "ct_primary":
+                    getattr(
+                        component,
+                        "ct_primary",
+                        0
+                    ),
+
+                "ct_secondary":
+                    getattr(
+                        component,
+                        "ct_secondary",
+                        0
+                    ),
 
                 "ct_ratio":
                     component.ct_ratio,
@@ -644,9 +1064,9 @@ class ComponentManager:
                 "core":
                     component.core,
 
-                # -------------------------------------------------
-                # Numerical relay
-                # -------------------------------------------------
+                # -----------------------------------------
+                # RELAY
+                # -----------------------------------------
 
                 "vt_ratio":
                     component.vt_ratio,
@@ -654,9 +1074,9 @@ class ComponentManager:
                 "firmware":
                     component.firmware,
 
-                # -------------------------------------------------
-                # Auxiliary relay
-                # -------------------------------------------------
+                # -----------------------------------------
+                # AUX RELAY
+                # -----------------------------------------
 
                 "coil_voltage":
                     component.coil_voltage,
@@ -664,12 +1084,15 @@ class ComponentManager:
                 "contact_configuration":
                     component.contact_configuration,
 
-                # -------------------------------------------------
-                # Protection functions
-                # -------------------------------------------------
+                # -----------------------------------------
+                # PROTECTION
+                # -----------------------------------------
 
                 "protection_functions":
-                    component.protection_functions
+                    list(
+                        component.protection_functions
+                        or []
+                    ),
             })
 
         self.components_file.parent.mkdir(
@@ -689,15 +1112,16 @@ class ComponentManager:
                 indent=4
             )
 
-    # =========================================================
+    # =====================================================
     # LOAD
-    # =========================================================
+    # =====================================================
 
     def load_components(self):
 
         self.components.clear()
 
         if not self.components_file.exists():
+
             return
 
         try:
@@ -725,95 +1149,134 @@ class ComponentManager:
 
                 component = TestComponent(
 
-                    component_id=
-                        item["component_id"],
+                    component_id=(
+                        item[
+                            "component_id"
+                        ]
+                    ),
 
-                    panel_id=
-                        item["panel_id"],
+                    panel_id=(
+                        item[
+                            "panel_id"
+                        ]
+                    ),
 
-                    component_type=
-                        item["component_type"],
+                    component_type=(
+                        item[
+                            "component_type"
+                        ]
+                    ),
 
-                    name=
-                        item["name"],
+                    name=(
+                        item[
+                            "name"
+                        ]
+                    ),
 
-                    manufacturer=
+                    manufacturer=(
                         item.get(
                             "manufacturer",
                             ""
-                        ),
+                        )
+                    ),
 
-                    model=
+                    model=(
                         item.get(
                             "model",
                             ""
-                        ),
+                        )
+                    ),
 
-                    serial_number=
+                    serial_number=(
                         item.get(
                             "serial_number",
                             ""
-                        ),
+                        )
+                    ),
 
-                    description=
+                    description=(
                         item.get(
                             "description",
                             ""
-                        ),
+                        )
+                    ),
 
-                    ct_ratio=
+                    ct_primary=(
+                        item.get(
+                            "ct_primary",
+                            0
+                        )
+                    ),
+
+                    ct_secondary=(
+                        item.get(
+                            "ct_secondary",
+                            0
+                        )
+                    ),
+
+                    ct_ratio=(
                         item.get(
                             "ct_ratio",
                             ""
-                        ),
+                        )
+                    ),
 
-                    ct_class=
+                    ct_class=(
                         item.get(
                             "ct_class",
                             ""
-                        ),
+                        )
+                    ),
 
-                    burden=
+                    burden=(
                         item.get(
                             "burden",
                             ""
-                        ),
+                        )
+                    ),
 
-                    core=
+                    core=(
                         item.get(
                             "core",
                             ""
-                        ),
+                        )
+                    ),
 
-                    vt_ratio=
+                    vt_ratio=(
                         item.get(
                             "vt_ratio",
                             ""
-                        ),
+                        )
+                    ),
 
-                    firmware=
+                    firmware=(
                         item.get(
                             "firmware",
                             ""
-                        ),
+                        )
+                    ),
 
-                    coil_voltage=
+                    coil_voltage=(
                         item.get(
                             "coil_voltage",
                             ""
-                        ),
+                        )
+                    ),
 
-                    contact_configuration=
+                    contact_configuration=(
                         item.get(
                             "contact_configuration",
                             ""
-                        ),
+                        )
+                    ),
 
-                    protection_functions=
+                    protection_functions=(
                         item.get(
                             "protection_functions",
                             []
                         )
+                    )
                 )
 
                 self.components[
@@ -830,38 +1293,37 @@ class ComponentManager:
             raise ValueError(
                 "components.json is corrupted or invalid."
             ) from error
-# =========================================================
-# GET COMPONENTS FOR LINKED PANEL
-# =========================================================
+    # =========================================================
+    # GET CTS FOR PANEL
+    # =========================================================
 
-    def get_components_for_linked_panel(
+    def get_panel_cts(
         self,
-        panel_id,
-        linked_panel_id
+        panel_id
     ):
 
-        # -----------------------------------------------------
-        # First look for components belonging to the local
-        # panel.
-        # -----------------------------------------------------
-
-        local_components = (
+        components = (
             self.get_panel_components(
                 panel_id
             )
         )
 
-        if local_components:
+        return [
 
-            return local_components
+            component
 
-        # -----------------------------------------------------
-        # Then look for components belonging to the original
-        # linked panel.
-        # -----------------------------------------------------
+            for component in components
 
-        return (
-            self.get_panel_components(
-                linked_panel_id
+            if str(
+                getattr(
+                    component,
+                    "component_type",
+                    ""
+                )
+            ).strip().upper()
+            in (
+                "CT",
+                "CURRENT TRANSFORMER",
             )
-        )
+
+        ]

@@ -1,0 +1,27 @@
+[
+    {
+        "node_id": "AST-B2F73BAA",
+        "name": "REF-3 SS-1",
+        "node_type": "SUBSTATION",
+        "parent_id": null
+    },
+    {
+        "node_id": "AST-EC7FA40E",
+        "name": "HV-201A",
+        "node_type": "SWITCHBOARD",
+        "parent_id": "AST-B2F73BAA"
+    },
+    {
+        "node_id": "AST-B930F4C1",
+        "name": "P-01",
+        "node_type": "PANEL",
+        "parent_id": "AST-EC7FA40E",
+        "equipment_name": "",
+        "equipment_type": "",
+        "ct_count": 0,
+        "relay_count": 0,
+        "aux_count": 0,
+        "asset_id": "ASSET-A8F8D13E77",
+        "linked_asset_id": "ASSET-A8F8D13E77"
+    }
+]

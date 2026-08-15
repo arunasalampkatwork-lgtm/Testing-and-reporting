@@ -32,6 +32,50 @@ DEFAULT_TOLERANCE = 5.0
 
 
 class TestingView(QWidget):
+    """
+    Protection testing view.
+
+    Current-based protection quantities are entered as
+    multiples of relay nominal current:
+
+        xIn
+
+    where:
+
+        In = selected CT secondary current.
+
+    Example:
+
+        CT = 1000/5
+
+        In = 5 A
+
+        1.20 xIn
+        =
+        1.20 × 5
+        =
+        6 A
+
+    The ProtectionCalculator performs protection calculations
+    in xIn for current-based protection functions.
+
+    Therefore:
+
+        Tester input
+                ↓
+             xIn
+                ↓
+       ProtectionCalculator
+                ↓
+      engineering result
+
+    CT secondary current is used only to display the
+    corresponding physical secondary injection current.
+    """
+
+    # =====================================================
+    # INITIALIZATION
+    # =====================================================
 
     def __init__(
         self,
@@ -40,15 +84,69 @@ class TestingView(QWidget):
         relay_id,
         protection_function,
         test_service,
-        parent=None,
+        component=None,
+        ct_component=None,
+        parent=None
     ):
 
-        super().__init__(parent)
+        super().__init__(
+            parent
+        )
 
-        self.project_id = project_id
-        self.panel_id = panel_id
-        self.relay_id = relay_id
-        self.test_service = test_service
+        # =================================================
+        # IDENTIFICATION
+        # =================================================
+
+        self.project_id = (
+            project_id
+        )
+
+        self.panel_id = (
+            panel_id
+        )
+
+        self.relay_id = (
+            relay_id
+        )
+
+        self.test_service = (
+            test_service
+        )
+
+        # =================================================
+        # NUMERICAL RELAY
+        #
+        # component = relay being tested
+        # =================================================
+
+        self.component = (
+            component
+        )
+
+        # =================================================
+        # SELECTED CT
+        #
+        # ct_component = CT selected by tester in
+        # RelayTestingDialog.
+        # =================================================
+
+        self.ct_component = (
+            ct_component
+        )
+
+        # =================================================
+        # CT SECONDARY = RELAY NOMINAL CURRENT In
+        # =================================================
+
+        self.nominal_current = (
+            self.get_ct_nominal_current(
+                self.ct_component
+            )
+        )
+
+        # =================================================
+        # PROTECTION FUNCTION
+        # =================================================
 
         self.protection_function = (
             normalize_protection_code(
@@ -56,7 +154,19 @@ class TestingView(QWidget):
             )
         )
 
+        # =================================================
+        # TEST DATA
+        # =================================================
+
         self.fields = {}
+
+        self.test_type = (
+            "functional"
+        )
+
+        # =================================================
+        # UI
+        # =================================================
 
         self.setObjectName(
             "TestingView"
@@ -66,20 +176,277 @@ class TestingView(QWidget):
             650
         )
 
+        # =================================================
+        # BUILD
+        # =================================================
+
         self.build_ui()
+
+    # =====================================================
+    # CT NOMINAL CURRENT
+    # =====================================================
+
+    @staticmethod
+    def get_ct_nominal_current(
+        ct_component
+    ):
+        """
+        Return CT secondary current.
+
+        This is the relay nominal current In.
+
+        Examples:
+
+            1000/5 -> 5 A
+            1000/1 -> 1 A
+        """
+
+        if ct_component is None:
+
+            return 0.0
+
+        # -------------------------------------------------
+        # Preferred:
+        # explicit CT secondary
+        # -------------------------------------------------
+
+        try:
+
+            secondary = float(
+                getattr(
+                    ct_component,
+                    "ct_secondary",
+                    0
+                )
+                or 0
+            )
+
+            if secondary > 0:
+
+                return secondary
+
+        except (
+            TypeError,
+            ValueError
+        ):
+
+            pass
+
+        # -------------------------------------------------
+        # Backward compatibility:
+        #
+        # ct_ratio = "1000/5"
+        # ct_ratio = "1000/1"
+        # -------------------------------------------------
+
+        ratio = str(
+            getattr(
+                ct_component,
+                "ct_ratio",
+                ""
+            )
+            or ""
+        ).strip()
+
+        if "/" in ratio:
+
+            try:
+
+                secondary = float(
+                    ratio.split(
+                        "/",
+                        1
+                    )[1].strip()
+                )
+
+                if secondary > 0:
+
+                    return secondary
+
+            except (
+                TypeError,
+                ValueError,
+                IndexError
+            ):
+
+                pass
+
+        return 0.0
+
+    # =====================================================
+    # CT PRIMARY
+    # =====================================================
+
+    def get_ct_primary(
+        self
+    ):
+        """
+        Return selected CT primary current.
+        """
+
+        if self.ct_component is None:
+
+            return 0.0
+
+        try:
+
+            return float(
+                getattr(
+                    self.ct_component,
+                    "ct_primary",
+                    0
+                )
+                or 0
+            )
+
+        except (
+            TypeError,
+            ValueError
+        ):
+
+            return 0.0
+
+    # =====================================================
+    # CT RATIO
+    # =====================================================
+
+    def get_current_ct_ratio(
+        self
+    ):
+        """
+        Return selected CT ratio.
+
+        Example:
+
+            1000/5
+            1000/1
+        """
+
+        if self.ct_component is None:
+
+            return ""
+
+        primary = (
+            self.get_ct_primary()
+        )
+
+        secondary = (
+            self.nominal_current
+        )
+
+        if (
+            primary > 0
+            and secondary > 0
+        ):
+
+            return (
+                f"{primary:g}/"
+                f"{secondary:g}"
+            )
+
+        return str(
+            getattr(
+                self.ct_component,
+                "ct_ratio",
+                ""
+            )
+            or ""
+        ).strip()
+
+    # =====================================================
+    # xIn -> AMPS
+    # =====================================================
+
+    def xin_to_amps(
+        self,
+        value
+    ):
+        """
+        Convert xIn to actual CT secondary current.
+
+            I = xIn × In
+
+        Example:
+
+            CT = 1000/5
+            In = 5 A
+
+            1.2 xIn = 6 A
+        """
+
+        if self.nominal_current <= 0:
+
+            raise ValueError(
+                "No CT has been selected or the selected "
+                "CT secondary current is not configured."
+            )
+
+        return (
+            float(value)
+            *
+            self.nominal_current
+        )
+
+    # =====================================================
+    # AMPS -> xIn
+    # =====================================================
+
+    def amps_to_xin(
+        self,
+        value
+    ):
+        """
+        Convert actual CT secondary current to xIn.
+        """
+
+        if self.nominal_current <= 0:
+
+            raise ValueError(
+                "No CT has been selected or the selected "
+                "CT secondary current is not configured."
+            )
+
+        return (
+            float(value)
+            /
+            self.nominal_current
+        )
+
+    # =====================================================
+    # CURRENT BASED TEST
+    # =====================================================
+
+    def is_current_based_test(
+        self
+    ):
+
+        return self.test_type in (
+            "idmt",
+            "current_pickup_time",
+            "directional_current",
+            "differential",
+        )
 
     # =====================================================
     # BUILD UI
     # =====================================================
 
-    def build_ui(self):
+    def build_ui(
+        self
+    ):
 
         main_layout = QVBoxLayout(
             self
         )
 
-        function = get_protection_function(
-            self.protection_function
+        # =================================================
+        # GET FUNCTION
+        # =================================================
+
+        function = (
+            get_protection_function(
+                self.protection_function
+            )
         )
 
         if function is None:
@@ -148,10 +515,22 @@ class TestingView(QWidget):
         # TEST TYPE
         # =================================================
 
-        self.test_type = function.get(
-            "test_type",
-            "functional"
+        self.test_type = (
+            function.get(
+                "test_type",
+                "functional"
+            )
         )
+
+        # =================================================
+        # CT INFORMATION
+        # =================================================
+
+        if self.is_current_based_test():
+
+            self.create_ct_information(
+                main_layout
+            )
 
         # =================================================
         # SCROLL AREA
@@ -186,10 +565,10 @@ class TestingView(QWidget):
         )
 
         # =================================================
-        # CREATE TOLERANCE OBJECT FIRST
+        # ENGINEERING VALIDATION
         #
-        # Calculation functions connect to this widget.
-        # Therefore it MUST EXIST before create_function_fields().
+        # IMPORTANT:
+        # This is created BEFORE create_function_fields().
         # =================================================
 
         self.tolerance_group = QGroupBox(
@@ -201,7 +580,9 @@ class TestingView(QWidget):
         self.tolerance_widget = QLineEdit()
 
         self.tolerance_widget.setText(
-            str(DEFAULT_TOLERANCE)
+            str(
+                DEFAULT_TOLERANCE
+            )
         )
 
         self.tolerance_widget.setPlaceholderText(
@@ -218,15 +599,13 @@ class TestingView(QWidget):
         )
 
         # =================================================
-        # CREATE PROTECTION-SPECIFIC FIELDS
+        # CREATE FUNCTION FIELDS
         # =================================================
 
         self.create_function_fields()
 
         # =================================================
-        # ENGINEERING VALIDATION
-        #
-        # Added AFTER protection-specific fields.
+        # ADD TOLERANCE
         # =================================================
 
         self.form_layout.addRow(
@@ -313,15 +692,156 @@ class TestingView(QWidget):
         )
 
     # =====================================================
+    # CREATE CT INFORMATION
+    # =====================================================
+
+    def create_ct_information(
+        self,
+        main_layout
+    ):
+
+        ct_group = QGroupBox(
+            "Relay Current Reference"
+        )
+
+        ct_layout = QFormLayout()
+
+        # -------------------------------------------------
+        # CT NAME
+        # -------------------------------------------------
+
+        self.ct_name_display = QLineEdit()
+
+        self.ct_name_display.setReadOnly(
+            True
+        )
+
+        ct_name = ""
+
+        if self.ct_component is not None:
+
+            ct_name = str(
+                getattr(
+                    self.ct_component,
+                    "name",
+                    ""
+                )
+                or ""
+            )
+
+        self.ct_name_display.setText(
+            ct_name
+            or
+            "No CT selected"
+        )
+
+        ct_layout.addRow(
+            "Selected CT",
+            self.ct_name_display
+        )
+
+        # -------------------------------------------------
+        # CT RATIO
+        # -------------------------------------------------
+
+        self.ct_ratio_display = QLineEdit()
+
+        self.ct_ratio_display.setReadOnly(
+            True
+        )
+
+        self.ct_ratio_display.setText(
+            self.get_current_ct_ratio()
+            or
+            "NOT CONFIGURED"
+        )
+
+        ct_layout.addRow(
+            "CT Ratio",
+            self.ct_ratio_display
+        )
+
+        # -------------------------------------------------
+        # NOMINAL CURRENT
+        # -------------------------------------------------
+
+        self.nominal_current_display = QLineEdit()
+
+        self.nominal_current_display.setReadOnly(
+            True
+        )
+
+        if self.nominal_current > 0:
+
+            nominal_text = (
+                f"{self.nominal_current:g} A"
+            )
+
+        else:
+
+            nominal_text = (
+                "NOT CONFIGURED"
+            )
+
+        self.nominal_current_display.setText(
+            nominal_text
+        )
+
+        ct_layout.addRow(
+            "Nominal Current (In)",
+            self.nominal_current_display
+        )
+
+        # -------------------------------------------------
+        # WARNING
+        # -------------------------------------------------
+
+        if self.nominal_current <= 0:
+
+            warning = QLabel(
+                "WARNING: No valid CT secondary current "
+                "has been configured for this relay test."
+            )
+
+            warning.setWordWrap(
+                True
+            )
+
+            warning.setStyleSheet(
+                """
+                QLabel {
+                    font-weight: bold;
+                    padding: 6px;
+                }
+                """
+            )
+
+            ct_layout.addRow(
+                warning
+            )
+
+        ct_group.setLayout(
+            ct_layout
+        )
+
+        main_layout.addWidget(
+            ct_group
+        )
+
+    # =====================================================
     # CREATE FUNCTION FIELDS
     # =====================================================
 
-    def create_function_fields(self):
+    def create_function_fields(
+        self
+    ):
 
-        test_type = self.test_type
+        test_type = (
+            self.test_type
+        )
 
         # =================================================
-        # IDMT
+        # IDMT / 51
         # =================================================
 
         if test_type == "idmt":
@@ -329,14 +849,14 @@ class TestingView(QWidget):
             self.add_number(
                 "pickup_current",
                 "Pickup Current",
-                "A",
+                "xIn",
                 True
             )
 
             self.add_number(
                 "test_current",
                 "Test Current",
-                "A",
+                "xIn",
                 True
             )
 
@@ -352,6 +872,18 @@ class TestingView(QWidget):
             self.add_readonly(
                 "psm",
                 "PSM"
+            )
+
+            self.add_readonly(
+                "pickup_current_a",
+                "Pickup Current",
+                "A"
+            )
+
+            self.add_readonly(
+                "test_current_a",
+                "Test Current",
+                "A"
             )
 
             self.add_readonly(
@@ -378,7 +910,7 @@ class TestingView(QWidget):
             return
 
         # =================================================
-        # CURRENT PICKUP
+        # CURRENT PICKUP / 50 / 50N / 51N
         # =================================================
 
         if test_type == "current_pickup_time":
@@ -386,15 +918,27 @@ class TestingView(QWidget):
             self.add_number(
                 "pickup_current",
                 "Pickup Current Setting",
-                "A",
+                "xIn",
                 True
             )
 
             self.add_number(
                 "test_current",
                 "Measured Pickup Current",
-                "A",
+                "xIn",
                 True
+            )
+
+            self.add_readonly(
+                "pickup_current_a",
+                "Pickup Setting",
+                "A"
+            )
+
+            self.add_readonly(
+                "test_current_a",
+                "Measured Pickup",
+                "A"
             )
 
             self.add_readonly(
@@ -526,15 +1070,27 @@ class TestingView(QWidget):
             self.add_number(
                 "pickup_current",
                 "Pickup Current",
-                "A",
+                "xIn",
                 True
             )
 
             self.add_number(
                 "test_current",
                 "Test Current",
-                "A",
+                "xIn",
                 True
+            )
+
+            self.add_readonly(
+                "pickup_current_a",
+                "Pickup Current",
+                "A"
+            )
+
+            self.add_readonly(
+                "test_current_a",
+                "Test Current",
+                "A"
             )
 
             self.add_number(
@@ -600,19 +1156,37 @@ class TestingView(QWidget):
             self.add_number(
                 "current_1",
                 "Current Input 1",
-                "A",
+                "xIn",
                 True
             )
 
             self.add_number(
                 "current_2",
                 "Current Input 2",
-                "A",
+                "xIn",
                 True
             )
 
             self.add_readonly(
+                "current_1_a",
+                "Current Input 1",
+                "A"
+            )
+
+            self.add_readonly(
+                "current_2_a",
+                "Current Input 2",
+                "A"
+            )
+
+            self.add_readonly(
                 "differential_current",
+                "Differential Current",
+                "xIn"
+            )
+
+            self.add_readonly(
+                "differential_current_a",
                 "Differential Current",
                 "A"
             )
@@ -620,8 +1194,14 @@ class TestingView(QWidget):
             self.add_number(
                 "expected_differential",
                 "Expected Differential",
-                "A",
+                "xIn",
                 True
+            )
+
+            self.add_readonly(
+                "expected_differential_a",
+                "Expected Differential",
+                "A"
             )
 
             self.add_readonly(
@@ -676,8 +1256,6 @@ class TestingView(QWidget):
             widget
         )
 
-    # =====================================================
-
     def add_readonly(
         self,
         field_id,
@@ -703,8 +1281,6 @@ class TestingView(QWidget):
             ),
             widget
         )
-
-    # =====================================================
 
     def add_select(
         self,
@@ -733,9 +1309,9 @@ class TestingView(QWidget):
             widget
         )
 
-    # =====================================================
-
-    def add_curve(self):
+    def add_curve(
+        self
+    ):
 
         widget = QComboBox()
 
@@ -751,10 +1327,14 @@ class TestingView(QWidget):
 
         if curves:
 
-            for curve_code in curves.keys():
+            for curve_code in (
+                curves.keys()
+            ):
 
                 widget.addItem(
-                    str(curve_code)
+                    str(
+                        curve_code
+                    )
                 )
 
         else:
@@ -781,8 +1361,6 @@ class TestingView(QWidget):
             widget
         )
 
-    # =====================================================
-
     def make_label(
         self,
         label,
@@ -790,12 +1368,18 @@ class TestingView(QWidget):
         required
     ):
 
-        text = str(label)
+        text = str(
+            label
+        )
 
         if unit:
-            text += f" ({unit})"
+
+            text += (
+                f" ({unit})"
+            )
 
         if required:
+
             text += " *"
 
         return QLabel(
@@ -803,10 +1387,12 @@ class TestingView(QWidget):
         )
 
     # =====================================================
-    # IDMT
+    # IDMT SIGNALS
     # =====================================================
 
-    def connect_idmt(self):
+    def connect_idmt(
+        self
+    ):
 
         for field_id in [
             "pickup_current",
@@ -837,28 +1423,75 @@ class TestingView(QWidget):
         )
 
     # =====================================================
+    # IDMT CALCULATION
+    # =====================================================
 
-    def calculate_idmt(self):
+    def calculate_idmt(
+        self
+    ):
 
         try:
+
+            pickup_xin = float(
+                self.fields[
+                    "pickup_current"
+                ].text()
+            )
+
+            test_xin = float(
+                self.fields[
+                    "test_current"
+                ].text()
+            )
+
+            pickup_a = (
+                self.xin_to_amps(
+                    pickup_xin
+                )
+            )
+
+            test_a = (
+                self.xin_to_amps(
+                    test_xin
+                )
+            )
+
+            # -------------------------------------------------
+            # Display actual current
+            # -------------------------------------------------
+
+            self.fields[
+                "pickup_current_a"
+            ].setText(
+                f"{pickup_a:.4f}"
+            )
+
+            self.fields[
+                "test_current_a"
+            ].setText(
+                f"{test_a:.4f}"
+            )
+
+            # -------------------------------------------------
+            # Calculator
+            # -------------------------------------------------
 
             calculation = (
                 ProtectionCalculator
                 .calculate_51_time(
-                    curve_code=self.fields[
-                        "curve"
-                    ].currentText(),
 
-                    pickup_current=float(
+                    curve_code=(
                         self.fields[
-                            "pickup_current"
-                        ].text()
+                            "curve"
+                        ].currentText()
                     ),
 
-                    test_current=float(
-                        self.fields[
-                            "test_current"
-                        ].text()
+                    pickup_xin=(
+                        pickup_xin
+                    ),
+
+                    test_xin=(
+                        test_xin
                     ),
 
                     tms=float(
@@ -890,6 +1523,14 @@ class TestingView(QWidget):
         ):
 
             self.fields[
+                "pickup_current_a"
+            ].clear()
+
+            self.fields[
+                "test_current_a"
+            ].clear()
+
+            self.fields[
                 "psm"
             ].clear()
 
@@ -904,8 +1545,12 @@ class TestingView(QWidget):
             self.result_widget.clear()
 
     # =====================================================
+    # IDMT RESULT
+    # =====================================================
 
-    def calculate_idmt_result(self):
+    def calculate_idmt_result(
+        self
+    ):
 
         try:
 
@@ -928,9 +1573,18 @@ class TestingView(QWidget):
             result = (
                 ProtectionCalculator
                 .evaluate_time_test(
-                    expected_time=expected_time,
-                    actual_time=actual_time,
-                    tolerance_percent=tolerance
+
+                    expected_time=(
+                        expected_time
+                    ),
+
+                    actual_time=(
+                        actual_time
+                    ),
+
+                    tolerance_percent=(
+                        tolerance
+                    )
                 )
             )
 
@@ -957,10 +1611,12 @@ class TestingView(QWidget):
             self.result_widget.clear()
 
     # =====================================================
-    # CURRENT PICKUP
+    # CURRENT PICKUP SIGNALS
     # =====================================================
 
-    def connect_current_pickup(self):
+    def connect_current_pickup(
+        self
+    ):
 
         self.fields[
             "test_current"
@@ -979,28 +1635,73 @@ class TestingView(QWidget):
         )
 
     # =====================================================
+    # CURRENT PICKUP CALCULATION
+    # =====================================================
 
-    def calculate_current_pickup(self):
+    def calculate_current_pickup(
+        self
+    ):
 
         try:
+
+            pickup_xin = float(
+                self.fields[
+                    "pickup_current"
+                ].text()
+            )
+
+            test_xin = float(
+                self.fields[
+                    "test_current"
+                ].text()
+            )
+
+            pickup_a = (
+                self.xin_to_amps(
+                    pickup_xin
+                )
+            )
+
+            test_a = (
+                self.xin_to_amps(
+                    test_xin
+                )
+            )
+
+            # -------------------------------------------------
+            # Display actual current
+            # -------------------------------------------------
+
+            self.fields[
+                "pickup_current_a"
+            ].setText(
+                f"{pickup_a:.4f}"
+            )
+
+            self.fields[
+                "test_current_a"
+            ].setText(
+                f"{test_a:.4f}"
+            )
+
+            tolerance = float(
+                self.tolerance_widget.text()
+            )
 
             result = (
                 ProtectionCalculator
                 .evaluate_current_pickup(
-                    expected_current=float(
-                        self.fields[
-                            "pickup_current"
-                        ].text()
+
+                    expected_xin=(
+                        pickup_xin
                     ),
 
-                    actual_current=float(
-                        self.fields[
-                            "test_current"
-                        ].text()
+                    actual_xin=(
+                        test_xin
                     ),
 
-                    tolerance_percent=float(
-                        self.tolerance_widget.text()
+                    tolerance_percent=(
+                        tolerance
                     )
                 )
             )
@@ -1022,16 +1723,26 @@ class TestingView(QWidget):
         ):
 
             self.fields[
+                "pickup_current_a"
+            ].clear()
+
+            self.fields[
+                "test_current_a"
+            ].clear()
+
+            self.fields[
                 "pickup_error_percent"
             ].clear()
 
             self.result_widget.clear()
 
     # =====================================================
-    # VOLTAGE
+    # VOLTAGE SIGNALS
     # =====================================================
 
-    def connect_voltage_threshold(self):
+    def connect_voltage_threshold(
+        self
+    ):
 
         for field_id in [
             "voltage_setting",
@@ -1049,8 +1760,12 @@ class TestingView(QWidget):
         )
 
     # =====================================================
+    # VOLTAGE
+    # =====================================================
 
-    def calculate_voltage(self):
+    def calculate_voltage(
+        self
+    ):
 
         try:
 
@@ -1063,6 +1778,7 @@ class TestingView(QWidget):
             result = (
                 ProtectionCalculator
                 .evaluate_threshold(
+
                     expected_value=float(
                         self.fields[
                             "voltage_setting"
@@ -1106,10 +1822,12 @@ class TestingView(QWidget):
             self.result_widget.clear()
 
     # =====================================================
-    # FREQUENCY
+    # FREQUENCY SIGNALS
     # =====================================================
 
-    def connect_frequency(self):
+    def connect_frequency(
+        self
+    ):
 
         for field_id in [
             "frequency_setting",
@@ -1127,14 +1845,19 @@ class TestingView(QWidget):
         )
 
     # =====================================================
+    # FREQUENCY
+    # =====================================================
 
-    def calculate_frequency(self):
+    def calculate_frequency(
+        self
+    ):
 
         try:
 
             result = (
                 ProtectionCalculator
                 .evaluate_frequency_pickup(
+
                     expected_frequency=float(
                         self.fields[
                             "frequency_setting"
@@ -1176,10 +1899,12 @@ class TestingView(QWidget):
             self.result_widget.clear()
 
     # =====================================================
-    # ROCOF
+    # ROCOF SIGNALS
     # =====================================================
 
-    def connect_rocof(self):
+    def connect_rocof(
+        self
+    ):
 
         for field_id in [
             "frequency_before",
@@ -1199,14 +1924,19 @@ class TestingView(QWidget):
         )
 
     # =====================================================
+    # ROCOF
+    # =====================================================
 
-    def calculate_rocof(self):
+    def calculate_rocof(
+        self
+    ):
 
         try:
 
             rocof = (
                 ProtectionCalculator
                 .calculate_rocof(
+
                     frequency_1=float(
                         self.fields[
                             "frequency_before"
@@ -1236,6 +1966,7 @@ class TestingView(QWidget):
             result = (
                 ProtectionCalculator
                 .evaluate_rocof(
+
                     expected_rocof=float(
                         self.fields[
                             "rocof_setting"
@@ -1277,12 +2008,16 @@ class TestingView(QWidget):
             self.result_widget.clear()
 
     # =====================================================
-    # DIRECTIONAL
+    # DIRECTIONAL SIGNALS
     # =====================================================
 
-    def connect_directional(self):
+    def connect_directional(
+        self
+    ):
 
         for field_id in [
+            "pickup_current",
+            "test_current",
             "expected_angle",
             "actual_angle"
         ]:
@@ -1298,14 +2033,55 @@ class TestingView(QWidget):
         )
 
     # =====================================================
+    # DIRECTIONAL
+    # =====================================================
 
-    def calculate_directional(self):
+    def calculate_directional(
+        self
+    ):
 
         try:
+
+            pickup_xin = float(
+                self.fields[
+                    "pickup_current"
+                ].text()
+            )
+
+            test_xin = float(
+                self.fields[
+                    "test_current"
+                ].text()
+            )
+
+            pickup_a = (
+                self.xin_to_amps(
+                    pickup_xin
+                )
+            )
+
+            test_a = (
+                self.xin_to_amps(
+                    test_xin
+                )
+            )
+
+            self.fields[
+                "pickup_current_a"
+            ].setText(
+                f"{pickup_a:.4f}"
+            )
+
+            self.fields[
+                "test_current_a"
+            ].setText(
+                f"{test_a:.4f}"
+            )
 
             result = (
                 ProtectionCalculator
                 .evaluate_directional_test(
+
                     expected_angle=float(
                         self.fields[
                             "expected_angle"
@@ -1336,8 +2112,17 @@ class TestingView(QWidget):
 
         except (
             ValueError,
-            TypeError
+            TypeError,
+            ZeroDivisionError
         ):
+
+            self.fields[
+                "pickup_current_a"
+            ].clear()
+
+            self.fields[
+                "test_current_a"
+            ].clear()
 
             self.fields[
                 "angle_error"
@@ -1346,10 +2131,12 @@ class TestingView(QWidget):
             self.result_widget.clear()
 
     # =====================================================
-    # FUNCTIONAL
+    # FUNCTIONAL SIGNALS
     # =====================================================
 
-    def connect_functional(self):
+    def connect_functional(
+        self
+    ):
 
         self.fields[
             "expected_operation"
@@ -1364,8 +2151,12 @@ class TestingView(QWidget):
         )
 
     # =====================================================
+    # FUNCTIONAL
+    # =====================================================
 
-    def calculate_functional(self):
+    def calculate_functional(
+        self
+    ):
 
         expected = (
             self.fields[
@@ -1392,10 +2183,12 @@ class TestingView(QWidget):
         )
 
     # =====================================================
-    # DIFFERENTIAL
+    # DIFFERENTIAL SIGNALS
     # =====================================================
 
-    def connect_differential(self):
+    def connect_differential(
+        self
+    ):
 
         for field_id in [
             "current_1",
@@ -1414,44 +2207,124 @@ class TestingView(QWidget):
         )
 
     # =====================================================
+    # DIFFERENTIAL
+    # =====================================================
 
-    def calculate_differential(self):
+    def calculate_differential(
+        self
+    ):
 
         try:
 
-            differential = (
+            current_1_xin = float(
+                self.fields[
+                    "current_1"
+                ].text()
+            )
+
+            current_2_xin = float(
+                self.fields[
+                    "current_2"
+                ].text()
+            )
+
+            expected_xin = float(
+                self.fields[
+                    "expected_differential"
+                ].text()
+            )
+
+            current_1_a = (
+                self.xin_to_amps(
+                    current_1_xin
+                )
+            )
+
+            current_2_a = (
+                self.xin_to_amps(
+                    current_2_xin
+                )
+            )
+
+            expected_a = (
+                self.xin_to_amps(
+                    expected_xin
+                )
+            )
+
+            # -------------------------------------------------
+            # Display actual currents
+            # -------------------------------------------------
+
+            self.fields[
+                "current_1_a"
+            ].setText(
+                f"{current_1_a:.4f}"
+            )
+
+            self.fields[
+                "current_2_a"
+            ].setText(
+                f"{current_2_a:.4f}"
+            )
+
+            # -------------------------------------------------
+            # Calculate differential current
+            # -------------------------------------------------
+
+            differential_xin = (
                 ProtectionCalculator
                 .calculate_differential_current(
-                    current_1=float(
-                        self.fields[
-                            "current_1"
-                        ].text()
+
+                    current_1_xin=(
+                        current_1_xin
                     ),
 
-                    current_2=float(
-                        self.fields[
-                            "current_2"
-                        ].text()
+                    current_2_xin=(
+                        current_2_xin
                     )
+                )
+            )
+
+            differential_a = (
+                self.xin_to_amps(
+                    differential_xin
                 )
             )
 
             self.fields[
                 "differential_current"
             ].setText(
-                f"{differential:.4f}"
+                f"{differential_xin:.4f}"
             )
+
+            self.fields[
+                "differential_current_a"
+            ].setText(
+                f"{differential_a:.4f}"
+            )
+
+            self.fields[
+                "expected_differential_a"
+            ].setText(
+                f"{expected_a:.4f}"
+            )
+
+            # -------------------------------------------------
+            # Evaluate
+            # -------------------------------------------------
 
             result = (
                 ProtectionCalculator
                 .evaluate_differential_test(
-                    expected_current=float(
-                        self.fields[
-                            "expected_differential"
-                        ].text()
+
+                    expected_xin=(
+                        expected_xin
                     ),
 
-                    actual_differential_current=differential,
+                    actual_differential_xin=(
+                        differential_xin
+                    ),
 
                     tolerance_percent=float(
                         self.tolerance_widget.text()
@@ -1476,7 +2349,23 @@ class TestingView(QWidget):
         ):
 
             self.fields[
+                "current_1_a"
+            ].clear()
+
+            self.fields[
+                "current_2_a"
+            ].clear()
+
+            self.fields[
                 "differential_current"
+            ].clear()
+
+            self.fields[
+                "differential_current_a"
+            ].clear()
+
+            self.fields[
+                "expected_differential_a"
             ].clear()
 
             self.fields[
@@ -1489,11 +2378,19 @@ class TestingView(QWidget):
     # GET FIELD VALUES
     # =====================================================
 
-    def get_field_values(self):
+    def get_field_values(
+        self
+    ):
 
         values = {}
 
-        for field_id, widget in self.fields.items():
+        # -------------------------------------------------
+        # Normal fields
+        # -------------------------------------------------
+
+        for field_id, widget in (
+            self.fields.items()
+        ):
 
             if isinstance(
                 widget,
@@ -1502,7 +2399,11 @@ class TestingView(QWidget):
 
                 values[
                     field_id
-                ] = widget.text().strip()
+                ] = (
+                    widget
+                    .text()
+                    .strip()
+                )
 
             elif isinstance(
                 widget,
@@ -1511,19 +2412,114 @@ class TestingView(QWidget):
 
                 values[
                     field_id
-                ] = widget.currentText()
+                ] = (
+                    widget
+                    .currentText()
+                )
+
+        # -------------------------------------------------
+        # Engineering validation
+        # -------------------------------------------------
 
         values[
             "tolerance_percent"
-        ] = self.tolerance_widget.text().strip()
+        ] = (
+            self.tolerance_widget
+            .text()
+            .strip()
+        )
+
+        # -------------------------------------------------
+        # Remarks
+        # -------------------------------------------------
 
         values[
             "remarks"
-        ] = self.remarks_widget.text().strip()
+        ] = (
+            self.remarks_widget
+            .text()
+            .strip()
+        )
+
+        # -------------------------------------------------
+        # Result
+        # -------------------------------------------------
 
         values[
             "result"
-        ] = self.result_widget.text().strip()
+        ] = (
+            self.result_widget
+            .text()
+            .strip()
+        )
+
+        # -------------------------------------------------
+        # Nominal current
+        # -------------------------------------------------
+
+        values[
+            "nominal_current_a"
+        ] = self.nominal_current
+
+        values[
+            "nominal_current_unit"
+        ] = "A"
+
+        # -------------------------------------------------
+        # CT information
+        # -------------------------------------------------
+
+        if self.ct_component is not None:
+
+            values[
+                "ct_id"
+            ] = getattr(
+                self.ct_component,
+                "component_id",
+                ""
+            )
+
+            values[
+                "ct_name"
+            ] = getattr(
+                self.ct_component,
+                "name",
+                ""
+            )
+
+            values[
+                "ct_primary_a"
+            ] = self.get_ct_primary()
+
+            values[
+                "ct_secondary_a"
+            ] = self.nominal_current
+
+            values[
+                "ct_ratio"
+            ] = self.get_current_ct_ratio()
+
+        else:
+
+            values[
+                "ct_id"
+            ] = ""
+
+            values[
+                "ct_name"
+            ] = ""
+
+            values[
+                "ct_primary_a"
+            ] = 0
+
+            values[
+                "ct_secondary_a"
+            ] = self.nominal_current
+
+            values[
+                "ct_ratio"
+            ] = ""
 
         return values
 
@@ -1531,9 +2527,16 @@ class TestingView(QWidget):
     # VALIDATION
     # =====================================================
 
-    def validate_fields(self, values):
+    def validate_fields(
+        self,
+        values
+    ):
 
         required_fields = []
+
+        # =================================================
+        # REQUIRED FIELDS BY TEST TYPE
+        # =================================================
 
         if self.test_type == "idmt":
 
@@ -1599,7 +2602,7 @@ class TestingView(QWidget):
             ]
 
         # =================================================
-        # REQUIRED FIELDS
+        # REQUIRED VALUE CHECK
         # =================================================
 
         for field_id in required_fields:
@@ -1619,14 +2622,38 @@ class TestingView(QWidget):
                     (
                         "Please enter: "
                         +
-                        field_id.replace(
+                        field_id
+                        .replace(
                             "_",
                             " "
-                        ).title()
+                        )
+                        .title()
                     )
                 )
 
                 return False
+
+        # =================================================
+        # CT CHECK
+        # =================================================
+
+        if (
+            self.is_current_based_test()
+            and self.nominal_current <= 0
+        ):
+
+            QMessageBox.warning(
+                self,
+                "CT Configuration Missing",
+                (
+                    "No valid CT secondary current has "
+                    "been configured for this test.\n\n"
+                    "Select a CT with a valid secondary "
+                    "current such as 1 A or 5 A."
+                )
+            )
+
+            return False
 
         # =================================================
         # TOLERANCE
@@ -1641,6 +2668,7 @@ class TestingView(QWidget):
             )
 
             if tolerance < 0:
+
                 raise ValueError
 
         except (
@@ -1663,16 +2691,21 @@ class TestingView(QWidget):
         return True
 
     # =====================================================
-    # SAVE
+    # SAVE TEST
     # =====================================================
 
-    def save_test(self):
+    def save_test(
+        self
+    ):
 
-        values = self.get_field_values()
+        values = (
+            self.get_field_values()
+        )
 
         if not self.validate_fields(
             values
         ):
+
             return
 
         result = (
@@ -1694,18 +2727,88 @@ class TestingView(QWidget):
 
             return
 
+        # =================================================
+        # SETTINGS
+        # =================================================
+
+        settings = {
+
+            "nominal_current_a":
+                self.nominal_current,
+
+            "nominal_current_unit":
+                "A",
+
+            "input_current_unit":
+                (
+                    "xIn"
+                    if self.is_current_based_test()
+                    else ""
+                ),
+
+            "ct_id":
+                values.get(
+                    "ct_id",
+                    ""
+                ),
+
+            "ct_name":
+                values.get(
+                    "ct_name",
+                    ""
+                ),
+
+            "ct_primary_a":
+                values.get(
+                    "ct_primary_a",
+                    0
+                ),
+
+            "ct_secondary_a":
+                values.get(
+                    "ct_secondary_a",
+                    self.nominal_current
+                ),
+
+            "ct_ratio":
+                values.get(
+                    "ct_ratio",
+                    ""
+                ),
+        }
+
+        # =================================================
+        # SAVE
+        # =================================================
+
         try:
 
             test_id = (
                 self.test_service
                 .save_protection_test(
-                    project_id=self.project_id,
-                    panel_id=self.panel_id,
-                    relay_id=self.relay_id,
-                    protection_code=self.protection_function,
-                    settings={},
+
+                    project_id=(
+                        self.project_id
+                    ),
+
+                    panel_id=(
+                        self.panel_id
+                    ),
+
+                    relay_id=(
+                        self.relay_id
+                    ),
+
+                    protection_code=(
+                        self.protection_function
+                    ),
+
+                    settings=settings,
+
                     measurements=values,
+
                     result=result,
+
                     remarks=values.get(
                         "remarks",
                         ""
@@ -1717,7 +2820,8 @@ class TestingView(QWidget):
                 self,
                 "Test Saved",
                 (
-                    "Test result saved successfully.\n\n"
+                    "Protection test saved "
+                    "successfully.\n\n"
                     f"Test ID: {test_id}"
                 )
             )
@@ -1734,9 +2838,13 @@ class TestingView(QWidget):
     # CLEAR
     # =====================================================
 
-    def clear_fields(self):
+    def clear_fields(
+        self
+    ):
 
-        for widget in self.fields.values():
+        for widget in (
+            self.fields.values()
+        ):
 
             if isinstance(
                 widget,
@@ -1755,9 +2863,142 @@ class TestingView(QWidget):
                 )
 
         self.tolerance_widget.setText(
-            str(DEFAULT_TOLERANCE)
+            str(
+                DEFAULT_TOLERANCE
+            )
         )
 
         self.remarks_widget.clear()
 
         self.result_widget.clear()
+
+    # =====================================================
+    # CHANGE CT CONTEXT
+    # =====================================================
+
+    def set_ct_context(
+        self,
+        ct_component
+    ):
+        """
+        Called by RelayTestingDialog when the tester
+        selects a different CT.
+
+        Existing xIn entries are preserved.
+
+        Only their actual ampere equivalents and
+        calculations are refreshed.
+        """
+
+        self.ct_component = (
+            ct_component
+        )
+
+        self.nominal_current = (
+            self.get_ct_nominal_current(
+                ct_component
+            )
+        )
+
+        self.update_ct_display()
+
+        self.recalculate_current_fields()
+
+    # =====================================================
+    # UPDATE CT DISPLAY
+    # =====================================================
+
+    def update_ct_display(
+        self
+    ):
+
+        if hasattr(
+            self,
+            "ct_name_display"
+        ):
+
+            if self.ct_component is not None:
+
+                self.ct_name_display.setText(
+                    str(
+                        getattr(
+                            self.ct_component,
+                            "name",
+                            ""
+                        )
+                        or
+                        "Unnamed CT"
+                    )
+                )
+
+            else:
+
+                self.ct_name_display.setText(
+                    "No CT selected"
+                )
+
+        if hasattr(
+            self,
+            "ct_ratio_display"
+        ):
+
+            self.ct_ratio_display.setText(
+                self.get_current_ct_ratio()
+                or
+                "NOT CONFIGURED"
+            )
+
+        if hasattr(
+            self,
+            "nominal_current_display"
+        ):
+
+            if self.nominal_current > 0:
+
+                self.nominal_current_display.setText(
+                    f"{self.nominal_current:g} A"
+                )
+
+            else:
+
+                self.nominal_current_display.setText(
+                    "NOT CONFIGURED"
+                )
+
+    # =====================================================
+    # RECALCULATE CURRENT FIELDS
+    # =====================================================
+
+    def recalculate_current_fields(
+        self
+    ):
+        """
+        Recalculate all current-dependent calculations
+        after changing the selected CT.
+
+        User-entered values remain in xIn.
+        """
+
+        try:
+
+            if self.test_type == "idmt":
+
+                self.calculate_idmt()
+
+            elif self.test_type == "current_pickup_time":
+
+                self.calculate_current_pickup()
+
+            elif self.test_type == "directional_current":
+
+                self.calculate_directional()
+
+            elif self.test_type == "differential":
+
+                self.calculate_differential()
+
+        except Exception:
+
+            # Do not crash the GUI merely because a
+            # field is incomplete while switching CTs.
+            pass
