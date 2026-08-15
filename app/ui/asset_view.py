@@ -1816,15 +1816,69 @@ class AssetView(QWidget):
 
         if component_type == "NUMERICAL_RELAY":
 
+            # =================================================
+            # GET CTs BELONGING TO THIS PANEL
+            # =================================================
+
+            try:
+
+                available_cts = (
+                    self.component_manager
+                    .get_panel_cts(
+                        panel_id
+                    )
+                )
+
+            except AttributeError:
+
+                # Compatibility fallback for an older
+                # ComponentManager.
+
+                available_cts = [
+
+                    item
+
+                    for item
+                    in self.component_manager
+                    .get_panel_components(
+                        panel_id
+                    )
+
+                    if str(
+                        getattr(
+                            item,
+                            "component_type",
+                            ""
+                        )
+                    ).strip().upper()
+                    in (
+                        "CT",
+                        "CURRENT TRANSFORMER",
+                    )
+                ]
+
+            # =================================================
+            # OPEN RELAY TESTING
+            # =================================================
+
             self.testing_dialog = RelayTestingDialog(
+
                 project_id=project_id,
+
                 panel_id=panel_id,
+
                 relay_id=component.component_id,
+
+                # Numerical relay
                 component=component,
+
+                # CTs mapped to this panel
+                available_cts=available_cts,
+
                 test_service=self.test_service,
+
                 parent=self,
             )
-
         elif component_type in (
             "CT",
             "CURRENT TRANSFORMER",

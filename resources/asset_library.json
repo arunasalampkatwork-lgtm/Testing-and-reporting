@@ -1,48 +1,9 @@
 [
     {
-        "asset_id": "ASSET-4D1D94DEE4",
-        "asset_type": "PANEL",
-        "asset_tag": "Incomer",
-        "name": "Incomer",
-        "description": "",
-        "serial_number": "",
-        "manufacturer": "",
-        "model": "",
-        "metadata": {
-            "parent_asset_id": "ASSET-EBF6543EB5"
-        }
-    },
-    {
-        "asset_id": "ASSET-315DF0FCDA",
-        "asset_type": "PANEL",
-        "asset_tag": "SS-1 P01",
-        "name": "Panel-01",
-        "description": "",
-        "serial_number": "",
-        "manufacturer": "",
-        "model": "",
-        "metadata": {
-            "parent_asset_id": "ASSET-00CEFCE9DF"
-        }
-    },
-    {
-        "asset_id": "ASSET-691FE0B7FC",
-        "asset_type": "PANEL",
-        "asset_tag": "SS-1 P04",
-        "name": "P04",
-        "description": "",
-        "serial_number": "",
-        "manufacturer": "",
-        "model": "",
-        "metadata": {
-            "parent_asset_id": "ASSET-00CEFCE9DF"
-        }
-    },
-    {
-        "asset_id": "ASSET-2233A4A247",
+        "asset_id": "ASSET-0363E60DEF",
         "asset_type": "SUBSTATION",
-        "asset_tag": "SS-1",
-        "name": "SS-1",
+        "asset_tag": "REF-3 SS-1",
+        "name": "REF-3 SS-1",
         "description": "",
         "serial_number": "",
         "manufacturer": "",
@@ -50,7 +11,7 @@
         "metadata": {}
     },
     {
-        "asset_id": "ASSET-00CEFCE9DF",
+        "asset_id": "ASSET-7073BC369A",
         "asset_type": "SWITCHBOARD",
         "asset_tag": "HV-201A",
         "name": "HV-201A",
@@ -59,120 +20,292 @@
         "manufacturer": "",
         "model": "",
         "metadata": {
-            "parent_asset_id": "ASSET-2233A4A247"
+            "parent_asset_id": "ASSET-0363E60DEF"
         }
     },
     {
-        "asset_id": "ASSET-CA9DB28D5D",
-        "asset_type": "SUBSTATION",
-        "asset_tag": "SS-2",
-        "name": "SS-2",
-        "description": "",
-        "serial_number": "",
-        "manufacturer": "",
-        "model": "",
-        "metadata": {}
-    },
-    {
-        "asset_id": "ASSET-DE59885799",
-        "asset_type": "SWITCHBOARD",
-        "asset_tag": "HV-203A",
-        "name": "HV-203A",
-        "description": "",
-        "serial_number": "",
-        "manufacturer": "",
-        "model": "",
-        "metadata": {
-            "parent_asset_id": "ASSET-CA9DB28D5D"
-        }
-    },
-    {
-        "asset_id": "ASSET-9EBA75D886",
-        "asset_type": "SUBSTATION",
-        "asset_tag": "EURO-IV",
-        "name": "EURO-IV",
-        "description": "",
-        "serial_number": "",
-        "manufacturer": "",
-        "model": "",
-        "metadata": {}
-    },
-    {
-        "asset_id": "ASSET-7D435F2FE1",
-        "asset_type": "SWITCHBOARD",
-        "asset_tag": "HV-207A",
-        "name": "HV-207A",
-        "description": "",
-        "serial_number": "",
-        "manufacturer": "",
-        "model": "",
-        "metadata": {
-            "parent_asset_id": "ASSET-9EBA75D886"
-        }
-    },
-    {
-        "asset_id": "ASSET-2E827D03A6",
-        "asset_type": "SUBSTATION",
-        "asset_tag": "Coke Yard",
-        "name": "Coke Yard",
-        "description": "",
-        "serial_number": "",
-        "manufacturer": "",
-        "model": "",
-        "metadata": {}
-    },
-    {
-        "asset_id": "ASSET-EBF6543EB5",
-        "asset_type": "SWITCHBOARD",
-        "asset_tag": "HV-Sec-A",
-        "name": "HV-Sec-A",
-        "description": "",
-        "serial_number": "",
-        "manufacturer": "",
-        "model": "",
-        "metadata": {
-            "parent_asset_id": "ASSET-2E827D03A6"
-        }
-    },
-    {
-        "asset_id": "ASSET-DDFC4DAE1A",
-        "asset_type": "SUBSTATION",
-        "asset_tag": "REF-2",
-        "name": "REF-2",
-        "description": "",
-        "serial_number": "",
-        "manufacturer": "",
-        "model": "",
-        "metadata": {}
-    },
-    {
-        "asset_id": "ASSET-9C993CE1E5",
-        "asset_type": "SWITCHBOARD",
-        "asset_tag": "REF-2A",
-        "name": "REF-2A",
-        "description": "",
-        "serial_number": "",
-        "manufacturer": "",
-        "model": "",
-        "metadata": {
-            "parent_asset_id": "ASSET-DDFC4DAE1A"
-        }
-    },
-    {
-        "asset_id": "ASSET-09BA5670B3",
+        "asset_id": "ASSET-A8F8D13E77",
         "asset_type": "PANEL",
-        "asset_tag": "REF-2-P-01",
+        "asset_tag": "SS-1 P-01",
         "name": "P-01",
         "description": "",
         "serial_number": "",
         "manufacturer": "",
         "model": "",
         "metadata": {
-            "parent_asset_id": "ASSET-9C993CE1E5"
+            "parent_asset_id": "ASSET-7073BC369A",
+            "components": [
+                {
+                    "component_type": "CT",
+                    "name": "CT-01",
+                    "manufacturer": "Jyoti",
+                    "model": "",
+                    "serial_number": "",
+                    "description": "Current transformer",
+                    "ct_ratio": "30/1",
+                    "ct_primary": 30.0,
+                    "ct_secondary": 1.0,
+                    "ct_class": "5P20",
+                    "burden": "10",
+                    "core": "Protection",
+                    "vt_ratio": "",
+                    "firmware": "",
+                    "coil_voltage": "",
+                    "contact_configuration": "",
+                    "protection_functions": []
+                },
+                {
+                    "component_type": "CT",
+                    "name": "CT-02",
+                    "manufacturer": "",
+                    "model": "",
+                    "serial_number": "",
+                    "description": "",
+                    "ct_ratio": "30/1",
+                    "ct_primary": 30.0,
+                    "ct_secondary": 1.0,
+                    "ct_class": "Class 1",
+                    "burden": "10",
+                    "core": "Metering",
+                    "vt_ratio": "",
+                    "firmware": "",
+                    "coil_voltage": "",
+                    "contact_configuration": "",
+                    "protection_functions": []
+                },
+                {
+                    "component_type": "CT",
+                    "name": "CT-03",
+                    "manufacturer": "",
+                    "model": "",
+                    "serial_number": "",
+                    "description": "",
+                    "ct_ratio": "1200/1",
+                    "ct_primary": 1200.0,
+                    "ct_secondary": 1.0,
+                    "ct_class": "",
+                    "burden": "5P20",
+                    "core": "Differential",
+                    "vt_ratio": "",
+                    "firmware": "",
+                    "coil_voltage": "",
+                    "contact_configuration": "",
+                    "protection_functions": []
+                },
+                {
+                    "component_type": "NUMERICAL_RELAY",
+                    "name": "REL-01",
+                    "manufacturer": "",
+                    "model": "",
+                    "serial_number": "",
+                    "description": "",
+                    "ct_ratio": "",
+                    "ct_primary": 0.0,
+                    "ct_secondary": 0.0,
+                    "ct_class": "",
+                    "burden": "",
+                    "core": "",
+                    "vt_ratio": "",
+                    "firmware": "",
+                    "coil_voltage": "",
+                    "contact_configuration": "",
+                    "protection_functions": [
+                        "50",
+                        "51",
+                        "50N",
+                        "51N"
+                    ]
+                },
+                {
+                    "component_type": "AUXILIARY_RELAY",
+                    "name": "AUX-01",
+                    "manufacturer": "",
+                    "model": "",
+                    "serial_number": "",
+                    "description": "",
+                    "ct_ratio": "",
+                    "ct_primary": 0.0,
+                    "ct_secondary": 0.0,
+                    "ct_class": "",
+                    "burden": "",
+                    "core": "",
+                    "vt_ratio": "",
+                    "firmware": "",
+                    "coil_voltage": "",
+                    "contact_configuration": "",
+                    "protection_functions": []
+                },
+                {
+                    "component_type": "AUXILIARY_RELAY",
+                    "name": "AUX-02",
+                    "manufacturer": "",
+                    "model": "",
+                    "serial_number": "",
+                    "description": "",
+                    "ct_ratio": "",
+                    "ct_primary": 0.0,
+                    "ct_secondary": 0.0,
+                    "ct_class": "",
+                    "burden": "",
+                    "core": "",
+                    "vt_ratio": "",
+                    "firmware": "",
+                    "coil_voltage": "",
+                    "contact_configuration": "",
+                    "protection_functions": []
+                }
+            ]
         }
     },
     {
-        "asset_id": "ASSET-971EBB5247",
+        "asset_id": "ASSET-65779DD66E",
+        "asset_type": "PANEL",
+        "asset_tag": "('P-02',)",
+        "name": "('P-02',)",
+        "description": "",
+        "serial_number": "",
+        "manufacturer": "",
+        "model": "",
+        "metadata": {
+            "parent_asset_id": "ASSET-7073BC369A",
+            "components": [
+                {
+                    "component_type": "CT",
+                    "name": "CT-01",
+                    "manufacturer": "",
+                    "model": "",
+                    "serial_number": "",
+                    "description": "",
+                    "ct_ratio": "",
+                    "ct_class": "",
+                    "burden": "",
+                    "core": "",
+                    "vt_ratio": "",
+                    "firmware": "",
+                    "coil_voltage": "",
+                    "contact_configuration": "",
+                    "protection_functions": []
+                },
+                {
+                    "component_type": "CT",
+                    "name": "CT-02",
+                    "manufacturer": "",
+                    "model": "",
+                    "serial_number": "",
+                    "description": "",
+                    "ct_ratio": "",
+                    "ct_class": "",
+                    "burden": "",
+                    "core": "",
+                    "vt_ratio": "",
+                    "firmware": "",
+                    "coil_voltage": "",
+                    "contact_configuration": "",
+                    "protection_functions": []
+                },
+                {
+                    "component_type": "CT",
+                    "name": "CT-03",
+                    "manufacturer": "",
+                    "model": "",
+                    "serial_number": "",
+                    "description": "",
+                    "ct_ratio": "",
+                    "ct_class": "",
+                    "burden": "",
+                    "core": "",
+                    "vt_ratio": "",
+                    "firmware": "",
+                    "coil_voltage": "",
+                    "contact_configuration": "",
+                    "protection_functions": []
+                },
+                {
+                    "component_type": "NUMERICAL_RELAY",
+                    "name": "REL-01",
+                    "manufacturer": "",
+                    "model": "",
+                    "serial_number": "",
+                    "description": "",
+                    "ct_ratio": "",
+                    "ct_class": "",
+                    "burden": "",
+                    "core": "",
+                    "vt_ratio": "",
+                    "firmware": "",
+                    "coil_voltage": "",
+                    "contact_configuration": "",
+                    "protection_functions": []
+                },
+                {
+                    "component_type": "AUXILIARY_RELAY",
+                    "name": "AUX-01",
+                    "manufacturer": "",
+                    "model": "",
+                    "serial_number": "",
+                    "description": "",
+                    "ct_ratio": "",
+                    "ct_class": "",
+                    "burden": "",
+                    "core": "",
+                    "vt_ratio": "",
+                    "firmware": "",
+                    "coil_voltage": "",
+                    "contact_configuration": "",
+                    "protection_functions": []
+                },
+                {
+                    "component_type": "AUXILIARY_RELAY",
+                    "name": "AUX-02",
+                    "manufacturer": "",
+                    "model": "",
+                    "serial_number": "",
+                    "description": "",
+                    "ct_ratio": "",
+                    "ct_class": "",
+                    "burden": "",
+                    "core": "",
+                    "vt_ratio": "",
+                    "firmware": "",
+                    "coil_voltage": "",
+                    "contact_configuration": "",
+                    "protection_functions": []
+                },
+                {
+                    "component_type": "AUXILIARY_RELAY",
+                    "name": "AUX-03",
+                    "manufacturer": "",
+                    "model": "",
+                    "serial_number": "",
+                    "description": "",
+                    "ct_ratio": "",
+                    "ct_class": "",
+                    "burden": "",
+                    "core": "",
+                    "vt_ratio": "",
+                    "firmware": "",
+                    "coil_voltage": "",
+                    "contact_configuration": "",
+                    "protection_functions": []
+                }
+            ]
+        }
+    },
+    {
+        "asset_id": "ASSET-B9753C4A40",
+        "asset_type": "PANEL",
+        "asset_tag": "P-03",
+        "name": "P-03",
+        "description": "",
+        "serial_number": "",
+        "manufacturer": "",
+        "model": "",
+        "metadata": {
+            "parent_asset_id": "ASSET-7073BC369A"
+        }
+    },
+    {
+        "asset_id": "ASSET-337FD799D9",
         "asset_type": "SWITCHBOARD",
         "asset_tag": "HV-201B",
         "name": "HV-201B",
@@ -181,43 +314,7 @@
         "manufacturer": "",
         "model": "",
         "metadata": {
-            "parent_asset_id": "ASSET-2233A4A247"
+            "parent_asset_id": "ASSET-0363E60DEF"
         }
-    },
-    {
-        "asset_id": "ASSET-48E317D5D3",
-        "asset_type": "PANEL",
-        "asset_tag": "HV-201BP21",
-        "name": "P-21",
-        "description": "",
-        "serial_number": "",
-        "manufacturer": "",
-        "model": "",
-        "metadata": {
-            "parent_asset_id": "ASSET-971EBB5247"
-        },
-        "equipment_name": "201-MG-18A",
-        "equipment_type": "MOTOR",
-        "ct_count": 3,
-        "relay_count": 1,
-        "aux_count": 1
-    },
-    {
-        "asset_id": "ASSET-861AD051C3",
-        "asset_type": "PANEL",
-        "asset_tag": "HV-201BP22",
-        "name": "P-22",
-        "description": "",
-        "serial_number": "",
-        "manufacturer": "",
-        "model": "",
-        "metadata": {
-            "parent_asset_id": "ASSET-971EBB5247"
-        },
-        "equipment_name": "201-MG-17B",
-        "equipment_type": "MOTOR",
-        "ct_count": 3,
-        "relay_count": 1,
-        "aux_count": 1
     }
 ]

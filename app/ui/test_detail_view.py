@@ -1,17 +1,16 @@
 import json
 
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QDialog,
     QVBoxLayout,
     QHBoxLayout,
     QLabel,
-    QFormLayout,
-    QLineEdit,
+    QTableWidget,
+    QTableWidgetItem,
     QPushButton,
-    QScrollArea,
-    QWidget,
-    QGroupBox,
-    QMessageBox
+    QHeaderView,
+    QMessageBox,
 )
 
 
@@ -21,24 +20,32 @@ class TestDetailView(QDialog):
         self,
         test_service,
         test_id,
-        parent=None
+        record_type=None,
+        parent=None,
     ):
 
         super().__init__(parent)
 
         self.test_service = test_service
-        self.test_id = test_id
+        self.test_id = str(test_id)
+        self.record_type = (
+            str(record_type).upper()
+            if record_type
+            else None
+        )
 
         self.setWindowTitle(
-            f"Test Details - {test_id}"
+            "Test Details"
         )
 
         self.resize(
-            700,
-            750
+            800,
+            650,
         )
 
         self.build_ui()
+
+        self.load_test()
 
     # =====================================================
     # BUILD UI
@@ -46,294 +53,194 @@ class TestDetailView(QDialog):
 
     def build_ui(self):
 
-        main_layout = QVBoxLayout(
+        layout = QVBoxLayout(
             self
         )
 
-        # =================================================
-        # GET TEST
-        # =================================================
-
-        test = self.test_service.get_test(
-            self.test_id
-        )
-
-        if test is None:
-
-            QMessageBox.critical(
-                self,
-                "Error",
-                "The selected test could not be found."
-            )
-
-            self.reject()
-
-            return
-
-        self.test = test
-
-        # =================================================
+        # -------------------------------------------------
         # HEADER
-        # =================================================
+        # -------------------------------------------------
 
-        header = QLabel(
-            "Protection Test Details"
+        self.header = QLabel(
+            "Test Details"
         )
 
-        header.setStyleSheet(
+        self.header.setStyleSheet(
             """
             QLabel {
                 font-size: 20px;
                 font-weight: bold;
+                padding: 6px;
             }
             """
         )
 
-        main_layout.addWidget(
-            header
+        layout.addWidget(
+            self.header
         )
 
-        # =================================================
-        # TEST INFORMATION
-        # =================================================
+        # -------------------------------------------------
+        # SUMMARY
+        # -------------------------------------------------
 
-        information_group = QGroupBox(
-            "Test Information"
+        self.summary = QLabel()
+
+        self.summary.setStyleSheet(
+            """
+            QLabel {
+                font-size: 13px;
+                padding: 6px;
+            }
+            """
         )
 
-        information_layout = QFormLayout()
-
-        self.add_readonly_field(
-            information_layout,
-            "Test ID",
-            test.get("test_id", "")
+        layout.addWidget(
+            self.summary
         )
 
-        self.add_readonly_field(
-            information_layout,
-            "Project ID",
-            test.get("project_id", "")
-        )
-
-        self.add_readonly_field(
-            information_layout,
-            "Panel ID",
-            test.get("panel_id", "")
-        )
-
-        self.add_readonly_field(
-            information_layout,
-            "Relay / Component ID",
-            test.get("relay_id", "")
-        )
-
-        self.add_readonly_field(
-            information_layout,
-            "Protection Function",
-            test.get("protection_code", "")
-        )
-
-        self.add_readonly_field(
-            information_layout,
-            "Test Date",
-            test.get("test_date", "")
-        )
-
-        information_group.setLayout(
-            information_layout
-        )
-
-        main_layout.addWidget(
-            information_group
-        )
-
-        # =================================================
+        # -------------------------------------------------
         # SETTINGS
-        # =================================================
+        # -------------------------------------------------
 
-        settings_group = QGroupBox(
-            "Test Settings"
+        self.settings_label = QLabel(
+            "Settings"
         )
 
-        settings_layout = QFormLayout()
-
-        settings = test.get(
-            "settings",
-            {}
+        self.settings_label.setStyleSheet(
+            """
+            QLabel {
+                font-size: 16px;
+                font-weight: bold;
+                padding-top: 8px;
+            }
+            """
         )
 
-        if settings:
-
-            for key, value in settings.items():
-
-                self.add_readonly_field(
-                    settings_layout,
-                    self.format_label(key),
-                    value
-                )
-
-        else:
-
-            settings_layout.addRow(
-                QLabel("No settings recorded.")
-            )
-
-        settings_group.setLayout(
-            settings_layout
+        layout.addWidget(
+            self.settings_label
         )
 
-        main_layout.addWidget(
-            settings_group
+        self.settings_table = (
+            QTableWidget()
         )
 
-        # =================================================
+        self.settings_table.setColumnCount(
+            2
+        )
+
+        self.settings_table.setHorizontalHeaderLabels(
+            [
+                "Parameter",
+                "Value",
+            ]
+        )
+
+        self.configure_table(
+            self.settings_table
+        )
+
+        layout.addWidget(
+            self.settings_table
+        )
+
+        # -------------------------------------------------
         # MEASUREMENTS
-        # =================================================
+        # -------------------------------------------------
 
-        measurements_group = QGroupBox(
-            "Test Measurements"
+        self.measurements_label = QLabel(
+            "Measurements / Results"
         )
 
-        measurements_layout = QFormLayout()
-
-        measurements = test.get(
-            "measurements",
-            {}
+        self.measurements_label.setStyleSheet(
+            """
+            QLabel {
+                font-size: 16px;
+                font-weight: bold;
+                padding-top: 8px;
+            }
+            """
         )
 
-        if measurements:
-
-            for key, value in measurements.items():
-
-                self.add_readonly_field(
-                    measurements_layout,
-                    self.format_label(key),
-                    value
-                )
-
-        else:
-
-            measurements_layout.addRow(
-                QLabel(
-                    "No measurements recorded."
-                )
-            )
-
-        measurements_group.setLayout(
-            measurements_layout
+        layout.addWidget(
+            self.measurements_label
         )
 
-        # =================================================
-        # SCROLL AREA
-        # =================================================
+        self.measurements_table = (
+            QTableWidget()
+        )
 
-        scroll = QScrollArea()
+        self.measurements_table.setColumnCount(
+            2
+        )
 
-        scroll.setWidgetResizable(
+        self.measurements_table.setHorizontalHeaderLabels(
+            [
+                "Parameter",
+                "Value",
+            ]
+        )
+
+        self.configure_table(
+            self.measurements_table
+        )
+
+        layout.addWidget(
+            self.measurements_table
+        )
+
+        # -------------------------------------------------
+        # REMARKS
+        # -------------------------------------------------
+
+        self.remarks_label = QLabel(
+            "Remarks"
+        )
+
+        self.remarks_label.setStyleSheet(
+            """
+            QLabel {
+                font-size: 16px;
+                font-weight: bold;
+                padding-top: 8px;
+            }
+            """
+        )
+
+        layout.addWidget(
+            self.remarks_label
+        )
+
+        self.remarks = QLabel()
+
+        self.remarks.setWordWrap(
             True
         )
 
-        scroll_container = QWidget()
-
-        scroll_layout = QVBoxLayout(
-            scroll_container
+        self.remarks.setTextInteractionFlags(
+            Qt.TextInteractionFlag.TextSelectableByMouse
         )
 
-        scroll_layout.addWidget(
-            measurements_group
+        self.remarks.setStyleSheet(
+            """
+            QLabel {
+                padding: 8px;
+                border: 1px solid #cccccc;
+                background: #f5f5f5;
+            }
+            """
         )
 
-        scroll.setWidget(
-            scroll_container
+        layout.addWidget(
+            self.remarks
         )
 
-        main_layout.addWidget(
-            scroll
-        )
-
-        # =================================================
-        # RESULT
-        # =================================================
-
-        result_group = QGroupBox(
-            "Test Result"
-        )
-
-        result_layout = QFormLayout()
-
-        result = test.get(
-            "result",
-            ""
-        )
-
-        result_field = QLineEdit(
-            str(result)
-        )
-
-        result_field.setReadOnly(
-            True
-        )
-
-        # Highlight result
-
-        if str(result).upper() == "PASS":
-
-            result_field.setStyleSheet(
-                """
-                QLineEdit {
-                    font-weight: bold;
-                    background-color: #d4edda;
-                }
-                """
-            )
-
-        elif str(result).upper() == "FAIL":
-
-            result_field.setStyleSheet(
-                """
-                QLineEdit {
-                    font-weight: bold;
-                    background-color: #f8d7da;
-                }
-                """
-            )
-
-        result_layout.addRow(
-            "Result",
-            result_field
-        )
-
-        remarks_field = QLineEdit(
-            str(
-                test.get(
-                    "remarks",
-                    ""
-                )
-            )
-        )
-
-        remarks_field.setReadOnly(
-            True
-        )
-
-        result_layout.addRow(
-            "Remarks",
-            remarks_field
-        )
-
-        result_group.setLayout(
-            result_layout
-        )
-
-        main_layout.addWidget(
-            result_group
-        )
-
-        # =================================================
-        # CLOSE BUTTON
-        # =================================================
+        # -------------------------------------------------
+        # BUTTONS
+        # -------------------------------------------------
 
         buttons = QHBoxLayout()
+
+        buttons.addStretch()
 
         close_button = QPushButton(
             "Close"
@@ -343,51 +250,462 @@ class TestDetailView(QDialog):
             self.accept
         )
 
-        buttons.addStretch()
-
         buttons.addWidget(
             close_button
         )
 
-        main_layout.addLayout(
+        layout.addLayout(
             buttons
         )
 
     # =====================================================
-    # ADD READ ONLY FIELD
+    # TABLE CONFIGURATION
     # =====================================================
 
-    def add_readonly_field(
-        self,
-        layout,
-        label,
-        value
+    @staticmethod
+    def configure_table(
+        table
     ):
 
-        field = QLineEdit(
-            str(value)
+        table.setEditTriggers(
+            QTableWidget.EditTrigger.NoEditTriggers
         )
 
-        field.setReadOnly(
+        table.setSelectionBehavior(
+            QTableWidget.SelectionBehavior.SelectRows
+        )
+
+        table.setAlternatingRowColors(
             True
         )
 
-        layout.addRow(
-            label,
-            field
+        table.horizontalHeader().setSectionResizeMode(
+            0,
+            QHeaderView.ResizeMode.ResizeToContents
+        )
+
+        table.horizontalHeader().setSectionResizeMode(
+            1,
+            QHeaderView.ResizeMode.Stretch
         )
 
     # =====================================================
-    # FORMAT LABEL
+    # LOAD TEST
     # =====================================================
 
-    def format_label(
+    def load_test(self):
+
+        try:
+
+            record = self.get_record()
+
+        except Exception as error:
+
+            QMessageBox.critical(
+                self,
+                "Database Error",
+                str(error),
+            )
+
+            return
+
+        if not record:
+
+            QMessageBox.warning(
+                self,
+                "Test Not Found",
+                (
+                    "The selected test record "
+                    "could not be found."
+                ),
+            )
+
+            return
+
+        self.record = record
+
+        self.populate_summary()
+
+        self.populate_settings()
+
+        self.populate_measurements()
+
+        self.remarks.setText(
+            str(
+                record.get(
+                    "remarks",
+                    ""
+                )
+                or ""
+            )
+        )
+
+    # =====================================================
+    # GET RECORD
+    # =====================================================
+
+    def get_record(self):
+
+        # -------------------------------------------------
+        # Explicit record type
+        # -------------------------------------------------
+
+        if self.record_type == "COMPONENT":
+
+            if hasattr(
+                self.test_service,
+                "get_component_test"
+            ):
+
+                return (
+                    self.test_service
+                    .get_component_test(
+                        self.test_id
+                    )
+                )
+
+        # -------------------------------------------------
+        # Protection
+        # -------------------------------------------------
+
+        if self.record_type == "PROTECTION":
+
+            return (
+                self.test_service
+                .get_test(
+                    self.test_id
+                )
+            )
+
+        # -------------------------------------------------
+        # Backward-compatible lookup
+        # -------------------------------------------------
+
+        try:
+
+            record = (
+                self.test_service
+                .get_test(
+                    self.test_id
+                )
+            )
+
+            if record:
+
+                return record
+
+        except Exception:
+
+            pass
+
+        if hasattr(
+            self.test_service,
+            "get_component_test"
+        ):
+
+            return (
+                self.test_service
+                .get_component_test(
+                    self.test_id
+                )
+            )
+
+        return None
+
+    # =====================================================
+    # SUMMARY
+    # =====================================================
+
+    def populate_summary(self):
+
+        record = self.record
+
+        record_type = str(
+            record.get(
+                "record_type",
+                ""
+            )
+        ).upper()
+
+        if record_type == "COMPONENT":
+
+            test_type = record.get(
+                "test_type",
+                ""
+            )
+
+            equipment = record.get(
+                "component_id",
+                ""
+            )
+
+        else:
+
+            record_type = "PROTECTION"
+
+            test_type = record.get(
+                "protection_code",
+                ""
+            )
+
+            equipment = record.get(
+                "relay_id",
+                ""
+            )
+
+        self.header.setText(
+            (
+                f"{test_type} - "
+                f"{record_type} Test"
+            )
+        )
+
+        self.summary.setText(
+            (
+                f"<b>Test ID:</b> "
+                f"{record.get('test_id', '')}"
+                f"<br>"
+                f"<b>Date:</b> "
+                f"{record.get('test_date', '')}"
+                f"<br>"
+                f"<b>Project:</b> "
+                f"{record.get('project_id', '')}"
+                f"<br>"
+                f"<b>Panel:</b> "
+                f"{record.get('panel_id', '')}"
+                f"<br>"
+                f"<b>Component / Relay:</b> "
+                f"{equipment}"
+                f"<br>"
+                f"<b>Test Type:</b> "
+                f"{test_type}"
+                f"<br>"
+                f"<b>Result:</b> "
+                f"<b>{record.get('result', '')}</b>"
+            )
+        )
+
+    # =====================================================
+    # SETTINGS
+    # =====================================================
+
+    def populate_settings(self):
+
+        settings = self.record.get(
+            "settings",
+            {}
+        )
+
+        if not isinstance(
+            settings,
+            dict
+        ):
+
+            settings = self.decode_json(
+                settings
+            )
+
+        self.populate_table(
+            self.settings_table,
+            settings
+        )
+
+        # Component tests currently store their
+        # configuration/test inputs inside measurements.
+        if not settings:
+
+            self.settings_label.setText(
+                "Configuration"
+            )
+
+        else:
+
+            self.settings_label.setText(
+                "Settings"
+            )
+
+    # =====================================================
+    # MEASUREMENTS
+    # =====================================================
+
+    def populate_measurements(self):
+
+        measurements = self.record.get(
+            "measurements",
+            {}
+        )
+
+        if not isinstance(
+            measurements,
+            dict
+        ):
+
+            measurements = self.decode_json(
+                measurements
+            )
+
+        self.populate_table(
+            self.measurements_table,
+            measurements
+        )
+
+    # =====================================================
+    # POPULATE TABLE
+    # =====================================================
+
+    def populate_table(
         self,
-        key
+        table,
+        data
+    ):
+
+        table.setRowCount(
+            0
+        )
+
+        if not isinstance(
+            data,
+            dict
+        ):
+
+            return
+
+        for key, value in data.items():
+
+            row = (
+                table.rowCount()
+            )
+
+            table.insertRow(
+                row
+            )
+
+            table.setItem(
+                row,
+                0,
+                QTableWidgetItem(
+                    self.pretty_name(
+                        key
+                    )
+                )
+            )
+
+            table.setItem(
+                row,
+                1,
+                QTableWidgetItem(
+                    self.format_value(
+                        value
+                    )
+                )
+            )
+
+        table.resizeRowsToContents()
+
+    # =====================================================
+    # JSON DECODER
+    # =====================================================
+
+    @staticmethod
+    def decode_json(
+        value
+    ):
+
+        if isinstance(
+            value,
+            dict
+        ):
+
+            return value
+
+        if not value:
+
+            return {}
+
+        try:
+
+            decoded = json.loads(
+                value
+            )
+
+            if isinstance(
+                decoded,
+                dict
+            ):
+
+                return decoded
+
+        except (
+            json.JSONDecodeError,
+            TypeError
+        ):
+
+            pass
+
+        return {}
+
+    # =====================================================
+    # FORMAT VALUE
+    # =====================================================
+
+    @staticmethod
+    def format_value(
+        value
+    ):
+
+        if value is None:
+
+            return ""
+
+        if isinstance(
+            value,
+            bool
+        ):
+
+            return (
+                "Yes"
+                if value
+                else
+                "No"
+            )
+
+        if isinstance(
+            value,
+            (dict, list)
+        ):
+
+            try:
+
+                return json.dumps(
+                    value,
+                    indent=2
+                )
+
+            except TypeError:
+
+                return str(
+                    value
+                )
+
+        return str(
+            value
+        )
+
+    # =====================================================
+    # PRETTY NAME
+    # =====================================================
+
+    @staticmethod
+    def pretty_name(
+        value
     ):
 
         return (
-            str(key)
-            .replace("_", " ")
+            str(value)
+            .replace(
+                "_",
+                " "
+            )
+            .strip()
             .title()
         )

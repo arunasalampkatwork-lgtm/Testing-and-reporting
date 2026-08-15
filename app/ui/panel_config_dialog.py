@@ -34,14 +34,20 @@ class PanelConfigDialog(QDialog):
 
         form = QFormLayout()
 
-        # ---------------------------------------------
+        # =============================================
         # PANEL
-        # ---------------------------------------------
+        # =============================================
 
         self.panel_name = QLineEdit()
 
         self.panel_name.setText(
-            node.name
+            str(
+                getattr(
+                    node,
+                    "name",
+                    ""
+                )
+            )
         )
 
         self.panel_name.setReadOnly(
@@ -53,31 +59,51 @@ class PanelConfigDialog(QDialog):
             self.panel_name
         )
 
-        # ---------------------------------------------
-        # EQUIPMENT
-        # ---------------------------------------------
+        # =============================================
+        # EQUIPMENT / FEED EQUIPMENT
+        # =============================================
 
         self.equipment_name = QLineEdit()
+
+        self.equipment_name.setText(
+            str(
+                getattr(
+                    node,
+                    "equipment_name",
+                    ""
+                ) or ""
+            )
+        )
 
         form.addRow(
             "Feed Equipment:",
             self.equipment_name
         )
 
-        # ---------------------------------------------
+        # =============================================
         # EQUIPMENT TYPE
-        # ---------------------------------------------
+        # =============================================
 
         self.equipment_type = QLineEdit()
+
+        self.equipment_type.setText(
+            str(
+                getattr(
+                    node,
+                    "equipment_type",
+                    ""
+                ) or ""
+            )
+        )
 
         form.addRow(
             "Equipment Type:",
             self.equipment_type
         )
 
-        # ---------------------------------------------
-        # CTS
-        # ---------------------------------------------
+        # =============================================
+        # CT COUNT
+        # =============================================
 
         self.ct_count = QSpinBox()
 
@@ -86,14 +112,22 @@ class PanelConfigDialog(QDialog):
             20
         )
 
+        self.ct_count.setValue(
+            self._get_int_value(
+                node,
+                "ct_count",
+                0
+            )
+        )
+
         form.addRow(
             "Number of CTs:",
             self.ct_count
         )
 
-        # ---------------------------------------------
-        # NUMERICAL RELAYS
-        # ---------------------------------------------
+        # =============================================
+        # NUMERICAL RELAY COUNT
+        # =============================================
 
         self.relay_count = QSpinBox()
 
@@ -102,20 +136,36 @@ class PanelConfigDialog(QDialog):
             20
         )
 
+        self.relay_count.setValue(
+            self._get_int_value(
+                node,
+                "relay_count",
+                0
+            )
+        )
+
         form.addRow(
             "Numerical Relays:",
             self.relay_count
         )
 
-        # ---------------------------------------------
-        # AUXILIARY RELAYS
-        # ---------------------------------------------
+        # =============================================
+        # AUXILIARY RELAY COUNT
+        # =============================================
 
         self.aux_count = QSpinBox()
 
         self.aux_count.setRange(
             0,
             50
+        )
+
+        self.aux_count.setValue(
+            self._get_int_value(
+                node,
+                "aux_count",
+                0
+            )
         )
 
         form.addRow(
@@ -127,9 +177,9 @@ class PanelConfigDialog(QDialog):
             form
         )
 
-        # ---------------------------------------------
+        # =============================================
         # BUTTONS
-        # ---------------------------------------------
+        # =============================================
 
         buttons = QHBoxLayout()
 
@@ -162,6 +212,36 @@ class PanelConfigDialog(QDialog):
         )
 
     # =================================================
+    # SAFE INTEGER VALUE
+    # =================================================
+
+    @staticmethod
+    def _get_int_value(
+        node,
+        attribute,
+        default=0
+    ):
+
+        value = getattr(
+            node,
+            attribute,
+            default
+        )
+
+        try:
+
+            return int(
+                value or default
+            )
+
+        except (
+            TypeError,
+            ValueError
+        ):
+
+            return default
+
+    # =================================================
     # GET CONFIGURATION
     # =================================================
 
@@ -170,13 +250,19 @@ class PanelConfigDialog(QDialog):
         return {
 
             "panel_name":
-                self.panel_name.text(),
+                self.panel_name
+                .text()
+                .strip(),
 
             "equipment_name":
-                self.equipment_name.text().strip(),
+                self.equipment_name
+                .text()
+                .strip(),
 
             "equipment_type":
-                self.equipment_type.text().strip(),
+                self.equipment_type
+                .text()
+                .strip(),
 
             "ct_count":
                 self.ct_count.value(),

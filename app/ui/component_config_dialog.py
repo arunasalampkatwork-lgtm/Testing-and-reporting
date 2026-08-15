@@ -1,12 +1,11 @@
 from PySide6.QtWidgets import (
     QDialog,
-    QVBoxLayout,
     QFormLayout,
     QLineEdit,
-    QSpinBox,
     QPushButton,
+    QVBoxLayout,
     QHBoxLayout,
-    QComboBox
+    QLabel,
 )
 
 
@@ -18,79 +17,244 @@ class ComponentConfigDialog(QDialog):
         parent=None
     ):
 
-        super().__init__(parent)
+        super().__init__(
+            parent
+        )
 
-        self.component = component
+        self.component = (
+            component
+        )
+
+        self.component_type = (
+            str(
+                getattr(
+                    component,
+                    "component_type",
+                    ""
+                )
+            )
+            .strip()
+            .upper()
+        )
+
+        self.fields = {}
 
         self.setWindowTitle(
-            f"Configure {component.name}"
+            f"Component Configuration - "
+            f"{component.name}"
         )
 
         self.resize(
-            500,
-            400
+            550,
+            550
         )
 
-        layout = QVBoxLayout(self)
+        self.build_ui()
+
+        self.populate_existing_values()
+
+    # =====================================================
+    # BUILD UI
+    # =====================================================
+
+    def build_ui(self):
+
+        layout = QVBoxLayout(
+            self
+        )
 
         form = QFormLayout()
 
-        # =====================================================
-        # COMMON FIELDS
-        # =====================================================
+        # =================================================
+        # NAME
+        # =================================================
 
-        self.manufacturer = QLineEdit()
+        self.name_edit = QLineEdit()
 
-        self.model = QLineEdit()
+        self.name_edit.setReadOnly(
+            True
+        )
 
-        self.serial_number = QLineEdit()
+        form.addRow(
+            "Component:",
+            self.name_edit
+        )
+
+        # =================================================
+        # COMMON
+        # =================================================
+
+        self.manufacturer_edit = (
+            QLineEdit()
+        )
+
+        self.model_edit = (
+            QLineEdit()
+        )
+
+        self.serial_number_edit = (
+            QLineEdit()
+        )
+
+        self.description_edit = (
+            QLineEdit()
+        )
 
         form.addRow(
             "Manufacturer:",
-            self.manufacturer
+            self.manufacturer_edit
         )
 
         form.addRow(
             "Model:",
-            self.model
+            self.model_edit
         )
 
         form.addRow(
             "Serial Number:",
-            self.serial_number
+            self.serial_number_edit
         )
 
-        # =====================================================
-        # COMPONENT-SPECIFIC FIELDS
-        # =====================================================
+        form.addRow(
+            "Description:",
+            self.description_edit
+        )
 
-        self.extra_fields = {}
+        # =================================================
+        # CT
+        # =================================================
 
-        if component.component_type == "CT":
+        self.ct_primary_edit = (
+            QLineEdit()
+        )
 
-            self.add_ct_fields(
-                form
+        self.ct_secondary_edit = (
+            QLineEdit()
+        )
+
+        self.ct_ratio_edit = (
+            QLineEdit()
+        )
+
+        self.ct_ratio_edit.setReadOnly(
+            True
+        )
+
+        self.ct_class_edit = (
+            QLineEdit()
+        )
+
+        self.burden_edit = (
+            QLineEdit()
+        )
+
+        self.core_edit = (
+            QLineEdit()
+        )
+
+        if self.component_type in (
+            "CT",
+            "CURRENT TRANSFORMER",
+        ):
+
+            form.addRow(
+                "CT Primary (A):",
+                self.ct_primary_edit
             )
 
-        elif component.component_type == "NUMERICAL_RELAY":
-
-            self.add_relay_fields(
-                form
+            form.addRow(
+                "CT Secondary (A):",
+                self.ct_secondary_edit
             )
 
-        elif component.component_type == "AUXILIARY_RELAY":
+            form.addRow(
+                "CT Ratio:",
+                self.ct_ratio_edit
+            )
 
-            self.add_auxiliary_relay_fields(
-                form
+            form.addRow(
+                "CT Class:",
+                self.ct_class_edit
+            )
+
+            form.addRow(
+                "Burden:",
+                self.burden_edit
+            )
+
+            form.addRow(
+                "Core:",
+                self.core_edit
+            )
+
+            self.ct_primary_edit.textChanged.connect(
+                self.update_ct_ratio
+            )
+
+            self.ct_secondary_edit.textChanged.connect(
+                self.update_ct_ratio
+            )
+
+        # =================================================
+        # NUMERICAL RELAY
+        # =================================================
+
+        self.vt_ratio_edit = (
+            QLineEdit()
+        )
+
+        self.firmware_edit = (
+            QLineEdit()
+        )
+
+        if self.component_type == (
+            "NUMERICAL_RELAY"
+        ):
+
+            form.addRow(
+                "VT Ratio:",
+                self.vt_ratio_edit
+            )
+
+            form.addRow(
+                "Firmware:",
+                self.firmware_edit
+            )
+
+        # =================================================
+        # AUXILIARY RELAY
+        # =================================================
+
+        self.coil_voltage_edit = (
+            QLineEdit()
+        )
+
+        self.contact_configuration_edit = (
+            QLineEdit()
+        )
+
+        if self.component_type in (
+            "AUXILIARY_RELAY",
+            "AUX RELAY",
+        ):
+
+            form.addRow(
+                "Coil Voltage:",
+                self.coil_voltage_edit
+            )
+
+            form.addRow(
+                "Contact Configuration:",
+                self.contact_configuration_edit
             )
 
         layout.addLayout(
             form
         )
 
-        # =====================================================
+        # =================================================
         # BUTTONS
-        # =====================================================
+        # =================================================
 
         buttons = QHBoxLayout()
 
@@ -122,186 +286,338 @@ class ComponentConfigDialog(QDialog):
             self.reject
         )
 
-        self.load_existing_values()
+    # =====================================================
+    # POPULATE
+    # =====================================================
 
-    # =========================================================
-    # CT
-    # =========================================================
+    def populate_existing_values(self):
 
-    def add_ct_fields(
-        self,
-        form
-    ):
-
-        self.extra_fields[
-            "ct_ratio"
-        ] = QLineEdit()
-
-        self.extra_fields[
-            "ct_class"
-        ] = QLineEdit()
-
-        self.extra_fields[
-            "burden"
-        ] = QLineEdit()
-
-        self.extra_fields[
-            "core"
-        ] = QLineEdit()
-
-        form.addRow(
-            "CT Ratio:",
-            self.extra_fields["ct_ratio"]
+        component = (
+            self.component
         )
 
-        form.addRow(
-            "Class:",
-            self.extra_fields["ct_class"]
-        )
-
-        form.addRow(
-            "Burden:",
-            self.extra_fields["burden"]
-        )
-
-        form.addRow(
-            "Core:",
-            self.extra_fields["core"]
-        )
-
-    # =========================================================
-    # NUMERICAL RELAY
-    # =========================================================
-
-    def add_relay_fields(
-        self,
-        form
-    ):
-
-        self.extra_fields[
-            "ct_ratio"
-        ] = QLineEdit()
-
-        self.extra_fields[
-            "vt_ratio"
-        ] = QLineEdit()
-
-        self.extra_fields[
-            "firmware"
-        ] = QLineEdit()
-
-        form.addRow(
-            "CT Ratio:",
-            self.extra_fields["ct_ratio"]
-        )
-
-        form.addRow(
-            "VT Ratio:",
-            self.extra_fields["vt_ratio"]
-        )
-
-        form.addRow(
-            "Firmware:",
-            self.extra_fields["firmware"]
-        )
-
-    # =========================================================
-    # AUXILIARY RELAY
-    # =========================================================
-
-    def add_auxiliary_relay_fields(
-        self,
-        form
-    ):
-
-        self.extra_fields[
-            "coil_voltage"
-        ] = QLineEdit()
-
-        self.extra_fields[
-            "contact_configuration"
-        ] = QLineEdit()
-
-        form.addRow(
-            "Coil Voltage:",
-            self.extra_fields["coil_voltage"]
-        )
-
-        form.addRow(
-            "Contact Configuration:",
-            self.extra_fields[
-                "contact_configuration"
-            ]
-        )
-
-    # =========================================================
-    # LOAD EXISTING
-    # =========================================================
-
-    def load_existing_values(
-        self
-    ):
-
-        self.manufacturer.setText(
-            getattr(
-                self.component,
-                "manufacturer",
-                ""
+        self.name_edit.setText(
+            str(
+                getattr(
+                    component,
+                    "name",
+                    ""
+                )
             )
         )
 
-        self.model.setText(
-            getattr(
-                self.component,
-                "model",
-                ""
+        self.manufacturer_edit.setText(
+            str(
+                getattr(
+                    component,
+                    "manufacturer",
+                    ""
+                )
+                or ""
             )
         )
 
-        self.serial_number.setText(
-            getattr(
-                self.component,
-                "serial_number",
-                ""
+        self.model_edit.setText(
+            str(
+                getattr(
+                    component,
+                    "model",
+                    ""
+                )
+                or ""
             )
         )
 
-        for key, widget in self.extra_fields.items():
+        self.serial_number_edit.setText(
+            str(
+                getattr(
+                    component,
+                    "serial_number",
+                    ""
+                )
+                or ""
+            )
+        )
 
-            value = getattr(
-                self.component,
-                key,
-                ""
+        self.description_edit.setText(
+            str(
+                getattr(
+                    component,
+                    "description",
+                    ""
+                )
+                or ""
+            )
+        )
+
+        # =================================================
+        # CT
+        # =================================================
+
+        self.ct_primary_edit.setText(
+            self._display_number(
+                getattr(
+                    component,
+                    "ct_primary",
+                    0
+                )
+            )
+        )
+
+        self.ct_secondary_edit.setText(
+            self._display_number(
+                getattr(
+                    component,
+                    "ct_secondary",
+                    0
+                )
+            )
+        )
+
+        self.ct_ratio_edit.setText(
+            str(
+                getattr(
+                    component,
+                    "ct_ratio",
+                    ""
+                )
+                or ""
+            )
+        )
+
+        self.ct_class_edit.setText(
+            str(
+                getattr(
+                    component,
+                    "ct_class",
+                    ""
+                )
+                or ""
+            )
+        )
+
+        self.burden_edit.setText(
+            str(
+                getattr(
+                    component,
+                    "burden",
+                    ""
+                )
+                or ""
+            )
+        )
+
+        self.core_edit.setText(
+            str(
+                getattr(
+                    component,
+                    "core",
+                    ""
+                )
+                or ""
+            )
+        )
+
+        # =================================================
+        # RELAY
+        # =================================================
+
+        self.vt_ratio_edit.setText(
+            str(
+                getattr(
+                    component,
+                    "vt_ratio",
+                    ""
+                )
+                or ""
+            )
+        )
+
+        self.firmware_edit.setText(
+            str(
+                getattr(
+                    component,
+                    "firmware",
+                    ""
+                )
+                or ""
+            )
+        )
+
+        # =================================================
+        # AUX
+        # =================================================
+
+        self.coil_voltage_edit.setText(
+            str(
+                getattr(
+                    component,
+                    "coil_voltage",
+                    ""
+                )
+                or ""
+            )
+        )
+
+        self.contact_configuration_edit.setText(
+            str(
+                getattr(
+                    component,
+                    "contact_configuration",
+                    ""
+                )
+                or ""
+            )
+        )
+
+        self.update_ct_ratio()
+
+    # =====================================================
+    # CT RATIO
+    # =====================================================
+
+    def update_ct_ratio(self):
+
+        try:
+
+            primary = float(
+                self.ct_primary_edit
+                .text()
+                .strip()
             )
 
-            widget.setText(
-                str(value)
+            secondary = float(
+                self.ct_secondary_edit
+                .text()
+                .strip()
             )
 
-    # =========================================================
+            if (
+                primary <= 0
+                or secondary <= 0
+            ):
+
+                raise ValueError
+
+            self.ct_ratio_edit.setText(
+                f"{primary:g}/{secondary:g}"
+            )
+
+        except (
+            ValueError,
+            TypeError
+        ):
+
+            self.ct_ratio_edit.clear()
+
+    # =====================================================
     # GET CONFIGURATION
-    # =========================================================
+    # =====================================================
 
-    def get_configuration(
-        self
-    ):
+    def get_configuration(self):
 
         configuration = {
 
             "manufacturer":
-                self.manufacturer.text().strip(),
+                self.manufacturer_edit
+                .text()
+                .strip(),
 
             "model":
-                self.model.text().strip(),
+                self.model_edit
+                .text()
+                .strip(),
 
             "serial_number":
-                self.serial_number.text().strip()
+                self.serial_number_edit
+                .text()
+                .strip(),
+
+            "description":
+                self.description_edit
+                .text()
+                .strip(),
+
+            "ct_primary":
+                self.ct_primary_edit
+                .text()
+                .strip(),
+
+            "ct_secondary":
+                self.ct_secondary_edit
+                .text()
+                .strip(),
+
+            "ct_ratio":
+                self.ct_ratio_edit
+                .text()
+                .strip(),
+
+            "ct_class":
+                self.ct_class_edit
+                .text()
+                .strip(),
+
+            "burden":
+                self.burden_edit
+                .text()
+                .strip(),
+
+            "core":
+                self.core_edit
+                .text()
+                .strip(),
+
+            "vt_ratio":
+                self.vt_ratio_edit
+                .text()
+                .strip(),
+
+            "firmware":
+                self.firmware_edit
+                .text()
+                .strip(),
+
+            "coil_voltage":
+                self.coil_voltage_edit
+                .text()
+                .strip(),
+
+            "contact_configuration":
+                self.contact_configuration_edit
+                .text()
+                .strip(),
         }
 
-        for key, widget in self.extra_fields.items():
+        return configuration
 
-            configuration[key] = (
-                widget.text().strip()
+    # =====================================================
+    # DISPLAY NUMBER
+    # =====================================================
+
+    @staticmethod
+    def _display_number(
+        value
+    ):
+
+        try:
+
+            number = float(
+                value or 0
             )
 
-        return configuration
+            if number == 0:
+
+                return ""
+
+            return f"{number:g}"
+
+        except (
+            TypeError,
+            ValueError
+        ):
+
+            return str(
+                value
+                or ""
+            )

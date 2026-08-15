@@ -5,9 +5,47 @@ All engineering calculations used by the protection-testing
 UI should be performed here.
 
 The UI should only:
+
     1. collect values
     2. call this class
     3. display the returned result
+
+CURRENT REPRESENTATION
+----------------------
+
+Protection current quantities are represented primarily as
+multiples of nominal relay current:
+
+    xIn
+
+Example:
+
+    CT = 1000 / 1 A
+    In = 1 A
+
+    Pickup = 1.20 xIn
+    Test   = 2.40 xIn
+
+Actual secondary injection:
+
+    Pickup = 1.20 A
+    Test   = 2.40 A
+
+
+For:
+
+    CT = 1000 / 5 A
+    In = 5 A
+
+    Pickup = 1.20 xIn
+           = 6.00 A
+
+    Test = 2.40 xIn
+         = 12.00 A
+
+The protection calculations themselves use xIn values.
+The CT configuration is used only when conversion to/from
+physical secondary current is required.
 """
 
 import math
@@ -56,14 +94,20 @@ class ProtectionCalculator:
         actual
     ):
 
-        expected = ProtectionCalculator._validate_number(
-            expected,
-            "Expected value"
+        expected = (
+            ProtectionCalculator
+            ._validate_number(
+                expected,
+                "Expected value"
+            )
         )
 
-        actual = ProtectionCalculator._validate_number(
-            actual,
-            "Actual value"
+        actual = (
+            ProtectionCalculator
+            ._validate_number(
+                actual,
+                "Actual value"
+            )
         )
 
         if expected == 0:
@@ -73,8 +117,13 @@ class ProtectionCalculator:
             )
 
         return (
-            (actual - expected)
-            / abs(expected)
+            (
+                actual
+                -
+                expected
+            )
+            /
+            abs(expected)
         ) * 100.0
 
     @staticmethod
@@ -84,19 +133,28 @@ class ProtectionCalculator:
         tolerance_percent
     ):
 
-        expected = ProtectionCalculator._validate_number(
-            expected,
-            "Expected value"
+        expected = (
+            ProtectionCalculator
+            ._validate_number(
+                expected,
+                "Expected value"
+            )
         )
 
-        actual = ProtectionCalculator._validate_number(
-            actual,
-            "Actual value"
+        actual = (
+            ProtectionCalculator
+            ._validate_number(
+                actual,
+                "Actual value"
+            )
         )
 
-        tolerance_percent = ProtectionCalculator._validate_number(
-            tolerance_percent,
-            "Tolerance"
+        tolerance_percent = (
+            ProtectionCalculator
+            ._validate_number(
+                tolerance_percent,
+                "Tolerance"
+            )
         )
 
         if tolerance_percent < 0:
@@ -113,7 +171,8 @@ class ProtectionCalculator:
 
         lower = (
             expected
-            * (
+            *
+            (
                 1.0
                 -
                 tolerance_percent / 100.0
@@ -122,7 +181,8 @@ class ProtectionCalculator:
 
         upper = (
             expected
-            * (
+            *
+            (
                 1.0
                 +
                 tolerance_percent / 100.0
@@ -143,67 +203,269 @@ class ProtectionCalculator:
         )
 
     # =========================================================
+    # CT CONFIGURATION
+    # =========================================================
+
+    @staticmethod
+    def validate_ct_ratio(
+        ct_primary,
+        ct_secondary
+    ):
+        """
+        Validate CT primary and secondary ratings.
+
+        Example:
+
+            1000 / 1
+            1000 / 5
+        """
+
+        ct_primary = (
+            ProtectionCalculator
+            ._validate_number(
+                ct_primary,
+                "CT primary"
+            )
+        )
+
+        ct_secondary = (
+            ProtectionCalculator
+            ._validate_number(
+                ct_secondary,
+                "CT secondary"
+            )
+        )
+
+        if ct_primary <= 0:
+
+            raise ValueError(
+                "CT primary must be greater than zero."
+            )
+
+        if ct_secondary <= 0:
+
+            raise ValueError(
+                "CT secondary must be greater than zero."
+            )
+
+        return {
+            "ct_primary": ct_primary,
+            "ct_secondary": ct_secondary,
+        }
+
+    @staticmethod
+    def calculate_ct_ratio(
+        ct_primary,
+        ct_secondary
+    ):
+        """
+        Calculate CT ratio.
+
+        Example:
+
+            1000 / 1
+            ratio = 1000
+
+        or:
+
+            1000 / 5
+            ratio = 200
+        """
+
+        ct = (
+            ProtectionCalculator
+            .validate_ct_ratio(
+                ct_primary,
+                ct_secondary
+            )
+        )
+
+        return (
+            ct["ct_primary"]
+            /
+            ct["ct_secondary"]
+        )
+
+    @staticmethod
+    def xin_to_secondary_current(
+        xin,
+        ct_secondary
+    ):
+        """
+        Convert xIn into actual secondary injection current.
+
+        Example:
+
+            2.5 xIn
+            CT secondary = 1 A
+
+            Actual = 2.5 A
+        """
+
+        xin = (
+            ProtectionCalculator
+            ._validate_number(
+                xin,
+                "Current in xIn"
+            )
+        )
+
+        ct_secondary = (
+            ProtectionCalculator
+            ._validate_number(
+                ct_secondary,
+                "CT secondary"
+            )
+        )
+
+        if ct_secondary <= 0:
+
+            raise ValueError(
+                "CT secondary must be greater than zero."
+            )
+
+        return (
+            xin
+            *
+            ct_secondary
+        )
+
+    @staticmethod
+    def secondary_current_to_xin(
+        secondary_current,
+        ct_secondary
+    ):
+        """
+        Convert actual secondary injection current to xIn.
+
+        Example:
+
+            Secondary injection = 2.5 A
+            CT secondary = 1 A
+
+            = 2.5 xIn
+        """
+
+        secondary_current = (
+            ProtectionCalculator
+            ._validate_number(
+                secondary_current,
+                "Secondary current"
+            )
+        )
+
+        ct_secondary = (
+            ProtectionCalculator
+            ._validate_number(
+                ct_secondary,
+                "CT secondary"
+            )
+        )
+
+        if ct_secondary <= 0:
+
+            raise ValueError(
+                "CT secondary must be greater than zero."
+            )
+
+        return (
+            secondary_current
+            /
+            ct_secondary
+        )
+
+    # =========================================================
     # 50 / 50N / 46
     # =========================================================
 
     @staticmethod
     def evaluate_current_pickup(
-        expected_current,
-        actual_current,
+        expected_xin,
+        actual_xin,
         tolerance_percent=5.0
     ):
+        """
+        Evaluate instantaneous / current pickup.
 
-        expected_current = (
-            ProtectionCalculator._validate_number(
-                expected_current,
-                "Expected current"
+        All current values are represented as xIn.
+
+        Example:
+
+            Expected = 1.20 xIn
+            Actual   = 1.24 xIn
+            Tolerance = 5 %
+
+        No CT primary/secondary conversion is required for
+        the protection calculation itself.
+        """
+
+        expected_xin = (
+            ProtectionCalculator
+            ._validate_number(
+                expected_xin,
+                "Expected pickup"
             )
         )
 
-        actual_current = (
-            ProtectionCalculator._validate_number(
-                actual_current,
-                "Actual current"
+        actual_xin = (
+            ProtectionCalculator
+            ._validate_number(
+                actual_xin,
+                "Actual pickup"
             )
         )
 
         tolerance_percent = (
-            ProtectionCalculator._validate_number(
+            ProtectionCalculator
+            ._validate_number(
                 tolerance_percent,
                 "Tolerance"
             )
         )
 
-        if expected_current <= 0:
+        if expected_xin <= 0:
 
             raise ValueError(
-                "Expected current must be greater than zero."
+                "Expected pickup must be greater than zero."
             )
 
         error_percent = (
-            ProtectionCalculator._percentage_error(
-                expected_current,
-                actual_current
+            ProtectionCalculator
+            ._percentage_error(
+                expected_xin,
+                actual_xin
             )
         )
 
         passed = (
-            ProtectionCalculator._within_tolerance(
-                expected_current,
-                actual_current,
+            ProtectionCalculator
+            ._within_tolerance(
+                expected_xin,
+                actual_xin,
                 tolerance_percent
             )
         )
 
         return {
-            "expected_current": expected_current,
-            "actual_current": actual_current,
-            "error_percent": error_percent,
-            "result": (
-                "PASS"
-                if passed
-                else "FAIL"
-            ),
+
+            "expected_xin":
+                expected_xin,
+
+            "actual_xin":
+                actual_xin,
+
+            "error_percent":
+                error_percent,
+
+            "tolerance_percent":
+                tolerance_percent,
+
+            "result":
+                (
+                    "PASS"
+                    if passed
+                    else "FAIL"
+                ),
         }
 
     # =========================================================
@@ -212,34 +474,50 @@ class ProtectionCalculator:
 
     @staticmethod
     def calculate_psm(
-        pickup_current,
-        test_current
+        pickup_xin,
+        test_xin
     ):
+        """
+        Calculate Plug Setting Multiplier.
 
-        pickup_current = (
-            ProtectionCalculator._validate_number(
-                pickup_current,
-                "Pickup current"
+            PSM = Test / Pickup
+
+        Both quantities are xIn.
+
+        Example:
+
+            Pickup = 1.20 xIn
+            Test   = 2.40 xIn
+
+            PSM = 2.0
+        """
+
+        pickup_xin = (
+            ProtectionCalculator
+            ._validate_number(
+                pickup_xin,
+                "Pickup xIn"
             )
         )
 
-        test_current = (
-            ProtectionCalculator._validate_number(
-                test_current,
-                "Test current"
+        test_xin = (
+            ProtectionCalculator
+            ._validate_number(
+                test_xin,
+                "Test xIn"
             )
         )
 
-        if pickup_current <= 0:
+        if pickup_xin <= 0:
 
             raise ValueError(
-                "Pickup current must be greater than zero."
+                "Pickup xIn must be greater than zero."
             )
 
         return (
-            test_current
+            test_xin
             /
-            pickup_current
+            pickup_xin
         )
 
     @staticmethod
@@ -248,6 +526,7 @@ class ProtectionCalculator:
     ):
 
         if curve_code is None:
+
             return ""
 
         text = str(
@@ -256,8 +535,14 @@ class ProtectionCalculator:
 
         text = (
             text
-            .replace("_", " ")
-            .replace("-", " ")
+            .replace(
+                "_",
+                " "
+            )
+            .replace(
+                "-",
+                " "
+            )
         )
 
         return " ".join(
@@ -267,56 +552,62 @@ class ProtectionCalculator:
     @staticmethod
     def calculate_51_time(
         curve_code,
-        pickup_current,
-        test_current,
+        pickup_xin,
+        test_xin,
         tms
     ):
         """
         Calculate IEC IDMT operating time.
 
-        Supported IEC curves:
+        Current quantities are xIn.
+
+        Formula:
+
+            t = TMS × K /
+                ((PSM ^ alpha) - 1)
+
+        Supported curves:
 
             IEC Standard / Normal Inverse
             IEC Very Inverse
             IEC Extremely Inverse
             IEC Long Time Inverse
-
-        Formula:
-
-            t = TMS * K / ((PSM ^ alpha) - 1)
         """
 
-        pickup_current = (
-            ProtectionCalculator._validate_number(
-                pickup_current,
-                "Pickup current"
+        pickup_xin = (
+            ProtectionCalculator
+            ._validate_number(
+                pickup_xin,
+                "Pickup xIn"
             )
         )
 
-        test_current = (
-            ProtectionCalculator._validate_number(
-                test_current,
-                "Test current"
+        test_xin = (
+            ProtectionCalculator
+            ._validate_number(
+                test_xin,
+                "Test xIn"
             )
         )
 
         tms = (
-            ProtectionCalculator._validate_number(
+            ProtectionCalculator
+            ._validate_number(
                 tms,
                 "TMS"
             )
         )
 
-        if pickup_current <= 0:
+        if pickup_xin <= 0:
 
             raise ValueError(
-                "Pickup current must be greater than zero."
+                "Pickup xIn must be greater than zero."
             )
 
-        if test_current <= 0:
+        if test_xin <= 0:
 
             raise ValueError(
-                "Test current must be greater than zero."
+                "Test xIn must be greater than zero."
             )
 
         if tms <= 0:
@@ -326,15 +617,18 @@ class ProtectionCalculator:
             )
 
         psm = (
-            test_current
-            /
-            pickup_current
+            ProtectionCalculator
+            .calculate_psm(
+                pickup_xin,
+                test_xin
+            )
         )
 
         if psm <= 1.0:
 
             raise ValueError(
-                "PSM must be greater than 1.0 for IDMT calculation."
+                "PSM must be greater than 1.0 "
+                "for IDMT calculation."
             )
 
         curve = (
@@ -344,7 +638,10 @@ class ProtectionCalculator:
             )
         )
 
-        # IEC 60255 commonly used constants.
+        # -------------------------------------------------
+        # IEC CURVE CONSTANTS
+        # -------------------------------------------------
+
         if (
             "extremely" in curve
             or "extreme" in curve
@@ -368,7 +665,7 @@ class ProtectionCalculator:
 
         else:
 
-            # Normal / Standard Inverse
+            # IEC Normal / Standard Inverse
             k = 0.14
             alpha = 0.02
 
@@ -396,10 +693,24 @@ class ProtectionCalculator:
         )
 
         return {
-            "psm": psm,
-            "expected_time": expected_time,
-            "curve": curve_code,
-            "tms": tms,
+
+            "pickup_xin":
+                pickup_xin,
+
+            "test_xin":
+                test_xin,
+
+            "psm":
+                psm,
+
+            "expected_time":
+                expected_time,
+
+            "curve":
+                curve_code,
+
+            "tms":
+                tms,
         }
 
     @staticmethod
@@ -410,21 +721,24 @@ class ProtectionCalculator:
     ):
 
         expected_time = (
-            ProtectionCalculator._validate_number(
+            ProtectionCalculator
+            ._validate_number(
                 expected_time,
                 "Expected time"
             )
         )
 
         actual_time = (
-            ProtectionCalculator._validate_number(
+            ProtectionCalculator
+            ._validate_number(
                 actual_time,
                 "Actual time"
             )
         )
 
         tolerance_percent = (
-            ProtectionCalculator._validate_number(
+            ProtectionCalculator
+            ._validate_number(
                 tolerance_percent,
                 "Tolerance"
             )
@@ -442,8 +756,15 @@ class ProtectionCalculator:
                 "Actual time cannot be negative."
             )
 
+        if tolerance_percent < 0:
+
+            raise ValueError(
+                "Tolerance cannot be negative."
+            )
+
         error_percent = (
-            ProtectionCalculator._percentage_error(
+            ProtectionCalculator
+            ._percentage_error(
                 expected_time,
                 actual_time
             )
@@ -476,16 +797,31 @@ class ProtectionCalculator:
         )
 
         return {
-            "expected_time": expected_time,
-            "actual_time": actual_time,
-            "error_percent": error_percent,
-            "lower_limit": lower_limit,
-            "upper_limit": upper_limit,
-            "result": (
-                "PASS"
-                if passed
-                else "FAIL"
-            ),
+
+            "expected_time":
+                expected_time,
+
+            "actual_time":
+                actual_time,
+
+            "error_percent":
+                error_percent,
+
+            "lower_limit":
+                lower_limit,
+
+            "upper_limit":
+                upper_limit,
+
+            "tolerance_percent":
+                tolerance_percent,
+
+            "result":
+                (
+                    "PASS"
+                    if passed
+                    else "FAIL"
+                ),
         }
 
     # =========================================================
@@ -499,37 +835,26 @@ class ProtectionCalculator:
         tolerance_percent=5.0,
         direction="equal"
     ):
-        """
-        Evaluate measured threshold against setting.
-
-        direction:
-            equal
-            lower
-            upper
-
-        The numerical pickup error is always calculated against
-        the setting.
-
-        For a threshold pickup test, the measured pickup point
-        must be within the configured tolerance band.
-        """
 
         expected_value = (
-            ProtectionCalculator._validate_number(
+            ProtectionCalculator
+            ._validate_number(
                 expected_value,
                 "Expected value"
             )
         )
 
         actual_value = (
-            ProtectionCalculator._validate_number(
+            ProtectionCalculator
+            ._validate_number(
                 actual_value,
                 "Actual value"
             )
         )
 
         tolerance_percent = (
-            ProtectionCalculator._validate_number(
+            ProtectionCalculator
+            ._validate_number(
                 tolerance_percent,
                 "Tolerance"
             )
@@ -552,7 +877,8 @@ class ProtectionCalculator:
         ).strip().lower()
 
         error_percent = (
-            ProtectionCalculator._percentage_error(
+            ProtectionCalculator
+            ._percentage_error(
                 expected_value,
                 actual_value
             )
@@ -578,45 +904,38 @@ class ProtectionCalculator:
             )
         )
 
-        if direction == "lower":
-
-            # For an undervoltage pickup setting, the measured
-            # pickup voltage is still expected to be near the
-            # configured setting.
-            passed = (
-                lower_limit
-                <= actual_value
-                <= upper_limit
-            )
-
-        elif direction == "upper":
-
-            passed = (
-                lower_limit
-                <= actual_value
-                <= upper_limit
-            )
-
-        else:
-
-            passed = (
-                lower_limit
-                <= actual_value
-                <= upper_limit
-            )
+        passed = (
+            lower_limit
+            <= actual_value
+            <= upper_limit
+        )
 
         return {
-            "expected_value": expected_value,
-            "actual_value": actual_value,
-            "error_percent": error_percent,
-            "lower_limit": lower_limit,
-            "upper_limit": upper_limit,
-            "direction": direction,
-            "result": (
-                "PASS"
-                if passed
-                else "FAIL"
-            ),
+
+            "expected_value":
+                expected_value,
+
+            "actual_value":
+                actual_value,
+
+            "error_percent":
+                error_percent,
+
+            "lower_limit":
+                lower_limit,
+
+            "upper_limit":
+                upper_limit,
+
+            "direction":
+                direction,
+
+            "result":
+                (
+                    "PASS"
+                    if passed
+                    else "FAIL"
+                ),
         }
 
     # =========================================================
@@ -631,14 +950,16 @@ class ProtectionCalculator:
     ):
 
         expected_frequency = (
-            ProtectionCalculator._validate_number(
+            ProtectionCalculator
+            ._validate_number(
                 expected_frequency,
                 "Expected frequency"
             )
         )
 
         actual_frequency = (
-            ProtectionCalculator._validate_number(
+            ProtectionCalculator
+            ._validate_number(
                 actual_frequency,
                 "Actual frequency"
             )
@@ -655,12 +976,24 @@ class ProtectionCalculator:
         )
 
         return {
-            "expected_frequency": expected_frequency,
-            "actual_frequency": actual_frequency,
-            "error_percent": result["error_percent"],
-            "lower_limit": result["lower_limit"],
-            "upper_limit": result["upper_limit"],
-            "result": result["result"],
+
+            "expected_frequency":
+                expected_frequency,
+
+            "actual_frequency":
+                actual_frequency,
+
+            "error_percent":
+                result["error_percent"],
+
+            "lower_limit":
+                result["lower_limit"],
+
+            "upper_limit":
+                result["upper_limit"],
+
+            "result":
+                result["result"],
         }
 
     # =========================================================
@@ -675,21 +1008,24 @@ class ProtectionCalculator:
     ):
 
         frequency_1 = (
-            ProtectionCalculator._validate_number(
+            ProtectionCalculator
+            ._validate_number(
                 frequency_1,
                 "Frequency before"
             )
         )
 
         frequency_2 = (
-            ProtectionCalculator._validate_number(
+            ProtectionCalculator
+            ._validate_number(
                 frequency_2,
                 "Frequency after"
             )
         )
 
         time_interval = (
-            ProtectionCalculator._validate_number(
+            ProtectionCalculator
+            ._validate_number(
                 time_interval,
                 "Time interval"
             )
@@ -715,14 +1051,16 @@ class ProtectionCalculator:
     ):
 
         expected_rocof = (
-            ProtectionCalculator._validate_number(
+            ProtectionCalculator
+            ._validate_number(
                 expected_rocof,
                 "Expected ROCOF"
             )
         )
 
         actual_rocof = (
-            ProtectionCalculator._validate_number(
+            ProtectionCalculator
+            ._validate_number(
                 actual_rocof,
                 "Actual ROCOF"
             )
@@ -753,11 +1091,18 @@ class ProtectionCalculator:
         ) * 100.0
 
         tolerance_percent = (
-            ProtectionCalculator._validate_number(
+            ProtectionCalculator
+            ._validate_number(
                 tolerance_percent,
                 "Tolerance"
             )
         )
+
+        if tolerance_percent < 0:
+
+            raise ValueError(
+                "Tolerance cannot be negative."
+            )
 
         lower = (
             expected_abs
@@ -786,16 +1131,28 @@ class ProtectionCalculator:
         )
 
         return {
-            "expected_rocof": expected_rocof,
-            "actual_rocof": actual_rocof,
-            "error_percent": error_percent,
-            "lower_limit": lower,
-            "upper_limit": upper,
-            "result": (
-                "PASS"
-                if passed
-                else "FAIL"
-            ),
+
+            "expected_rocof":
+                expected_rocof,
+
+            "actual_rocof":
+                actual_rocof,
+
+            "error_percent":
+                error_percent,
+
+            "lower_limit":
+                lower,
+
+            "upper_limit":
+                upper,
+
+            "result":
+                (
+                    "PASS"
+                    if passed
+                    else "FAIL"
+                ),
         }
 
     # =========================================================
@@ -832,21 +1189,24 @@ class ProtectionCalculator:
     ):
 
         expected_angle = (
-            ProtectionCalculator._validate_number(
+            ProtectionCalculator
+            ._validate_number(
                 expected_angle,
                 "Expected angle"
             )
         )
 
         actual_angle = (
-            ProtectionCalculator._validate_number(
+            ProtectionCalculator
+            ._validate_number(
                 actual_angle,
                 "Actual angle"
             )
         )
 
         angle_tolerance = (
-            ProtectionCalculator._validate_number(
+            ProtectionCalculator
+            ._validate_number(
                 angle_tolerance,
                 "Angle tolerance"
             )
@@ -859,7 +1219,8 @@ class ProtectionCalculator:
             )
 
         angle_error = (
-            ProtectionCalculator._angle_difference(
+            ProtectionCalculator
+            ._angle_difference(
                 expected_angle,
                 actual_angle
             )
@@ -871,14 +1232,25 @@ class ProtectionCalculator:
         )
 
         return {
-            "expected_angle": expected_angle,
-            "actual_angle": actual_angle,
-            "angle_error": angle_error,
-            "result": (
-                "PASS"
-                if passed
-                else "FAIL"
-            ),
+
+            "expected_angle":
+                expected_angle,
+
+            "actual_angle":
+                actual_angle,
+
+            "angle_error":
+                angle_error,
+
+            "angle_tolerance":
+                angle_tolerance,
+
+            "result":
+                (
+                    "PASS"
+                    if passed
+                    else "FAIL"
+                ),
         }
 
     # =========================================================
@@ -904,13 +1276,19 @@ class ProtectionCalculator:
         )
 
         return {
-            "expected_operation": expected,
-            "observed_operation": observed,
-            "result": (
-                "PASS"
-                if passed
-                else "FAIL"
-            ),
+
+            "expected_operation":
+                expected,
+
+            "observed_operation":
+                observed,
+
+            "result":
+                (
+                    "PASS"
+                    if passed
+                    else "FAIL"
+                ),
         }
 
     # =========================================================
@@ -919,60 +1297,66 @@ class ProtectionCalculator:
 
     @staticmethod
     def calculate_differential_current(
-        current_1,
-        current_2
+        current_1_xin,
+        current_2_xin
     ):
         """
-        Basic magnitude differential calculation.
-
-        For the simple two-input testing template:
+        Basic differential calculation using xIn.
 
             Idiff = |I1 - I2|
+
+        Both currents must use the same nominal-current
+        reference.
         """
 
-        current_1 = (
-            ProtectionCalculator._validate_number(
-                current_1,
-                "Current 1"
+        current_1_xin = (
+            ProtectionCalculator
+            ._validate_number(
+                current_1_xin,
+                "Current 1 xIn"
             )
         )
 
-        current_2 = (
-            ProtectionCalculator._validate_number(
-                current_2,
-                "Current 2"
+        current_2_xin = (
+            ProtectionCalculator
+            ._validate_number(
+                current_2_xin,
+                "Current 2 xIn"
             )
         )
 
         return abs(
-            current_1
+            current_1_xin
             -
-            current_2
+            current_2_xin
         )
 
     @staticmethod
     def evaluate_differential_test(
-        expected_current,
-        actual_differential_current,
+        expected_xin,
+        actual_differential_xin,
         tolerance_percent=5.0
     ):
 
-        expected_current = (
-            ProtectionCalculator._validate_number(
-                expected_current,
-                "Expected differential current"
+        expected_xin = (
+            ProtectionCalculator
+            ._validate_number(
+                expected_xin,
+                "Expected differential xIn"
             )
         )
 
-        actual_differential_current = (
-            ProtectionCalculator._validate_number(
-                actual_differential_current,
-                "Actual differential current"
+        actual_differential_xin = (
+            ProtectionCalculator
+            ._validate_number(
+                actual_differential_xin,
+                "Actual differential xIn"
             )
         )
 
         tolerance_percent = (
-            ProtectionCalculator._validate_number(
+            ProtectionCalculator
+            ._validate_number(
                 tolerance_percent,
                 "Tolerance"
             )
@@ -981,19 +1365,27 @@ class ProtectionCalculator:
         result = (
             ProtectionCalculator
             .evaluate_threshold(
-                expected_value=expected_current,
-                actual_value=actual_differential_current,
+                expected_value=expected_xin,
+                actual_value=actual_differential_xin,
                 tolerance_percent=tolerance_percent,
                 direction="equal"
             )
         )
 
         return {
-            "expected_current": expected_current,
-            "actual_differential_current":
-                actual_differential_current,
+
+            "expected_xin":
+                expected_xin,
+
+            "actual_differential_xin":
+                actual_differential_xin,
+
             "error_percent":
                 result["error_percent"],
+
+            "tolerance_percent":
+                tolerance_percent,
+
             "result":
                 result["result"],
         }

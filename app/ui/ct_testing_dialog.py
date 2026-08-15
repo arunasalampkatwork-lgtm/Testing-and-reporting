@@ -24,6 +24,7 @@ class CTTestingDialog(QDialog):
         test_service=None,
         parent=None,
     ):
+
         super().__init__(parent)
 
         self.project_id = project_id
@@ -37,9 +38,172 @@ class CTTestingDialog(QDialog):
             f"CT Testing - {component.name}"
         )
 
-        self.resize(900, 750)
+        self.resize(
+            900,
+            750
+        )
 
         self.build_ui()
+
+    # =====================================================
+    # CT CONFIGURATION HELPERS
+    # =====================================================
+
+    def _get_ct_primary(self):
+
+        value = getattr(
+            self.component,
+            "ct_primary",
+            0
+        )
+
+        try:
+
+            value = float(
+                value or 0
+            )
+
+            if value > 0:
+                return value
+
+        except (
+            TypeError,
+            ValueError
+        ):
+
+            pass
+
+        # -------------------------------------------------
+        # BACKWARD COMPATIBILITY
+        # -------------------------------------------------
+
+        ratio = str(
+            getattr(
+                self.component,
+                "ct_ratio",
+                ""
+            )
+            or ""
+        ).strip()
+
+        if "/" in ratio:
+
+            try:
+
+                primary, _secondary = (
+                    ratio.split(
+                        "/",
+                        1
+                    )
+                )
+
+                value = float(
+                    primary.strip()
+                )
+
+                if value > 0:
+                    return value
+
+            except (
+                TypeError,
+                ValueError
+            ):
+
+                pass
+
+        return 0.0
+
+    def _get_ct_secondary(self):
+
+        value = getattr(
+            self.component,
+            "ct_secondary",
+            0
+        )
+
+        try:
+
+            value = float(
+                value or 0
+            )
+
+            if value > 0:
+                return value
+
+        except (
+            TypeError,
+            ValueError
+        ):
+
+            pass
+
+        # -------------------------------------------------
+        # BACKWARD COMPATIBILITY
+        # -------------------------------------------------
+
+        ratio = str(
+            getattr(
+                self.component,
+                "ct_ratio",
+                ""
+            )
+            or ""
+        ).strip()
+
+        if "/" in ratio:
+
+            try:
+
+                _primary, secondary = (
+                    ratio.split(
+                        "/",
+                        1
+                    )
+                )
+
+                value = float(
+                    secondary.strip()
+                )
+
+                if value > 0:
+                    return value
+
+            except (
+                TypeError,
+                ValueError
+            ):
+
+                pass
+
+        return 0.0
+
+    @staticmethod
+    def _format_number(
+        value
+    ):
+
+        try:
+
+            value = float(
+                value
+            )
+
+        except (
+            TypeError,
+            ValueError
+        ):
+
+            return ""
+
+        if value.is_integer():
+
+            return str(
+                int(value)
+            )
+
+        return str(
+            value
+        )
 
     # =====================================================
     # BUILD UI
@@ -47,7 +211,9 @@ class CTTestingDialog(QDialog):
 
     def build_ui(self):
 
-        main_layout = QVBoxLayout(self)
+        main_layout = QVBoxLayout(
+            self
+        )
 
         # -------------------------------------------------
         # HEADER
@@ -68,7 +234,9 @@ class CTTestingDialog(QDialog):
             """
         )
 
-        main_layout.addWidget(header)
+        main_layout.addWidget(
+            header
+        )
 
         # -------------------------------------------------
         # SCROLL AREA
@@ -76,15 +244,19 @@ class CTTestingDialog(QDialog):
 
         scroll = QScrollArea()
 
-        scroll.setWidgetResizable(True)
+        scroll.setWidgetResizable(
+            True
+        )
 
         container = QDialog()
 
-        container_layout = QVBoxLayout(container)
+        container_layout = QVBoxLayout(
+            container
+        )
 
-        # -------------------------------------------------
+        # =================================================
         # CT IDENTIFICATION
-        # -------------------------------------------------
+        # =================================================
 
         identification = QGroupBox(
             "CT Identification"
@@ -94,13 +266,31 @@ class CTTestingDialog(QDialog):
 
         self.add_field(
             identification_layout,
+            "ct_primary",
+            "CT Primary",
+            self._get_ct_primary(),
+            "A",
+        )
+
+        self.add_field(
+            identification_layout,
+            "ct_secondary",
+            "CT Secondary",
+            self._get_ct_secondary(),
+            "A",
+        )
+
+        self.add_readonly(
+            identification_layout,
+            "nominal_current",
+            "Nominal Current",
+            "A",
+        )
+
+        self.add_readonly(
+            identification_layout,
             "ct_ratio",
             "CT Ratio",
-            getattr(
-                self.component,
-                "ct_ratio",
-                ""
-            ),
         )
 
         self.add_field(
@@ -177,9 +367,23 @@ class CTTestingDialog(QDialog):
             identification
         )
 
-        # -------------------------------------------------
+        self.fields[
+            "ct_primary"
+        ].textChanged.connect(
+            self.update_ct_configuration
+        )
+
+        self.fields[
+            "ct_secondary"
+        ].textChanged.connect(
+            self.update_ct_configuration
+        )
+
+        self.update_ct_configuration()
+
+        # =================================================
         # RATIO TEST
-        # -------------------------------------------------
+        # =================================================
 
         ratio_group = QGroupBox(
             "CT Ratio Test"
@@ -236,9 +440,9 @@ class CTTestingDialog(QDialog):
             self.calculate_ratio
         )
 
-        # -------------------------------------------------
+        # =================================================
         # POLARITY
-        # -------------------------------------------------
+        # =================================================
 
         polarity_group = QGroupBox(
             "Polarity Test"
@@ -292,94 +496,22 @@ class CTTestingDialog(QDialog):
             self.calculate_polarity
         )
 
-        # -------------------------------------------------
-        # INSULATION RESISTANCE
-        # -------------------------------------------------
+        self.calculate_polarity()
 
-        ir_group = QGroupBox(
-            "Insulation Resistance"
-        )
-
-        ir_layout = QFormLayout()
-
-        self.add_field(
-            ir_layout,
-            "ir_primary_earth",
-            "Primary - Earth",
-            "",
-            "MΩ",
-        )
-
-        self.add_field(
-            ir_layout,
-            "ir_secondary_earth",
-            "Secondary - Earth",
-            "",
-            "MΩ",
-        )
-
-        self.add_field(
-            ir_layout,
-            "ir_primary_secondary",
-            "Primary - Secondary",
-            "",
-            "MΩ",
-        )
-
-        self.add_field(
-            ir_layout,
-            "ir_test_voltage",
-            "Test Voltage",
-            "",
-            "V",
-        )
-
-        self.add_field(
-            ir_layout,
-            "ir_test_duration",
-            "Test Duration",
-            "",
-            "s",
-        )
-
-        ir_group.setLayout(
-            ir_layout
-        )
-
-        container_layout.addWidget(
-            ir_group
-        )
-
-        # -------------------------------------------------
+        # =================================================
         # WINDING RESISTANCE
-        # -------------------------------------------------
+        # =================================================
 
         winding_group = QGroupBox(
-            "Winding Resistance"
+            "Winding Resistance Test"
         )
 
         winding_layout = QFormLayout()
 
         self.add_field(
             winding_layout,
-            "resistance_phase_a",
-            "Phase A",
-            "",
-            "Ω",
-        )
-
-        self.add_field(
-            winding_layout,
-            "resistance_phase_b",
-            "Phase B",
-            "",
-            "Ω",
-        )
-
-        self.add_field(
-            winding_layout,
-            "resistance_phase_c",
-            "Phase C",
+            "winding_resistance",
+            "Measured Resistance",
             "",
             "Ω",
         )
@@ -408,9 +540,9 @@ class CTTestingDialog(QDialog):
             winding_group
         )
 
-        # -------------------------------------------------
+        # =================================================
         # EXCITATION / KNEE POINT
-        # -------------------------------------------------
+        # =================================================
 
         excitation_group = QGroupBox(
             "Excitation / Knee Point Test"
@@ -458,9 +590,9 @@ class CTTestingDialog(QDialog):
             excitation_group
         )
 
-        # -------------------------------------------------
+        # =================================================
         # BURDEN
-        # -------------------------------------------------
+        # =================================================
 
         burden_group = QGroupBox(
             "Burden Test"
@@ -505,9 +637,9 @@ class CTTestingDialog(QDialog):
             self.calculate_burden
         )
 
-        # -------------------------------------------------
+        # =================================================
         # ENGINEERING VALIDATION
-        # -------------------------------------------------
+        # =================================================
 
         validation_group = QGroupBox(
             "Engineering Validation"
@@ -531,9 +663,9 @@ class CTTestingDialog(QDialog):
             validation_group
         )
 
-        # -------------------------------------------------
-        # REMARKS
-        # -------------------------------------------------
+        # =================================================
+        # REMARKS / RESULT
+        # =================================================
 
         remarks_group = QGroupBox(
             "Remarks and Result"
@@ -576,9 +708,9 @@ class CTTestingDialog(QDialog):
             scroll
         )
 
-        # -------------------------------------------------
+        # =================================================
         # BUTTONS
-        # -------------------------------------------------
+        # =================================================
 
         button_layout = QHBoxLayout()
 
@@ -625,6 +757,58 @@ class CTTestingDialog(QDialog):
         )
 
     # =====================================================
+    # CT CONFIGURATION DISPLAY
+    # =====================================================
+
+    def update_ct_configuration(self):
+
+        try:
+
+            primary = float(
+                self.fields[
+                    "ct_primary"
+                ].text()
+            )
+
+            secondary = float(
+                self.fields[
+                    "ct_secondary"
+                ].text()
+            )
+
+            if (
+                primary <= 0
+                or secondary <= 0
+            ):
+
+                raise ValueError
+
+            self.fields[
+                "ct_ratio"
+            ].setText(
+                f"{primary:g}/{secondary:g}"
+            )
+
+            self.fields[
+                "nominal_current"
+            ].setText(
+                f"{secondary:g}"
+            )
+
+        except (
+            ValueError,
+            TypeError
+        ):
+
+            self.fields[
+                "ct_ratio"
+            ].clear()
+
+            self.fields[
+                "nominal_current"
+            ].clear()
+
+    # =====================================================
     # FIELD HELPERS
     # =====================================================
 
@@ -644,9 +828,14 @@ class CTTestingDialog(QDialog):
         )
 
         if unit:
-            label = f"{label} ({unit})"
 
-        self.fields[field_id] = widget
+            label = (
+                f"{label} ({unit})"
+            )
+
+        self.fields[
+            field_id
+        ] = widget
 
         layout.addRow(
             QLabel(label),
@@ -663,12 +852,19 @@ class CTTestingDialog(QDialog):
 
         widget = QLineEdit()
 
-        widget.setReadOnly(True)
+        widget.setReadOnly(
+            True
+        )
 
         if unit:
-            label = f"{label} ({unit})"
 
-        self.fields[field_id] = widget
+            label = (
+                f"{label} ({unit})"
+            )
+
+        self.fields[
+            field_id
+        ] = widget
 
         layout.addRow(
             QLabel(label),
@@ -689,7 +885,9 @@ class CTTestingDialog(QDialog):
             options
         )
 
-        self.fields[field_id] = widget
+        self.fields[
+            field_id
+        ] = widget
 
         layout.addRow(
             QLabel(label),
@@ -697,7 +895,7 @@ class CTTestingDialog(QDialog):
         )
 
     # =====================================================
-    # CALCULATIONS
+    # RATIO CALCULATION
     # =====================================================
 
     def calculate_ratio(self):
@@ -717,10 +915,13 @@ class CTTestingDialog(QDialog):
             )
 
             if secondary == 0:
+
                 raise ValueError
 
             ratio = (
-                primary / secondary
+                primary
+                /
+                secondary
             )
 
             self.fields[
@@ -729,34 +930,54 @@ class CTTestingDialog(QDialog):
                 f"{ratio:.4f}"
             )
 
-            configured_ratio = str(
-                getattr(
-                    self.component,
-                    "ct_ratio",
-                    ""
-                )
+            configured_primary = (
+                self._get_ct_primary()
             )
 
-            if "/" in configured_ratio:
+            configured_secondary = (
+                self._get_ct_secondary()
+            )
 
-                expected = float(
-                    configured_ratio
-                    .split("/")[0]
-                ) / float(
-                    configured_ratio
-                    .split("/")[1]
+            if (
+                configured_primary > 0
+                and configured_secondary > 0
+            ):
+
+                expected = (
+                    configured_primary
+                    /
+                    configured_secondary
                 )
 
-                error = (
-                    (ratio - expected)
-                    / expected
-                ) * 100
+                if expected != 0:
+
+                    error = (
+                        (
+                            ratio
+                            -
+                            expected
+                        )
+                        /
+                        expected
+                    ) * 100
+
+                    self.fields[
+                        "ratio_error"
+                    ].setText(
+                        f"{error:.2f}"
+                    )
+
+                else:
+
+                    self.fields[
+                        "ratio_error"
+                    ].clear()
+
+            else:
 
                 self.fields[
                     "ratio_error"
-                ].setText(
-                    f"{error:.2f}"
-                )
+                ].clear()
 
         except (
             ValueError,
@@ -771,27 +992,43 @@ class CTTestingDialog(QDialog):
                 "ratio_error"
             ].clear()
 
+    # =====================================================
+    # POLARITY
+    # =====================================================
+
     def calculate_polarity(self):
 
-        expected = self.fields[
-            "expected_polarity"
-        ].currentText()
+        expected = (
+            self.fields[
+                "expected_polarity"
+            ].currentText()
+        )
 
-        observed = self.fields[
-            "observed_polarity"
-        ].currentText()
+        observed = (
+            self.fields[
+                "observed_polarity"
+            ].currentText()
+        )
 
         if expected == observed:
 
             self.fields[
                 "polarity_result"
-            ].setText("PASS")
+            ].setText(
+                "PASS"
+            )
 
         else:
 
             self.fields[
                 "polarity_result"
-            ].setText("FAIL")
+            ].setText(
+                "FAIL"
+            )
+
+    # =====================================================
+    # BURDEN
+    # =====================================================
 
     def calculate_burden(self):
 
@@ -813,16 +1050,25 @@ class CTTestingDialog(QDialog):
 
             rated_value = float(
                 rated.lower()
-                .replace("va", "")
+                .replace(
+                    "va",
+                    ""
+                )
                 .strip()
             )
 
             if rated_value == 0:
+
                 raise ValueError
 
             error = (
-                (measured - rated_value)
-                / rated_value
+                (
+                    measured
+                    -
+                    rated_value
+                )
+                /
+                rated_value
             ) * 100
 
             self.fields[
@@ -848,15 +1094,20 @@ class CTTestingDialog(QDialog):
 
         values = {}
 
-        for field_id, widget in self.fields.items():
+        for field_id, widget in (
+            self.fields.items()
+        ):
 
             if isinstance(
                 widget,
                 QLineEdit,
             ):
 
-                values[field_id] = (
-                    widget.text().strip()
+                values[
+                    field_id
+                ] = (
+                    widget.text()
+                    .strip()
                 )
 
             elif isinstance(
@@ -864,7 +1115,9 @@ class CTTestingDialog(QDialog):
                 QComboBox,
             ):
 
-                values[field_id] = (
+                values[
+                    field_id
+                ] = (
                     widget.currentText()
                 )
 
@@ -876,7 +1129,9 @@ class CTTestingDialog(QDialog):
 
     def save_test(self):
 
-        values = self.get_field_values()
+        values = (
+            self.get_field_values()
+        )
 
         if not self.test_service:
 
@@ -888,6 +1143,22 @@ class CTTestingDialog(QDialog):
 
             return
 
+        # -------------------------------------------------
+        # Add authoritative CT configuration to test record
+        # -------------------------------------------------
+
+        values[
+            "ct_primary"
+        ] = self._get_ct_primary()
+
+        values[
+            "ct_secondary"
+        ] = self._get_ct_secondary()
+
+        values[
+            "nominal_current"
+        ] = self._get_ct_secondary()
+
         try:
 
             test_id = (
@@ -895,7 +1166,9 @@ class CTTestingDialog(QDialog):
                 .save_component_test(
                     project_id=self.project_id,
                     panel_id=self.panel_id,
-                    component_id=self.component.component_id,
+                    component_id=(
+                        self.component.component_id
+                    ),
                     test_type="CT",
                     measurements=values,
                     result=values.get(
@@ -912,8 +1185,10 @@ class CTTestingDialog(QDialog):
             QMessageBox.information(
                 self,
                 "Test Saved",
-                f"CT test saved successfully.\n\n"
-                f"Test ID: {test_id}",
+                (
+                    "CT test saved successfully.\n\n"
+                    f"Test ID: {test_id}"
+                ),
             )
 
         except AttributeError:
@@ -921,8 +1196,10 @@ class CTTestingDialog(QDialog):
             QMessageBox.warning(
                 self,
                 "Save Method Missing",
-                "The test service does not yet have "
-                "save_component_test().",
+                (
+                    "The test service does not yet have "
+                    "save_component_test()."
+                ),
             )
 
         except Exception as error:
@@ -939,7 +1216,33 @@ class CTTestingDialog(QDialog):
 
     def clear_fields(self):
 
-        for widget in self.fields.values():
+        # Don't clear the CT identification fields.
+        # They are configuration, not test measurements.
+
+        test_fields = [
+            "primary_current",
+            "secondary_current",
+            "measured_ratio",
+            "ratio_error",
+            "polarity_result",
+            "winding_resistance",
+            "resistance_test_current",
+            "winding_temperature",
+            "knee_point_voltage",
+            "knee_point_current",
+            "excitation_test_voltage",
+            "excitation_test_current",
+            "burden_test_current",
+            "measured_burden",
+            "burden_error",
+            "remarks",
+        ]
+
+        for field_id in test_fields:
+
+            widget = self.fields.get(
+                field_id
+            )
 
             if isinstance(
                 widget,
@@ -948,10 +1251,30 @@ class CTTestingDialog(QDialog):
 
                 widget.clear()
 
-        self.fields[
-            "tolerance_percent"
-        ].setText("5")
+        if "expected_polarity" in self.fields:
 
-        self.fields[
-            "result"
-        ].setCurrentIndex(2)
+            self.fields[
+                "expected_polarity"
+            ].setCurrentIndex(0)
+
+        if "observed_polarity" in self.fields:
+
+            self.fields[
+                "observed_polarity"
+            ].setCurrentIndex(0)
+
+        if "result" in self.fields:
+
+            self.fields[
+                "result"
+            ].setCurrentIndex(2)
+
+        if "tolerance_percent" in self.fields:
+
+            self.fields[
+                "tolerance_percent"
+            ].setText(
+                "5"
+            )
+
+        self.update_ct_configuration()
