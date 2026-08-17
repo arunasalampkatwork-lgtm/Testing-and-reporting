@@ -11,107 +11,155 @@ from PySide6.QtWidgets import (
     QLineEdit,
     QComboBox,
     QPushButton,
+    QMessageBox,
     QSplitter,
-    QScrollArea,
+    QFileDialog,
+)
+
+from app.services.asset_library_manager import (
+    AssetLibraryManager
+)
+
+from app.services.asset_export_service import (
+    AssetExportService
 )
 
 
 class AssetExplorerView(QWidget):
-    """
-    GLOBAL ASSET EXPLORER
 
-    This view is completely independent of the currently
-    opened project.
+    """
+    =========================================================
+    GLOBAL ASSET EXPLORER
+    =========================================================
+
+    This view is completely project-independent.
 
     Hierarchy:
 
         Substation
-            └── Switchboard
-                    └── Panel
-                            └── Components
+            |
+            +-- Switchboard
+                    |
+                    +-- Panel
+                            |
+                            +-- CT
+                            +-- Numerical Relay
+                            +-- Auxiliary Relay
+                            +-- Meter
 
-    The explorer reads physical assets from GlobalAssetService.
+    The physical hierarchy is taken from the GLOBAL asset
+    library using:
 
-    It does NOT use:
-        - AssetManager
-        - ComponentManager
-        - current project
-        - current project folder
+        metadata["parent_asset_id"]
+
+    No project needs to be opened.
     """
 
     def __init__(
         self,
-        global_asset_service,
+        global_asset_service=None,
         parent=None,
     ):
 
         super().__init__(parent)
 
+        # =================================================
+        # GLOBAL SERVICE
+        # =================================================
+
         self.global_asset_service = (
             global_asset_service
         )
 
-        self._tree_nodes = {}
+        # =================================================
+        # GLOBAL ASSET LIBRARY
+        #
+        # Keep a direct AssetLibraryManager reference as a
+        # fallback. This also makes the view usable even if
+        # MainWindow does not pass a service.
+        # =================================================
 
-        self._all_assets = []
+        self.asset_library = (
+            AssetLibraryManager()
+        )
+
+        # =================================================
+        # DATA
+        # =================================================
+
+        self.assets = []
+
+        self.assets_by_id = {}
+
+        self.tree_items = {}
+
+        # =================================================
+        # UI
+        # =================================================
 
         self._build_ui()
 
         self.refresh()
 
-    # =========================================================
-    # UI
-    # =========================================================
+    # =====================================================
+    # BUILD UI
+    # =====================================================
 
-    def _build_ui(self):
+    def _build_ui(
+        self
+    ):
 
         root = QVBoxLayout(
             self
         )
 
         root.setContentsMargins(
-            16,
-            16,
-            16,
-            16
-        )
-
-        root.setSpacing(
+            12,
+            12,
+            12,
             12
         )
 
-        # =====================================================
-        # HEADER
-        # =====================================================
+        root.setSpacing(
+            10
+        )
 
-        header = QLabel(
+        # =================================================
+        # TITLE
+        # =================================================
+
+        title = QLabel(
             "Asset Explorer"
         )
 
-        header.setStyleSheet(
+        title.setStyleSheet(
             """
             QLabel {
                 font-size: 24px;
                 font-weight: 700;
-                padding: 4px 2px;
+                padding: 4px;
             }
             """
         )
 
         root.addWidget(
-            header
+            title
         )
 
+        # =================================================
+        # SUBTITLE
+        # =================================================
+
         subtitle = QLabel(
-            "Global physical asset hierarchy"
+            "Global physical asset hierarchy and configuration"
         )
 
         subtitle.setStyleSheet(
             """
             QLabel {
                 color: #999999;
-                font-size: 13px;
-                padding-left: 2px;
+                padding-left: 4px;
+                padding-bottom: 4px;
             }
             """
         )
@@ -120,66 +168,58 @@ class AssetExplorerView(QWidget):
             subtitle
         )
 
-        # =====================================================
-        # SEARCH / FILTER
-        # =====================================================
+        # =================================================
+        # FILTER BAR
+        # =================================================
 
-        filter_frame = QFrame()
+        filter_row = QHBoxLayout()
 
-        filter_frame.setObjectName(
-            "FilterFrame"
-        )
-
-        filter_layout = QHBoxLayout(
-            filter_frame
-        )
-
-        filter_layout.setContentsMargins(
-            10,
-            8,
-            10,
+        filter_row.setSpacing(
             8
         )
 
-        filter_layout.setSpacing(
-            8
-        )
+        # -------------------------------------------------
+        # SEARCH
+        # -------------------------------------------------
 
         self.search_edit = QLineEdit()
 
         self.search_edit.setPlaceholderText(
-            "Search substation, switchboard, panel, "
-            "asset tag, manufacturer or model..."
+            "Search asset, tag, manufacturer, model, component..."
         )
 
-        self.search_edit.textChanged.connect(
-            self.apply_filters
+        self.search_edit.setClearButtonEnabled(
+            True
         )
 
-        filter_layout.addWidget(
+        filter_row.addWidget(
             self.search_edit,
             1
         )
+
+        # -------------------------------------------------
+        # TYPE FILTER
+        # -------------------------------------------------
 
         self.type_filter = QComboBox()
 
         self.type_filter.addItems(
             [
-                "All Assets",
-                "Substations",
-                "Switchboards",
-                "Panels",
-                "Components",
+                "All",
+                "Substation",
+                "Switchboard",
+                "Panel",
+                "Component",
             ]
         )
 
-        self.type_filter.currentIndexChanged.connect(
-            self.apply_filters
-        )
-
-        filter_layout.addWidget(
+        filter_row.addWidget(
             self.type_filter
         )
+
+        # -------------------------------------------------
+        # REFRESH
+        # -------------------------------------------------
 
         refresh_button = QPushButton(
             "Refresh"
@@ -189,17 +229,37 @@ class AssetExplorerView(QWidget):
             self.refresh
         )
 
-        filter_layout.addWidget(
+        filter_row.addWidget(
             refresh_button
         )
 
-        root.addWidget(
-            filter_frame
+        # -------------------------------------------------
+        # EXPORT EXCEL
+        # -------------------------------------------------
+
+        self.export_button = QPushButton(
+            "Export Excel"
         )
 
-        # =====================================================
-        # SPLITTER
-        # =====================================================
+        self.export_button.setToolTip(
+            "Export the complete global asset register to Excel"
+        )
+
+        self.export_button.clicked.connect(
+            self.export_excel
+        )
+
+        filter_row.addWidget(
+            self.export_button
+        )
+
+        root.addLayout(
+            filter_row
+        )
+
+        # =================================================
+        # MAIN SPLITTER
+        # =================================================
 
         splitter = QSplitter(
             Qt.Orientation.Horizontal
@@ -209,42 +269,15 @@ class AssetExplorerView(QWidget):
             False
         )
 
-        # =====================================================
-        # LEFT: GLOBAL ASSET TREE
-        # =====================================================
-
-        tree_frame = QFrame()
-
-        tree_layout = QVBoxLayout(
-            tree_frame
-        )
-
-        tree_layout.setContentsMargins(
-            0,
-            0,
-            0,
-            0
-        )
-
-        tree_header = QLabel(
-            "Asset Structure"
-        )
-
-        tree_header.setStyleSheet(
-            """
-            QLabel {
-                font-size: 16px;
-                font-weight: 700;
-                padding: 8px;
-            }
-            """
-        )
-
-        tree_layout.addWidget(
-            tree_header
-        )
+        # =================================================
+        # LEFT: ASSET TREE
+        # =================================================
 
         self.tree = QTreeWidget()
+
+        self.tree.setColumnCount(
+            3
+        )
 
         self.tree.setHeaderLabels(
             [
@@ -270,42 +303,46 @@ class AssetExplorerView(QWidget):
             False
         )
 
+        self.tree.setSelectionMode(
+            QTreeWidget.SelectionMode.SingleSelection
+        )
+
         self.tree.itemSelectionChanged.connect(
             self._selection_changed
         )
 
-        tree_layout.addWidget(
+        splitter.addWidget(
             self.tree
         )
 
-        splitter.addWidget(
-            tree_frame
-        )
-
-        # =====================================================
+        # =================================================
         # RIGHT: DETAILS
-        # =====================================================
+        # =================================================
 
-        details_frame = QFrame()
+        self.details_frame = QFrame()
 
-        details_frame.setObjectName(
-            "DetailsFrame"
+        self.details_frame.setObjectName(
+            "ExplorerDetails"
         )
 
-        details_outer = QVBoxLayout(
-            details_frame
+        self.details_layout = QVBoxLayout(
+            self.details_frame
         )
 
-        details_outer.setContentsMargins(
-            0,
-            0,
-            0,
-            0
+        self.details_layout.setContentsMargins(
+            18,
+            18,
+            18,
+            18
         )
 
-        # -----------------------------------------------------
-        # DETAILS HEADER
-        # -----------------------------------------------------
+        self.details_layout.setSpacing(
+            10
+        )
+
+        # -------------------------------------------------
+        # DETAILS TITLE
+        # -------------------------------------------------
 
         self.details_title = QLabel(
             "Select an asset"
@@ -314,85 +351,73 @@ class AssetExplorerView(QWidget):
         self.details_title.setStyleSheet(
             """
             QLabel {
-                font-size: 21px;
+                font-size: 20px;
                 font-weight: 700;
-                padding: 10px;
             }
             """
         )
 
-        details_outer.addWidget(
+        self.details_layout.addWidget(
             self.details_title
         )
 
+        # -------------------------------------------------
+        # DETAILS SUBTITLE
+        # -------------------------------------------------
+
         self.details_subtitle = QLabel(
-            "Asset configuration will appear here."
+            "Configuration will appear here."
         )
 
         self.details_subtitle.setStyleSheet(
             """
             QLabel {
                 color: #999999;
-                padding: 0 10px 10px 10px;
             }
             """
         )
 
-        details_outer.addWidget(
-            self.details_subtitle
-        )
-
-        # -----------------------------------------------------
-        # SCROLL AREA
-        # -----------------------------------------------------
-
-        scroll = QScrollArea()
-
-        scroll.setWidgetResizable(
+        self.details_subtitle.setWordWrap(
             True
         )
 
-        scroll.setFrameShape(
-            QFrame.Shape.NoFrame
+        self.details_layout.addWidget(
+            self.details_subtitle
         )
 
-        self.details_container = QWidget()
+        # -------------------------------------------------
+        # DETAILS FORM
+        # -------------------------------------------------
 
-        self.details_layout = QVBoxLayout(
-            self.details_container
+        self.details_content = QFormLayout()
+
+        self.details_content.setLabelAlignment(
+            Qt.AlignmentFlag.AlignRight
         )
 
-        self.details_layout.setContentsMargins(
-            10,
-            10,
-            10,
-            10
+        self.details_content.setFormAlignment(
+            Qt.AlignmentFlag.AlignTop
         )
 
-        self.details_layout.setSpacing(
-            10
+        self.details_content.setSpacing(
+            8
         )
 
-        scroll.setWidget(
-            self.details_container
+        self.details_layout.addLayout(
+            self.details_content
         )
 
-        details_outer.addWidget(
-            scroll
-        )
+        self.details_layout.addStretch()
 
         splitter.addWidget(
-            details_frame
+            self.details_frame
         )
 
-        splitter.setStretchFactor(
-            0,
-            5
-        )
-
-        splitter.setStretchFactor(
-            1,
-            4
+        splitter.setSizes(
+            [
+                650,
+                650,
+            ]
         )
 
         root.addWidget(
@@ -400,52 +425,24 @@ class AssetExplorerView(QWidget):
             1
         )
 
-        # =====================================================
+        # =================================================
         # STYLE
-        # =====================================================
+        # =================================================
 
         self.setStyleSheet(
             """
-            QFrame#FilterFrame {
-                background: #292929;
-                border: 1px solid #404040;
-                border-radius: 8px;
-            }
-
-            QFrame#DetailsFrame {
-                background: #292929;
-                border: 1px solid #404040;
-                border-radius: 8px;
-            }
-
-            QTreeWidget {
-                background: #242424;
-                border: 1px solid #3d3d3d;
-                border-radius: 7px;
-                outline: none;
-            }
-
-            QTreeWidget::item {
-                padding: 7px 5px;
-                min-height: 28px;
-            }
-
-            QTreeWidget::item:hover {
-                background: #333333;
-            }
-
-            QTreeWidget::item:selected {
-                background: #3b3b3b;
-                border-left: 3px solid #f39c12;
-            }
-
             QLineEdit,
             QComboBox {
-                min-height: 32px;
-                padding: 4px 8px;
+                min-height: 34px;
+                padding: 5px 9px;
                 border: 1px solid #444444;
                 border-radius: 6px;
-                background: #303030;
+                background: #292929;
+            }
+
+            QLineEdit:focus,
+            QComboBox:focus {
+                border: 1px solid #e58a18;
             }
 
             QPushButton {
@@ -460,162 +457,205 @@ class AssetExplorerView(QWidget):
                 background: #3a3a3a;
             }
 
-            QLabel#DetailSection {
-                font-size: 15px;
-                font-weight: 700;
-                padding: 8px 4px;
-                border-bottom: 1px solid #444444;
+            QPushButton:pressed {
+                background: #252525;
+            }
+
+            QTreeWidget {
+                background: #292929;
+                border: 1px solid #3e3e3e;
+                border-radius: 7px;
+                padding: 4px;
+            }
+
+            QTreeWidget::item {
+                height: 32px;
+                padding: 3px 6px;
+                border-radius: 4px;
+            }
+
+            QTreeWidget::item:hover {
+                background: #353535;
+            }
+
+            QTreeWidget::item:selected {
+                background: #3b3b3b;
+                border-left: 3px solid #e58a18;
+            }
+
+            QHeaderView::section {
+                background: #353535;
+                padding: 7px;
+                border: 0px;
+                border-right: 1px solid #444444;
+                font-weight: 600;
+            }
+
+            QFrame#ExplorerDetails {
+                background: #242424;
+                border: 1px solid #414141;
+                border-radius: 8px;
+            }
+
+            QLabel#DetailLabel {
+                color: #aaaaaa;
+                font-weight: 600;
             }
 
             QLabel#DetailValue {
-                padding: 7px 9px;
-                background: #303030;
-                border-radius: 5px;
                 color: #eeeeee;
             }
             """
         )
 
-    # =========================================================
-    # REFRESH
-    # =========================================================
+        # =================================================
+        # SIGNALS
+        # =================================================
 
-    def refresh(self):
+        self.search_edit.textChanged.connect(
+            self._apply_filter
+        )
+
+        self.type_filter.currentTextChanged.connect(
+            self._apply_filter
+        )
+
+    # =====================================================
+    # REFRESH
+    # =====================================================
+
+    def refresh(
+        self
+    ):
 
         try:
 
-            service = (
-                self.global_asset_service
-            )
+            self._load_global_assets()
 
-            # -------------------------------------------------
-            # Let the service reload its backing data if it
-            # supports refresh/load.
-            # -------------------------------------------------
+            self._populate_tree()
 
-            if hasattr(
-                service,
-                "refresh"
-            ):
-
-                service.refresh()
-
-            elif hasattr(
-                service,
-                "load"
-            ):
-
-                service.load()
-
-            elif hasattr(
-                service,
-                "reload"
-            ):
-
-                service.reload()
-
-            # -------------------------------------------------
-            # Obtain global assets.
-            # -------------------------------------------------
-
-            assets = (
-                self._get_global_assets()
-            )
-
-            self._all_assets = assets
-
-            self.apply_filters()
+            self._clear_details()
 
         except Exception as error:
 
-            self.tree.clear()
-
-            self.details_title.setText(
-                "Asset Explorer"
+            QMessageBox.critical(
+                self,
+                "Asset Explorer Error",
+                f"Unable to load global assets:\n\n{error}"
             )
 
-            self.details_subtitle.setText(
-                f"Unable to load global assets: {error}"
-            )
+    # =====================================================
+    # LOAD GLOBAL ASSETS
+    # =====================================================
 
-    # =========================================================
-    # GET GLOBAL ASSETS
-    # =========================================================
+    def _load_global_assets(
+        self
+    ):
 
-    def _get_global_assets(self):
+        assets = []
 
-        service = self.global_asset_service
+        # =================================================
+        # FIRST TRY GLOBAL SERVICE
+        # =================================================
 
-        assets_by_id = {}
+        if self.global_asset_service is not None:
 
-        # =====================================================
-        # GLOBAL ASSET DATA IS CURRENTLY EXPOSED THROUGH
-        # get_all_nodes()
-        #
-        # Each project node points to its master physical
-        # asset through node.asset_id.
-        #
-        # We use the GLOBAL asset record for configuration
-        # and hierarchy information.
-        # =====================================================
+            try:
 
-        try:
+                if hasattr(
+                    self.global_asset_service,
+                    "refresh"
+                ):
 
-            records = (
-                service.get_all_nodes()
+                    self.global_asset_service.refresh()
+
+            except Exception:
+
+                pass
+
+            # -------------------------------------------------
+            # get_all_assets()
+            # -------------------------------------------------
+
+            try:
+
+                if hasattr(
+                    self.global_asset_service,
+                    "get_all_assets"
+                ):
+
+                    assets = (
+                        self.global_asset_service
+                        .get_all_assets()
+                        or []
+                    )
+
+            except Exception:
+
+                assets = []
+
+            # -------------------------------------------------
+            # get_assets()
+            # -------------------------------------------------
+
+            if not assets:
+
+                try:
+
+                    if hasattr(
+                        self.global_asset_service,
+                        "get_assets"
+                    ):
+
+                        assets = (
+                            self.global_asset_service
+                            .get_assets()
+                            or []
+                        )
+
+                except Exception:
+
+                    assets = []
+
+        # =================================================
+        # FALLBACK TO ASSET LIBRARY
+        # =================================================
+
+        if not assets:
+
+            try:
+
+                self.asset_library.load()
+
+            except Exception:
+
+                pass
+
+            assets = (
+                self.asset_library
+                .get_all_assets()
                 or []
             )
 
-        except Exception:
+        # =================================================
+        # NORMALIZE
+        # =================================================
 
-            records = []
+        normalized = {}
 
-        for record in records:
+        for asset in assets:
 
             if not isinstance(
-                record,
+                asset,
                 dict
             ):
-                continue
-
-            node = record.get(
-                "node"
-            )
-
-            manager = record.get(
-                "asset_manager"
-            )
-
-            if node is None:
 
                 continue
 
-            node_type = str(
-                getattr(
-                    node,
-                    "node_type",
-                    ""
+            asset_id = (
+                asset.get(
+                    "asset_id"
                 )
-                or ""
-            ).strip().upper()
-
-            # -------------------------------------------------
-            # Only physical assets belong in the global
-            # explorer hierarchy.
-            # -------------------------------------------------
-
-            if node_type not in (
-                "SUBSTATION",
-                "SWITCHBOARD",
-                "PANEL",
-            ):
-
-                continue
-
-            asset_id = getattr(
-                node,
-                "asset_id",
-                None
             )
 
             if not asset_id:
@@ -626,813 +666,15 @@ class AssetExplorerView(QWidget):
                 asset_id
             )
 
-            # -------------------------------------------------
-            # Avoid duplicate physical assets when the same
-            # global asset is referenced by multiple projects.
-            # -------------------------------------------------
-
-            if asset_id in assets_by_id:
-
-                continue
-
-            global_asset = None
-
-            # -------------------------------------------------
-            # Load the actual master asset record.
-            # -------------------------------------------------
-
-            try:
-
-                if manager is not None:
-
-                    library = getattr(
-                        manager,
-                        "asset_library",
-                        None
-                    )
-
-                    if library is not None:
-
-                        # Ensure latest configuration is visible.
-                        try:
-
-                            library.load()
-
-                        except Exception:
-
-                            pass
-
-                        global_asset = (
-                            library.get_asset(
-                                asset_id
-                            )
-                        )
-
-            except Exception:
-
-                global_asset = None
-
-            # -------------------------------------------------
-            # If the master record cannot be loaded, create
-            # a fallback record from the project node.
-            # -------------------------------------------------
-
-            if global_asset is None:
-
-                global_asset = {
-                    "asset_id":
-                        asset_id,
-
-                    "asset_type":
-                        node_type,
-
-                    "name":
-                        getattr(
-                            node,
-                            "name",
-                            ""
-                        ),
-
-                    "asset_tag":
-                        getattr(
-                            node,
-                            "name",
-                            ""
-                        ),
-
-                    "manufacturer":
-                        getattr(
-                            node,
-                            "manufacturer",
-                            ""
-                        ),
-
-                    "model":
-                        getattr(
-                            node,
-                            "model",
-                            ""
-                        ),
-
-                    "serial_number":
-                        getattr(
-                            node,
-                            "serial_number",
-                            ""
-                        ),
-
-                    "metadata":
-                        {}
-                }
-
-            else:
-
-                # Make a copy so we don't accidentally modify
-                # the AssetLibrary's internal dictionary.
-
-                global_asset = dict(
-                    global_asset
-                )
-
-            # -------------------------------------------------
-            # Ensure essential fields exist.
-            # -------------------------------------------------
-
-            global_asset[
-                "asset_id"
-            ] = asset_id
-
-            global_asset[
-                "asset_type"
-            ] = (
-                str(
-                    global_asset.get(
-                        "asset_type",
-                        node_type
-                    )
-                    or node_type
-                )
-                .strip()
-                .upper()
-            )
-
-            global_asset[
-                "name"
-            ] = (
-                str(
-                    global_asset.get(
-                        "name",
-                        ""
-                    )
-                    or getattr(
-                        node,
-                        "name",
-                        ""
-                    )
-                )
-                .strip()
-            )
-
-            global_asset[
-                "asset_tag"
-            ] = (
-                str(
-                    global_asset.get(
-                        "asset_tag",
-                        ""
-                    )
-                    or getattr(
-                        node,
-                        "name",
-                        ""
-                    )
-                )
-                .strip()
-            )
-
-            # -------------------------------------------------
-            # Preserve project-node configuration as fallback.
-            # -------------------------------------------------
-
-            for field in (
-                "manufacturer",
-                "model",
-                "serial_number",
-                "equipment_name",
-                "equipment_type",
-                "ct_count",
-                "relay_count",
-                "aux_count",
-                "meter_count",
-            ):
-
-                if (
-                    field not in global_asset
-                    or global_asset.get(
-                        field
-                    ) in (
-                        None,
-                        ""
-                    )
-                ):
-
-                    global_asset[
-                        field
-                    ] = getattr(
-                        node,
-                        field,
-                        ""
-                    )
-
-            # -------------------------------------------------
-            # Metadata
-            # -------------------------------------------------
-
-            metadata = (
-                global_asset.get(
-                    "metadata",
-                    {}
-                )
-                or {}
-            )
-
-            if not isinstance(
-                metadata,
-                dict
-            ):
-
-                metadata = {}
-
-            global_asset[
-                "metadata"
-            ] = metadata
-
-            assets_by_id[
-                asset_id
-            ] = global_asset
-
-        # =====================================================
-        # SECOND PASS
-        #
-        # Some global assets may exist in the AssetLibrary but
-        # not currently be represented by a project node.
-        #
-        # Pull those directly from every AssetManager's
-        # AssetLibrary as well.
-        # =====================================================
-
-        try:
-
-            for project in (
-                service.get_projects()
-                or []
-            ):
-
-                manager = project.get(
-                    "asset_manager"
-                )
-
-                if manager is None:
-                    continue
-
-                library = getattr(
-                    manager,
-                    "asset_library",
-                    None
-                )
-
-                if library is None:
-                    continue
-
-                try:
-
-                    library.load()
-
-                except Exception:
-
-                    pass
-
-                try:
-
-                    library_assets = (
-                        library.get_all_assets()
-                        or []
-                    )
-
-                except Exception:
-
-                    library_assets = []
-
-                for asset in library_assets:
-
-                    if not isinstance(
-                        asset,
-                        dict
-                    ):
-                        continue
-
-                    asset_type = str(
-                        asset.get(
-                            "asset_type",
-                            ""
-                        )
-                        or ""
-                    ).strip().upper()
-
-                    if asset_type not in (
-                        "SUBSTATION",
-                        "SWITCHBOARD",
-                        "PANEL",
-                    ):
-
-                        continue
-
-                    asset_id = asset.get(
-                        "asset_id"
-                    )
-
-                    if not asset_id:
-                        continue
-
-                    asset_id = str(
-                        asset_id
-                    )
-
-                    if asset_id in assets_by_id:
-                        continue
-
-                    assets_by_id[
-                        asset_id
-                    ] = dict(
-                        asset
-                    )
-
-        except Exception:
-
-            pass
-
-        return list(
-            assets_by_id.values()
-        )
-    # =========================================================
-    # NORMALISE ASSETS
-    # =========================================================
-
-    def _normalise_assets(
-        self,
-        assets
-    ):
-
-        if assets is None:
-            return []
-
-        # -----------------------------------------------------
-        # Dictionary of assets
-        # -----------------------------------------------------
-
-        if isinstance(
-            assets,
-            dict
-        ):
-
-            # Common format:
-            #
-            # {
-            #     asset_id: {...},
-            #     asset_id: {...}
-            # }
-
-            values = list(
-                assets.values()
-            )
-
-        else:
-
-            try:
-
-                values = list(
-                    assets
-                )
-
-            except TypeError:
-
-                return []
-
-        normalised = []
-
-        for asset in values:
-
-            if isinstance(
-                asset,
-                dict
-            ):
-
-                item = dict(
-                    asset
-                )
-
-            else:
-
-                item = {
-                    "asset_id":
-                        getattr(
-                            asset,
-                            "asset_id",
-                            getattr(
-                                asset,
-                                "node_id",
-                                ""
-                            )
-                        ),
-
-                    "asset_type":
-                        getattr(
-                            asset,
-                            "asset_type",
-                            getattr(
-                                asset,
-                                "node_type",
-                                ""
-                            )
-                        ),
-
-                    "name":
-                        getattr(
-                            asset,
-                            "name",
-                            ""
-                        ),
-
-                    "asset_tag":
-                        getattr(
-                            asset,
-                            "asset_tag",
-                            ""
-                        ),
-
-                    "serial_number":
-                        getattr(
-                            asset,
-                            "serial_number",
-                            ""
-                        ),
-
-                    "manufacturer":
-                        getattr(
-                            asset,
-                            "manufacturer",
-                            ""
-                        ),
-
-                    "model":
-                        getattr(
-                            asset,
-                            "model",
-                            ""
-                        ),
-
-                    "metadata":
-                        getattr(
-                            asset,
-                            "metadata",
-                            {}
-                        ),
-                }
-
-            item["asset_type"] = str(
-                item.get(
-                    "asset_type",
-                    item.get(
-                        "node_type",
-                        ""
-                    )
-                )
-                or ""
-            ).strip().upper()
-
-            item["name"] = str(
-                item.get(
-                    "name",
-                    ""
-                )
-                or ""
-            ).strip()
-
-            item["asset_tag"] = str(
-                item.get(
-                    "asset_tag",
-                    ""
-                )
-                or ""
-            ).strip()
-
-            item["asset_id"] = str(
-                item.get(
-                    "asset_id",
-                    ""
-                )
-                or ""
-            ).strip()
-
-            if not item["name"]:
-
-                item["name"] = (
-                    item["asset_tag"]
-                    or item["asset_id"]
-                    or "Unnamed Asset"
-                )
-
-            metadata = item.get(
-                "metadata"
-            )
-
-            if not isinstance(
-                metadata,
-                dict
-            ):
-
-                metadata = {}
-
-            item["metadata"] = metadata
-
-            normalised.append(
-                item
-            )
-
-        return normalised
-
-    # =========================================================
-    # FILTER
-    # =========================================================
-
-    def apply_filters(self):
-
-        search_text = (
-            self.search_edit
-            .text()
-            .strip()
-            .lower()
-        )
-
-        selected_type = (
-            self.type_filter
-            .currentText()
-        )
-
-        self.tree.clear()
-
-        self._tree_nodes = {}
-
-        # -----------------------------------------------------
-        # First determine which assets match.
-        # -----------------------------------------------------
-
-        assets = []
-
-        for asset in self._all_assets:
-
-            asset_type = str(
-                asset.get(
-                    "asset_type",
-                    ""
-                )
-            ).upper()
-
-            if selected_type == "Substations":
-
-                if asset_type != "SUBSTATION":
-                    continue
-
-            elif selected_type == "Switchboards":
-
-                if asset_type != "SWITCHBOARD":
-                    continue
-
-            elif selected_type == "Panels":
-
-                if asset_type != "PANEL":
-                    continue
-
-            elif selected_type == "Components":
-
-                # Components may be stored inside panel
-                # metadata rather than as top-level assets.
-                continue
-
-            if search_text:
-
-                searchable = " ".join(
-                    [
-                        str(
-                            asset.get(
-                                "name",
-                                ""
-                            )
-                        ),
-                        str(
-                            asset.get(
-                                "asset_tag",
-                                ""
-                            )
-                        ),
-                        str(
-                            asset.get(
-                                "manufacturer",
-                                ""
-                            )
-                        ),
-                        str(
-                            asset.get(
-                                "model",
-                                ""
-                            )
-                        ),
-                        str(
-                            asset.get(
-                                "serial_number",
-                                ""
-                            )
-                        ),
-                    ]
-                ).lower()
-
-                if search_text not in searchable:
-
-                    continue
-
-            assets.append(
+            asset_type = self._asset_type(
                 asset
             )
 
-        # -----------------------------------------------------
-        # If searching/filtering, preserve hierarchy by also
-        # including parents of matching assets.
-        # -----------------------------------------------------
+            # -------------------------------------------------
+            # Only physical assets belong in the hierarchy.
+            # -------------------------------------------------
 
-        visible_ids = {
-            asset.get("asset_id")
-            for asset in assets
-        }
-
-        if search_text:
-
-            changed = True
-
-            while changed:
-
-                changed = False
-
-                for asset in self._all_assets:
-
-                    asset_id = (
-                        asset.get(
-                            "asset_id"
-                        )
-                    )
-
-                    if asset_id in visible_ids:
-                        continue
-
-                    parent_id = (
-                        self._get_parent_asset_id(
-                            asset
-                        )
-                    )
-
-                    if parent_id in visible_ids:
-
-                        visible_ids.add(
-                            asset_id
-                        )
-
-                        changed = True
-
-            assets = [
-                asset
-                for asset in self._all_assets
-                if asset.get(
-                    "asset_id"
-                ) in visible_ids
-            ]
-
-        # -----------------------------------------------------
-        # Build hierarchy.
-        # -----------------------------------------------------
-
-        self._populate_tree(
-            assets
-        )
-
-    # =========================================================
-    # POPULATE TREE
-    # =========================================================
-
-    def _populate_tree(
-        self,
-        assets
-    ):
-
-        by_id = {}
-
-        for asset in assets:
-
-            asset_id = (
-                asset.get(
-                    "asset_id"
-                )
-            )
-
-            if asset_id:
-
-                by_id[
-                    asset_id
-                ] = asset
-
-        # -----------------------------------------------------
-        # Root assets = substations
-        # -----------------------------------------------------
-
-        substations = [
-            asset
-            for asset in assets
-            if str(
-                asset.get(
-                    "asset_type",
-                    ""
-                )
-            ).upper()
-            == "SUBSTATION"
-        ]
-
-        # Sort alphabetically.
-        substations.sort(
-            key=lambda item:
-                str(
-                    item.get(
-                        "name",
-                        ""
-                    )
-                ).lower()
-        )
-
-        for substation in substations:
-
-            item = self._create_tree_item(
-                substation
-            )
-
-            self.tree.addTopLevelItem(
-                item
-            )
-
-            self._tree_nodes[
-                item
-            ] = substation
-
-            self._add_children(
-                item,
-                substation,
-                assets
-            )
-
-        # -----------------------------------------------------
-        # Fallback for orphaned global assets.
-        #
-        # This is useful for old data created before the
-        # parent_asset_id migration was completed.
-        # -----------------------------------------------------
-
-        displayed_ids = set()
-
-        for item in self._tree_nodes.values():
-
-            asset_id = (
-                item.get(
-                    "asset_id"
-                )
-            )
-
-            if asset_id:
-                displayed_ids.add(
-                    asset_id
-                )
-
-        orphans = [
-            asset
-            for asset in assets
-            if asset.get(
-                "asset_id"
-            ) not in displayed_ids
-        ]
-
-        orphans.sort(
-            key=lambda item:
-                (
-                    str(
-                        item.get(
-                            "asset_type",
-                            ""
-                        )
-                    ),
-                    str(
-                        item.get(
-                            "name",
-                            ""
-                        )
-                    ).lower()
-                )
-        )
-
-        for asset in orphans:
-
-            # Components are not global physical assets and
-            # should not appear as root nodes.
-            if str(
-                asset.get(
-                    "asset_type",
-                    ""
-                )
-            ).upper() not in (
+            if asset_type not in (
                 "SUBSTATION",
                 "SWITCHBOARD",
                 "PANEL",
@@ -1440,312 +682,509 @@ class AssetExplorerView(QWidget):
 
                 continue
 
-            item = self._create_tree_item(
-                asset
-            )
+            # -------------------------------------------------
+            # Avoid duplicate global records.
+            # -------------------------------------------------
 
-            self.tree.addTopLevelItem(
-                item
-            )
-
-            self._tree_nodes[
-                item
-            ] = asset
-
-            self._add_children(
-                item,
-                asset,
-                assets
-            )
-
-        self.tree.expandToDepth(
-            0
-        )
-        
-        self._collapse_all_items()
-
-    # =========================================================
-    # ADD CHILDREN
-    # =========================================================
-
-    def _add_children(
-        self,
-        parent_item,
-        parent_asset,
-        assets
-    ):
-
-        parent_asset_id = (
-            parent_asset.get(
-                "asset_id"
-            )
-        )
-
-        children = []
-
-        for asset in assets:
-
-            if asset.get(
-                "asset_id"
-            ) == parent_asset_id:
+            if asset_id in normalized:
 
                 continue
 
-            child_parent_id = (
-                self._get_parent_asset_id(
-                    asset
-                )
+            normalized[
+                asset_id
+            ] = dict(
+                asset
             )
 
-            if child_parent_id == parent_asset_id:
-
-                children.append(
-                    asset
-                )
-
-        children.sort(
-            key=lambda item:
-                (
-                    self._asset_type_order(
-                        item.get(
-                            "asset_type"
-                        )
-                    ),
-                    str(
-                        item.get(
-                            "name",
-                            ""
-                        )
-                    ).lower()
-                )
+        self.assets = list(
+            normalized.values()
         )
 
-        for child in children:
+        self.assets_by_id = (
+            normalized
+        )
 
-            item = self._create_tree_item(
-                child
-            )
+    # =====================================================
+    # POPULATE TREE
+    # =====================================================
 
-            parent_item.addChild(
-                item
-            )
+    def _populate_tree(
+        self
+    ):
 
-            self._tree_nodes[
-                item
-            ] = child
+        self.tree.blockSignals(
+            True
+        )
 
-            self._add_children(
-                item,
-                child,
-                assets
-            )
+        try:
 
-        # -----------------------------------------------------
-        # Components stored in panel metadata
-        # -----------------------------------------------------
+            self.tree.clear()
 
-        if str(
-            parent_asset.get(
-                "asset_type",
-                ""
-            )
-        ).upper() == "PANEL":
+            self.tree_items.clear()
 
-            components = self._get_components(
-                parent_asset
-            )
+            # =================================================
+            # PHYSICAL ASSET GROUPS
+            # =================================================
 
-            for component in components:
+            substations = []
 
-                item = self._create_component_item(
-                    component
+            switchboards = []
+
+            panels = []
+
+            for asset in self.assets:
+
+                asset_type = self._asset_type(
+                    asset
                 )
 
-                parent_item.addChild(
+                if asset_type == "SUBSTATION":
+
+                    substations.append(
+                        asset
+                    )
+
+                elif asset_type == "SWITCHBOARD":
+
+                    switchboards.append(
+                        asset
+                    )
+
+                elif asset_type == "PANEL":
+
+                    panels.append(
+                        asset
+                    )
+
+            # =================================================
+            # SUBSTATIONS
+            # =================================================
+
+            for substation in sorted(
+                substations,
+                key=lambda item:
+                    self._display_name(
+                        item
+                    ).lower()
+            ):
+
+                substation_item = (
+                    self._create_asset_item(
+                        substation
+                    )
+                )
+
+                self.tree.addTopLevelItem(
+                    substation_item
+                )
+
+                # -------------------------------------------------
+                # SWITCHBOARDS UNDER SUBSTATION
+                # -------------------------------------------------
+
+                substation_id = (
+                    substation.get(
+                        "asset_id"
+                    )
+                )
+
+                child_switchboards = [
+
+                    switchboard
+
+                    for switchboard
+                    in switchboards
+
+                    if self._parent_id(
+                        switchboard
+                    )
+                    == substation_id
+
+                ]
+
+                for switchboard in sorted(
+                    child_switchboards,
+                    key=lambda item:
+                        self._display_name(
+                            item
+                        ).lower()
+                ):
+
+                    switchboard_item = (
+                        self._create_asset_item(
+                            switchboard
+                        )
+                    )
+
+                    substation_item.addChild(
+                        switchboard_item
+                    )
+
+                    # -------------------------------------------------
+                    # PANELS UNDER SWITCHBOARD
+                    # -------------------------------------------------
+
+                    switchboard_id = (
+                        switchboard.get(
+                            "asset_id"
+                        )
+                    )
+
+                    child_panels = [
+
+                        panel
+
+                        for panel
+                        in panels
+
+                        if self._parent_id(
+                            panel
+                        )
+                        == switchboard_id
+
+                    ]
+
+                    for panel in sorted(
+                        child_panels,
+                        key=lambda item:
+                            self._display_name(
+                                item
+                            ).lower()
+                    ):
+
+                        panel_item = (
+                            self._create_asset_item(
+                                panel
+                            )
+                        )
+
+                        switchboard_item.addChild(
+                            panel_item
+                        )
+
+                        # -------------------------------------------------
+                        # COMPONENTS UNDER PANEL
+                        # -------------------------------------------------
+
+                        components = (
+                            self._get_components(
+                                panel
+                            )
+                        )
+
+                        for component in sorted(
+                            components,
+                            key=lambda item:
+                                str(
+                                    item.get(
+                                        "name",
+                                        ""
+                                    )
+                                    or ""
+                                ).lower()
+                        ):
+
+                            component_item = (
+                                self._create_component_item(
+                                    component,
+                                    panel,
+                                )
+                            )
+
+                            panel_item.addChild(
+                                component_item
+                            )
+
+            # =================================================
+            # ORPHAN SWITCHBOARDS
+            #
+            # If a switchboard has a missing/incorrect parent,
+            # don't silently throw it away.
+            # =================================================
+
+            top_level_ids = {
+                self._item_asset_id(
+                    self.tree.topLevelItem(index)
+                )
+                for index in range(
+                    self.tree.topLevelItemCount()
+                )
+            }
+
+            for switchboard in sorted(
+                switchboards,
+                key=lambda item:
+                    self._display_name(
+                        item
+                    ).lower()
+            ):
+
+                parent_id = (
+                    self._parent_id(
+                        switchboard
+                    )
+                )
+
+                if (
+                    parent_id
+                    and
+                    parent_id in self.assets_by_id
+                ):
+
+                    continue
+
+                switchboard_id = (
+                    switchboard.get(
+                        "asset_id"
+                    )
+                )
+
+                if switchboard_id in (
+                    top_level_ids
+                ):
+
+                    continue
+
+                item = (
+                    self._create_asset_item(
+                        switchboard
+                    )
+                )
+
+                self.tree.addTopLevelItem(
                     item
                 )
 
-                self._tree_nodes[
+            # =================================================
+            # ORPHAN PANELS
+            # =================================================
+
+            existing_asset_ids = set(
+                self.tree_items.keys()
+            )
+
+            for panel in sorted(
+                panels,
+                key=lambda item:
+                    self._display_name(
+                        item
+                    ).lower()
+            ):
+
+                panel_id = (
+                    panel.get(
+                        "asset_id"
+                    )
+                )
+
+                if panel_id in existing_asset_ids:
+
+                    continue
+
+                item = (
+                    self._create_asset_item(
+                        panel
+                    )
+                )
+
+                self.tree.addTopLevelItem(
                     item
-                ] = component
+                )
 
-    # =========================================================
-    # TREE ITEM
-    # =========================================================
+                components = (
+                    self._get_components(
+                        panel
+                    )
+                )
 
-    def _create_tree_item(
+                for component in components:
+
+                    component_item = (
+                        self._create_component_item(
+                            component,
+                            panel,
+                        )
+                    )
+
+                    item.addChild(
+                        component_item
+                    )
+
+            # =================================================
+            # IMPORTANT:
+            #
+            # EVERYTHING IS COLLAPSED BY DEFAULT.
+            # =================================================
+
+            self._collapse_all_items()
+
+            # =================================================
+            # COLUMN WIDTHS
+            # =================================================
+
+            self.tree.resizeColumnToContents(
+                0
+            )
+
+            self.tree.setColumnWidth(
+                0,
+                max(
+                    self.tree.columnWidth(0),
+                    260,
+                )
+            )
+
+            self.tree.setColumnWidth(
+                1,
+                150
+            )
+
+            self.tree.setColumnWidth(
+                2,
+                220
+            )
+
+        finally:
+
+            self.tree.blockSignals(
+                False
+            )
+
+    # =====================================================
+    # CREATE ASSET ITEM
+    # =====================================================
+
+    def _create_asset_item(
         self,
         asset
     ):
 
-        item = QTreeWidgetItem()
+        name = (
+            self._display_name(
+                asset
+            )
+        )
 
-        item.setText(
-            0,
-            str(
-                asset.get(
-                    "name",
-                    ""
+        asset_type = (
+            self._pretty_type(
+                self._asset_type(
+                    asset
                 )
             )
         )
 
-        item.setText(
-            1,
-            self._display_type(
-                asset.get(
-                    "asset_type",
-                    ""
-                )
+        asset_tag = str(
+            asset.get(
+                "asset_tag",
+                ""
             )
+            or ""
         )
 
-        item.setText(
-            2,
-            str(
-                asset.get(
-                    "asset_tag",
-                    ""
-                )
-            )
+        item = QTreeWidgetItem(
+            [
+                name,
+                asset_type,
+                asset_tag,
+            ]
         )
 
         item.setData(
             0,
             Qt.ItemDataRole.UserRole,
-            asset
+            {
+                "kind": "asset",
+                "asset": asset,
+            }
         )
+
+        asset_id = asset.get(
+            "asset_id"
+        )
+
+        if asset_id:
+
+            self.tree_items[
+                str(asset_id)
+            ] = item
 
         return item
 
-    # =========================================================
-    # COMPONENT ITEM
-    # =========================================================
+    # =====================================================
+    # CREATE COMPONENT ITEM
+    # =====================================================
 
     def _create_component_item(
         self,
-        component
+        component,
+        panel
     ):
-
-        item = QTreeWidgetItem()
 
         name = str(
             component.get(
                 "name",
-                "Component"
-            )
-        )
-
-        component_type = str(
-            component.get(
-                "component_type",
                 ""
             )
+            or "Component"
         )
 
-        item.setText(
-            0,
-            name
-        )
-
-        item.setText(
-            1,
-            self._display_type(
-                component_type
-            )
-        )
-
-        item.setText(
-            2,
-            str(
+        component_type = (
+            self._pretty_type(
                 component.get(
-                    "serial_number",
-                    ""
+                    "component_type",
+                    "COMPONENT"
                 )
             )
+        )
+
+        item = QTreeWidgetItem(
+            [
+                name,
+                component_type,
+                "",
+            ]
         )
 
         item.setData(
             0,
             Qt.ItemDataRole.UserRole,
-            component
+            {
+                "kind": "component",
+                "component": component,
+                "panel": panel,
+            }
         )
+
+        component_id = (
+            component.get(
+                "component_id"
+            )
+        )
+
+        if component_id:
+
+            self.tree_items[
+                str(component_id)
+            ] = item
 
         return item
 
-    # =========================================================
-    # PARENT ASSET ID
-    # =========================================================
-
-    def _get_parent_asset_id(
-        self,
-        asset
-    ):
-
-        metadata = (
-            asset.get(
-                "metadata",
-                {}
-            )
-            or {}
-        )
-
-        if isinstance(
-            metadata,
-            dict
-        ):
-
-            parent_id = (
-                metadata.get(
-                    "parent_asset_id"
-                )
-            )
-
-            if parent_id:
-
-                return str(
-                    parent_id
-                )
-
-        # -----------------------------------------------------
-        # Some versions may store it directly.
-        # -----------------------------------------------------
-
-        parent_id = asset.get(
-            "parent_asset_id"
-        )
-
-        if parent_id:
-
-            return str(
-                parent_id
-            )
-
-        return None
-
-    # =========================================================
-    # COMPONENTS
-    # =========================================================
+    # =====================================================
+    # COMPONENTS FROM PANEL
+    # =====================================================
 
     def _get_components(
         self,
-        panel_asset
+        panel
     ):
 
         metadata = (
-            panel_asset.get(
+            panel.get(
                 "metadata",
                 {}
             )
             or {}
         )
-
-        if not isinstance(
-            metadata,
-            dict
-        ):
-
-            return []
 
         components = (
             metadata.get(
@@ -1763,539 +1202,400 @@ class AssetExplorerView(QWidget):
             return []
 
         return [
-            item
-            for item in components
+            component
+            for component
+            in components
             if isinstance(
-                item,
+                component,
                 dict
             )
         ]
 
-    # =========================================================
-    # ASSET TYPE ORDER
-    # =========================================================
-
-    @staticmethod
-    def _asset_type_order(
-        asset_type
-    ):
-
-        asset_type = str(
-            asset_type
-            or ""
-        ).upper()
-
-        return {
-            "SUBSTATION": 0,
-            "SWITCHBOARD": 1,
-            "PANEL": 2,
-        }.get(
-            asset_type,
-            99
-        )
-
-    # =========================================================
-    # DISPLAY TYPE
-    # =========================================================
-
-    @staticmethod
-    def _display_type(
-        asset_type
-    ):
-
-        value = str(
-            asset_type
-            or ""
-        ).strip().upper()
-
-        replacements = {
-            "SUBSTATION":
-                "Substation",
-
-            "SWITCHBOARD":
-                "Switchboard",
-
-            "PANEL":
-                "Panel",
-
-            "NUMERICAL_RELAY":
-                "Numerical Relay",
-
-            "AUXILIARY_RELAY":
-                "Auxiliary Relay",
-
-            "AUX RELAY":
-                "Auxiliary Relay",
-
-            "CURRENT_TRANSFORMER":
-                "CT",
-
-            "CURRENT TRANSFORMER":
-                "CT",
-
-            "CT":
-                "CT",
-
-            "METER":
-                "Meter",
-        }
-
-        return replacements.get(
-            value,
-            value.replace(
-                "_",
-                " "
-            ).title()
-        )
-
-    # =========================================================
+    # =====================================================
     # SELECTION
-    # =========================================================
+    # =====================================================
 
     def _selection_changed(
         self
     ):
 
-        selected = (
-            self.tree.selectedItems()
+        item = (
+            self.tree.currentItem()
         )
 
-        if not selected:
+        if item is None:
 
             self._clear_details()
 
             return
 
-        item = selected[0]
-
-        data = (
-            self._tree_nodes.get(
-                item
-            )
+        data = item.data(
+            0,
+            Qt.ItemDataRole.UserRole
         )
 
-        if data is None:
-
-            data = item.data(
-                0,
-                Qt.ItemDataRole.UserRole
-            )
-
-        if data is None:
+        if not isinstance(
+            data,
+            dict
+        ):
 
             self._clear_details()
 
             return
 
-        self._show_details(
-            data
+        kind = data.get(
+            "kind"
         )
 
-    # =========================================================
-    # DETAILS
-    # =========================================================
+        if kind == "asset":
 
-    def _show_details(
+            asset = data.get(
+                "asset"
+            )
+
+            self._show_asset_details(
+                asset
+            )
+
+        elif kind == "component":
+
+            component = data.get(
+                "component"
+            )
+
+            panel = data.get(
+                "panel"
+            )
+
+            self._show_component_details(
+                component,
+                panel
+            )
+
+    # =====================================================
+    # ASSET DETAILS
+    # =====================================================
+
+    def _show_asset_details(
         self,
-        data
+        asset
     ):
 
-        self._clear_detail_widgets()
+        if not isinstance(
+            asset,
+            dict
+        ):
 
-        asset_type = str(
-            data.get(
-                "asset_type",
-                data.get(
+            self._clear_details()
+
+            return
+
+        self._clear_details()
+
+        name = (
+            self._display_name(
+                asset
+            )
+        )
+
+        asset_type = (
+            self._pretty_type(
+                self._asset_type(
+                    asset
+                )
+            )
+        )
+
+        self.details_title.setText(
+            name
+        )
+
+        self.details_subtitle.setText(
+            asset_type
+        )
+
+        self._add_detail(
+            "Asset ID",
+            asset.get(
+                "asset_id",
+                ""
+            )
+        )
+
+        self._add_detail(
+            "Asset Tag",
+            asset.get(
+                "asset_tag",
+                ""
+            )
+        )
+
+        self._add_detail(
+            "Manufacturer",
+            asset.get(
+                "manufacturer",
+                ""
+            )
+        )
+
+        self._add_detail(
+            "Model",
+            asset.get(
+                "model",
+                ""
+            )
+        )
+
+        self._add_detail(
+            "Serial Number",
+            asset.get(
+                "serial_number",
+                ""
+            )
+        )
+
+        # -------------------------------------------------
+        # PANEL-SPECIFIC
+        # -------------------------------------------------
+
+        if self._asset_type(
+            asset
+        ) == "PANEL":
+
+            self._add_detail(
+                "Feed Equipment",
+                asset.get(
+                    "equipment_name",
+                    ""
+                )
+            )
+
+            self._add_detail(
+                "Equipment Type",
+                asset.get(
+                    "equipment_type",
+                    ""
+                )
+            )
+
+            self._add_detail(
+                "CT Count",
+                asset.get(
+                    "ct_count",
+                    0
+                )
+            )
+
+            self._add_detail(
+                "Numerical Relays",
+                asset.get(
+                    "relay_count",
+                    0
+                )
+            )
+
+            self._add_detail(
+                "Auxiliary Relays",
+                asset.get(
+                    "aux_count",
+                    0
+                )
+            )
+
+            components = (
+                self._get_components(
+                    asset
+                )
+            )
+
+            self._add_detail(
+                "Configured Components",
+                len(
+                    components
+                )
+            )
+
+    # =====================================================
+    # COMPONENT DETAILS
+    # =====================================================
+
+    def _show_component_details(
+        self,
+        component,
+        panel=None
+    ):
+
+        if not isinstance(
+            component,
+            dict
+        ):
+
+            self._clear_details()
+
+            return
+
+        self._clear_details()
+
+        component_name = str(
+            component.get(
+                "name",
+                ""
+            )
+            or "Component"
+        )
+
+        component_type = (
+            self._pretty_type(
+                component.get(
                     "component_type",
                     ""
                 )
             )
-            or ""
-        ).upper()
-
-        name = str(
-            data.get(
-                "name",
-                ""
-            )
-            or ""
         )
 
         self.details_title.setText(
-            name or "Asset"
+            component_name
         )
 
         self.details_subtitle.setText(
-            self._display_type(
-                asset_type
-            )
+            component_type
         )
 
-        # -----------------------------------------------------
-        # COMPONENT
-        # -----------------------------------------------------
+        # =================================================
+        # COMMON
+        # =================================================
 
-        if asset_type not in (
-            "SUBSTATION",
-            "SWITCHBOARD",
-            "PANEL",
-        ):
-
-            self._show_component_details(
-                data
-            )
-
-            return
-
-        # -----------------------------------------------------
-        # PHYSICAL ASSET
-        # -----------------------------------------------------
-
-        fields = [
-            (
-                "Asset ID",
-                data.get(
-                    "asset_id",
-                    ""
-                )
-            ),
-            (
-                "Asset Tag",
-                data.get(
-                    "asset_tag",
-                    ""
-                )
-            ),
-            (
-                "Manufacturer",
-                data.get(
-                    "manufacturer",
-                    ""
-                )
-            ),
-            (
-                "Model",
-                data.get(
-                    "model",
-                    ""
-                )
-            ),
-            (
-                "Serial Number",
-                data.get(
-                    "serial_number",
-                    ""
-                )
-            ),
-        ]
-
-        metadata = data.get(
-            "metadata",
-            {}
-        )
-
-        if not isinstance(
-            metadata,
-            dict
-        ):
-
-            metadata = {}
-
-        # -----------------------------------------------------
-        # PANEL CONFIGURATION
-        # -----------------------------------------------------
-
-        if asset_type == "PANEL":
-
-            panel_configuration = (
-                metadata.get(
-                    "panel_configuration",
-                    {}
-                )
-                or {}
-            )
-
-            if isinstance(
-                panel_configuration,
-                dict
-            ):
-
-                fields.extend(
-                    [
-                        (
-                            "Feed Equipment",
-                            panel_configuration.get(
-                                "equipment_name",
-                                data.get(
-                                    "equipment_name",
-                                    ""
-                                )
-                            )
-                        ),
-                        (
-                            "Equipment Type",
-                            panel_configuration.get(
-                                "equipment_type",
-                                data.get(
-                                    "equipment_type",
-                                    ""
-                                )
-                            )
-                        ),
-                        (
-                            "Number of CTs",
-                            panel_configuration.get(
-                                "ct_count",
-                                data.get(
-                                    "ct_count",
-                                    ""
-                                )
-                            )
-                        ),
-                        (
-                            "Numerical Relays",
-                            panel_configuration.get(
-                                "relay_count",
-                                data.get(
-                                    "relay_count",
-                                    ""
-                                )
-                            )
-                        ),
-                        (
-                            "Auxiliary Relays",
-                            panel_configuration.get(
-                                "aux_count",
-                                data.get(
-                                    "aux_count",
-                                    ""
-                                )
-                            )
-                        ),
-                        (
-                            "Meters",
-                            panel_configuration.get(
-                                "meter_count",
-                                data.get(
-                                    "meter_count",
-                                    ""
-                                )
-                            )
-                        ),
-                    ]
-                )
-
-        self._add_detail_section(
-            "Asset Configuration"
-        )
-
-        for label, value in fields:
-
-            self._add_detail_row(
-                label,
-                value
-            )
-
-        # -----------------------------------------------------
-        # PANEL COMPONENTS
-        # -----------------------------------------------------
-
-        if asset_type == "PANEL":
-
-            components = (
-                self._get_components(
-                    data
-                )
-            )
-
-            self._add_detail_section(
-                f"Components ({len(components)})"
-            )
-
-            if not components:
-
-                self._add_detail_row(
-                    "Status",
-                    "No components configured"
-                )
-
-            else:
-
-                for component in components:
-
-                    component_name = (
-                        component.get(
-                            "name",
-                            ""
-                        )
-                    )
-
-                    component_type = (
-                        component.get(
-                            "component_type",
-                            ""
-                        )
-                    )
-
-                    self._add_detail_row(
-                        component_name,
-                        self._display_type(
-                            component_type
-                        )
-                    )
-
-        self.details_layout.addStretch()
-
-    # =========================================================
-    # COMPONENT DETAILS
-    # =========================================================
-
-    def _show_component_details(
-        self,
-        component
-    ):
-
-        self._add_detail_section(
-            "Component Configuration"
-        )
-
-        fields = [
-            (
-                "Component ID",
-                component.get(
-                    "component_id",
-                    ""
-                )
-            ),
-            (
-                "Component Type",
-                self._display_type(
-                    component.get(
-                        "component_type",
-                        ""
-                    )
-                )
-            ),
-            (
-                "Manufacturer",
-                component.get(
-                    "manufacturer",
-                    ""
-                )
-            ),
-            (
-                "Model",
-                component.get(
-                    "model",
-                    ""
-                )
-            ),
-            (
-                "Serial Number",
-                component.get(
-                    "serial_number",
-                    ""
-                )
-            ),
-            (
-                "Description",
-                component.get(
-                    "description",
-                    ""
-                )
-            ),
-        ]
-
-        # -----------------------------------------------------
-        # CT
-        # -----------------------------------------------------
-
-        if str(
+        self._add_detail(
+            "Component ID",
             component.get(
-                "component_type",
+                "component_id",
                 ""
             )
-        ).upper() in (
+        )
+
+        self._add_detail(
+            "Manufacturer",
+            component.get(
+                "manufacturer",
+                ""
+            )
+        )
+
+        self._add_detail(
+            "Model",
+            component.get(
+                "model",
+                ""
+            )
+        )
+
+        self._add_detail(
+            "Serial Number",
+            component.get(
+                "serial_number",
+                ""
+            )
+        )
+
+        self._add_detail(
+            "Description",
+            component.get(
+                "description",
+                ""
+            )
+        )
+
+        # =================================================
+        # CT
+        # =================================================
+
+        normalized_type = (
+            str(
+                component.get(
+                    "component_type",
+                    ""
+                )
+                or ""
+            )
+            .strip()
+            .upper()
+        )
+
+        if normalized_type in (
             "CT",
-            "CURRENT_TRANSFORMER",
             "CURRENT TRANSFORMER",
         ):
 
-            fields.extend(
-                [
-                    (
-                        "CT Primary",
-                        component.get(
-                            "ct_primary",
-                            ""
-                        )
-                    ),
-                    (
-                        "CT Secondary",
-                        component.get(
-                            "ct_secondary",
-                            ""
-                        )
-                    ),
-                    (
-                        "CT Ratio",
-                        component.get(
-                            "ct_ratio",
-                            ""
-                        )
-                    ),
-                    (
-                        "CT Class",
-                        component.get(
-                            "ct_class",
-                            ""
-                        )
-                    ),
-                    (
-                        "Burden",
-                        component.get(
-                            "burden",
-                            ""
-                        )
-                    ),
-                    (
-                        "Core",
-                        component.get(
-                            "core",
-                            ""
-                        )
-                    ),
-                ]
+            self._add_detail(
+                "CT Primary",
+                component.get(
+                    "ct_primary",
+                    ""
+                )
             )
 
-        # -----------------------------------------------------
+            self._add_detail(
+                "CT Secondary",
+                component.get(
+                    "ct_secondary",
+                    ""
+                )
+            )
+
+            self._add_detail(
+                "CT Ratio",
+                component.get(
+                    "ct_ratio",
+                    ""
+                )
+            )
+
+            self._add_detail(
+                "CT Class",
+                component.get(
+                    "ct_class",
+                    ""
+                )
+            )
+
+            self._add_detail(
+                "Rated Burden",
+                component.get(
+                    "burden",
+                    ""
+                )
+            )
+
+            self._add_detail(
+                "Core",
+                component.get(
+                    "core",
+                    ""
+                )
+            )
+
+        # =================================================
         # NUMERICAL RELAY
-        # -----------------------------------------------------
+        # =================================================
 
-        elif str(
-            component.get(
-                "component_type",
-                ""
+        if normalized_type == (
+            "NUMERICAL_RELAY"
+        ):
+
+            self._add_detail(
+                "VT Ratio",
+                component.get(
+                    "vt_ratio",
+                    ""
+                )
             )
-        ).upper() == "NUMERICAL_RELAY":
 
-            fields.extend(
-                [
-                    (
-                        "VT Ratio",
-                        component.get(
-                            "vt_ratio",
-                            ""
-                        )
-                    ),
-                    (
-                        "Firmware",
-                        component.get(
-                            "firmware",
-                            ""
-                        )
-                    ),
-                ]
+            self._add_detail(
+                "Firmware",
+                component.get(
+                    "firmware",
+                    ""
+                )
             )
 
             functions = (
@@ -2306,82 +1606,58 @@ class AssetExplorerView(QWidget):
                 or []
             )
 
-            if functions:
-
-                fields.append(
-                    (
-                        "Protection Functions",
-                        ", ".join(
-                            str(function)
-                            for function in functions
-                        )
-                    )
+            self._add_detail(
+                "Protection Functions",
+                self._list_to_text(
+                    functions
                 )
-
-        # -----------------------------------------------------
-        # AUXILIARY RELAY
-        # -----------------------------------------------------
-
-        elif str(
-            component.get(
-                "component_type",
-                ""
             )
-        ).upper() in (
+
+        # =================================================
+        # AUXILIARY RELAY
+        # =================================================
+
+        if normalized_type in (
             "AUXILIARY_RELAY",
             "AUX RELAY",
         ):
 
-            fields.extend(
-                [
-                    (
-                        "Coil Voltage",
-                        component.get(
-                            "coil_voltage",
-                            ""
-                        )
-                    ),
-                    (
-                        "Contact Configuration",
-                        component.get(
-                            "contact_configuration",
-                            ""
-                        )
-                    ),
-                ]
+            self._add_detail(
+                "Coil Voltage",
+                component.get(
+                    "coil_voltage",
+                    ""
+                )
             )
 
-        # -----------------------------------------------------
-        # METER
-        # -----------------------------------------------------
-
-        elif str(
-            component.get(
-                "component_type",
-                ""
-            )
-        ).upper() == "METER":
-
-            fields.extend(
-                [
-                    (
-                        "Meter Type",
-                        component.get(
-                            "meter_type",
-                            ""
-                        )
-                    ),
-                    (
-                        "Accuracy Class",
-                        component.get(
-                            "accuracy_class",
-                            ""
-                        )
-                    ),
-                ]
+            self._add_detail(
+                "Contact Configuration",
+                component.get(
+                    "contact_configuration",
+                    ""
+                )
             )
 
-            meter_functions = (
+        # =================================================
+        # METERS
+        # =================================================
+
+        if normalized_type in (
+            "METER",
+            "AMMETER",
+            "VOLTMETER",
+            "MULTIFUNCTION_METER",
+        ):
+
+            self._add_detail(
+                "Meter Type",
+                component.get(
+                    "meter_type",
+                    ""
+                )
+            )
+
+            functions = (
                 component.get(
                     "meter_functions",
                     []
@@ -2389,74 +1665,30 @@ class AssetExplorerView(QWidget):
                 or []
             )
 
-            if meter_functions:
-
-                fields.append(
-                    (
-                        "Meter Functions",
-                        ", ".join(
-                            str(function)
-                            for function in meter_functions
-                        )
-                    )
+            self._add_detail(
+                "Meter Functions",
+                self._list_to_text(
+                    functions
                 )
-
-        for label, value in fields:
-
-            self._add_detail_row(
-                label,
-                value
             )
 
-        self.details_layout.addStretch()
+            self._add_detail(
+                "Accuracy Class",
+                component.get(
+                    "accuracy_class",
+                    ""
+                )
+            )
 
-    # =========================================================
-    # DETAIL SECTION
-    # =========================================================
+    # =====================================================
+    # ADD DETAIL
+    # =====================================================
 
-    def _add_detail_section(
-        self,
-        title
-    ):
-
-        label = QLabel(
-            title
-        )
-
-        label.setObjectName(
-            "DetailSection"
-        )
-
-        self.details_layout.addWidget(
-            label
-        )
-
-    # =========================================================
-    # DETAIL ROW
-    # =========================================================
-
-    def _add_detail_row(
+    def _add_detail(
         self,
         label,
         value
     ):
-
-        frame = QFrame()
-
-        frame.setObjectName(
-            "DetailRow"
-        )
-
-        layout = QFormLayout(
-            frame
-        )
-
-        layout.setContentsMargins(
-            4,
-            3,
-            4,
-            3
-        )
 
         label_widget = QLabel(
             str(
@@ -2464,13 +1696,18 @@ class AssetExplorerView(QWidget):
             )
         )
 
-        label_widget.setMinimumWidth(
-            150
+        label_widget.setObjectName(
+            "DetailLabel"
         )
 
         value_widget = QLabel(
-            self._format_value(
+            str(
                 value
+                if value not in (
+                    None,
+                    ""
+                )
+                else "-"
             )
         )
 
@@ -2482,128 +1719,362 @@ class AssetExplorerView(QWidget):
             True
         )
 
-        layout.addRow(
+        self.details_content.addRow(
             label_widget,
             value_widget
         )
 
-        self.details_layout.addWidget(
-            frame
-        )
-
-    # =========================================================
-    # FORMAT VALUE
-    # =========================================================
-
-    @staticmethod
-    def _format_value(
-        value
-    ):
-
-        if value is None:
-
-            return ""
-
-        if isinstance(
-            value,
-            list
-        ):
-
-            return ", ".join(
-                str(item)
-                for item in value
-            )
-
-        if isinstance(
-            value,
-            dict
-        ):
-
-            return "; ".join(
-                f"{key}: {val}"
-                for key, val in value.items()
-            )
-
-        return str(
-            value
-        )
-
-    # =========================================================
+    # =====================================================
     # CLEAR DETAILS
-    # =========================================================
+    # =====================================================
 
     def _clear_details(
         self
     ):
+
+        while (
+            self.details_content.rowCount()
+            > 0
+        ):
+
+            self.details_content.removeRow(
+                0
+            )
 
         self.details_title.setText(
             "Select an asset"
         )
 
         self.details_subtitle.setText(
-            "Asset configuration will appear here."
+            "Configuration will appear here."
         )
 
-        self._clear_detail_widgets()
+    # =====================================================
+    # FILTER
+    # =====================================================
 
-    # =========================================================
-    # CLEAR DETAIL WIDGETS
-    # =========================================================
-
-    def _clear_detail_widgets(
+    def _apply_filter(
         self
     ):
 
-        while (
-            self.details_layout.count()
+        search_text = (
+            self.search_edit
+            .text()
+            .strip()
+            .lower()
+        )
+
+        selected_type = (
+            self.type_filter
+            .currentText()
+            .strip()
+            .upper()
+        )
+
+        # -------------------------------------------------
+        # No filters
+        # -------------------------------------------------
+
+        if (
+            not search_text
+            and selected_type == "ALL"
+        ):
+
+            self._show_all_tree_items()
+
+            self._collapse_all_items()
+
+            return
+
+        # -------------------------------------------------
+        # Evaluate recursively
+        # -------------------------------------------------
+
+        for index in range(
+            self.tree.topLevelItemCount()
         ):
 
             item = (
-                self.details_layout
-                .takeAt(0)
+                self.tree.topLevelItem(
+                    index
+                )
             )
 
-            widget = (
-                item.widget()
+            self._filter_item(
+                item,
+                search_text,
+                selected_type
             )
 
-            if widget is not None:
+    # =====================================================
+    # FILTER ITEM
+    # =====================================================
 
-                widget.deleteLater()
+    def _filter_item(
+        self,
+        item,
+        search_text,
+        selected_type
+    ):
 
-    # =========================================================
-    # EXPAND / COLLAPSE HELPERS
-    # =========================================================
+        data = item.data(
+            0,
+            Qt.ItemDataRole.UserRole
+        )
 
-    def expand_all(
+        own_match = (
+            self._item_matches(
+                item,
+                data,
+                search_text,
+                selected_type
+            )
+        )
+
+        child_match = False
+
+        for index in range(
+            item.childCount()
+        ):
+
+            child = (
+                item.child(index)
+            )
+
+            if self._filter_item(
+                child,
+                search_text,
+                selected_type
+            ):
+
+                child_match = True
+
+        visible = (
+            own_match
+            or
+            child_match
+        )
+
+        item.setHidden(
+            not visible
+        )
+
+        # -------------------------------------------------
+        # Expand only when filtering.
+        # -------------------------------------------------
+
+        if search_text or selected_type != "ALL":
+
+            item.setExpanded(
+                child_match
+            )
+
+        return visible
+
+    # =====================================================
+    # ITEM MATCH
+    # =====================================================
+
+    def _item_matches(
+        self,
+        item,
+        data,
+        search_text,
+        selected_type
+    ):
+
+        if not isinstance(
+            data,
+            dict
+        ):
+
+            return False
+
+        kind = data.get(
+            "kind"
+        )
+
+        if kind == "asset":
+
+            asset = data.get(
+                "asset",
+                {}
+            )
+
+            item_type = self._asset_type(
+                asset
+            )
+
+            if (
+                selected_type != "ALL"
+                and
+                selected_type
+                != self._pretty_type(
+                    item_type
+                ).upper()
+            ):
+
+                return False
+
+            searchable = " ".join(
+                [
+                    str(
+                        asset.get(
+                            "name",
+                            ""
+                        )
+                        or ""
+                    ),
+
+                    str(
+                        asset.get(
+                            "asset_tag",
+                            ""
+                        )
+                        or ""
+                    ),
+
+                    str(
+                        asset.get(
+                            "manufacturer",
+                            ""
+                        )
+                        or ""
+                    ),
+
+                    str(
+                        asset.get(
+                            "model",
+                            ""
+                        )
+                        or ""
+                    ),
+
+                    str(
+                        asset.get(
+                            "serial_number",
+                            ""
+                        )
+                        or ""
+                    ),
+                ]
+            ).lower()
+
+        elif kind == "component":
+
+            component = data.get(
+                "component",
+                {}
+            )
+
+            item_type = str(
+                component.get(
+                    "component_type",
+                    ""
+                )
+                or ""
+            ).upper()
+
+            if (
+                selected_type != "ALL"
+                and
+                selected_type != "COMPONENT"
+            ):
+
+                return False
+
+            searchable = " ".join(
+                [
+                    str(
+                        component.get(
+                            "name",
+                            ""
+                        )
+                        or ""
+                    ),
+
+                    item_type,
+
+                    str(
+                        component.get(
+                            "manufacturer",
+                            ""
+                        )
+                        or ""
+                    ),
+
+                    str(
+                        component.get(
+                            "model",
+                            ""
+                        )
+                        or ""
+                    ),
+
+                    str(
+                        component.get(
+                            "serial_number",
+                            ""
+                        )
+                        or ""
+                    ),
+                ]
+            ).lower()
+
+        else:
+
+            return False
+
+        if not search_text:
+
+            return True
+
+        return (
+            search_text
+            in searchable
+        )
+
+    # =====================================================
+    # SHOW ALL ITEMS
+    # =====================================================
+
+    def _show_all_tree_items(
         self
     ):
-        """
-        Expand the complete asset hierarchy.
-        """
 
-        self.tree.expandAll()
+        def show_item(
+            item
+        ):
 
+            item.setHidden(
+                False
+            )
 
-    def collapse_all(
-        self
-    ):
-        """
-        Collapse the complete asset hierarchy.
-        """
+            for index in range(
+                item.childCount()
+            ):
 
-        self.tree.collapseAll()
+                show_item(
+                    item.child(index)
+                )
 
+        for index in range(
+            self.tree.topLevelItemCount()
+        ):
+
+            show_item(
+                self.tree.topLevelItem(
+                    index
+                )
+            )
+
+    # =====================================================
+    # COLLAPSE EVERYTHING
+    # =====================================================
 
     def _collapse_all_items(
         self
     ):
-        """
-        Force every item in the Asset Explorer to start collapsed.
-
-        This recursively collapses every item after the hierarchy
-        has been completely constructed.
-        """
 
         def collapse_item(
             item
@@ -2630,3 +2101,237 @@ class AssetExplorerView(QWidget):
                     index
                 )
             )
+
+    # =====================================================
+    # EXPORT EXCEL
+    # =====================================================
+
+    def export_excel(
+        self
+    ):
+
+        default_name = (
+            "Protection_Asset_Register.xlsx"
+        )
+
+        output_path, _ = (
+            QFileDialog.getSaveFileName(
+                self,
+                "Export Global Asset Register",
+                default_name,
+                "Excel Workbook (*.xlsx)",
+            )
+        )
+
+        if not output_path:
+
+            return
+
+        try:
+
+            # -------------------------------------------------
+            # Always reload the global library before export.
+            # -------------------------------------------------
+
+            try:
+
+                self.asset_library.load()
+
+            except Exception:
+
+                pass
+
+            exporter = (
+                AssetExportService(
+                    self.asset_library
+                )
+            )
+
+            exporter.export_asset_register(
+                output_path
+            )
+
+            QMessageBox.information(
+                self,
+                "Export Complete",
+                "Global asset register exported successfully.\n\n"
+                f"{output_path}",
+            )
+
+        except Exception as error:
+
+            QMessageBox.critical(
+                self,
+                "Excel Export Failed",
+                f"Unable to export the asset register:\n\n"
+                f"{error}",
+            )
+
+    # =====================================================
+    # HELPERS
+    # =====================================================
+
+    @staticmethod
+    def _asset_type(
+        asset
+    ):
+
+        return str(
+            asset.get(
+                "asset_type",
+                ""
+            )
+            or ""
+        ).strip().upper()
+
+    @staticmethod
+    def _display_name(
+        asset
+    ):
+
+        return str(
+            asset.get(
+                "name",
+                ""
+            )
+            or
+            asset.get(
+                "asset_tag",
+                ""
+            )
+            or
+            "Unnamed Asset"
+        ).strip()
+
+    @staticmethod
+    def _parent_id(
+        asset
+    ):
+
+        metadata = (
+            asset.get(
+                "metadata",
+                {}
+            )
+            or {}
+        )
+
+        return metadata.get(
+            "parent_asset_id"
+        )
+
+    @staticmethod
+    def _pretty_type(
+        value
+    ):
+
+        value = str(
+            value
+            or ""
+        ).strip().upper()
+
+        mapping = {
+
+            "SUBSTATION":
+                "Substation",
+
+            "SWITCHBOARD":
+                "Switchboard",
+
+            "PANEL":
+                "Panel",
+
+            "NUMERICAL_RELAY":
+                "Numerical Relay",
+
+            "AUXILIARY_RELAY":
+                "Auxiliary Relay",
+
+            "AUX RELAY":
+                "Auxiliary Relay",
+
+            "CURRENT TRANSFORMER":
+                "CT",
+
+            "CT":
+                "CT",
+
+            "METER":
+                "Meter",
+
+            "AMMETER":
+                "Ammeter",
+
+            "VOLTMETER":
+                "Voltmeter",
+
+            "MULTIFUNCTION_METER":
+                "Multifunction Meter",
+        }
+
+        return mapping.get(
+            value,
+            value.replace(
+                "_",
+                " "
+            ).title()
+        )
+
+    @staticmethod
+    def _list_to_text(
+        value
+    ):
+
+        if isinstance(
+            value,
+            (list, tuple)
+        ):
+
+            return ", ".join(
+                str(item)
+                for item in value
+            )
+
+        if value is None:
+
+            return ""
+
+        return str(
+            value
+        )
+
+    @staticmethod
+    def _item_asset_id(
+        item
+    ):
+
+        if item is None:
+
+            return None
+
+        data = item.data(
+            0,
+            Qt.ItemDataRole.UserRole
+        )
+
+        if not isinstance(
+            data,
+            dict
+        ):
+
+            return None
+
+        asset = data.get(
+            "asset"
+        )
+
+        if not isinstance(
+            asset,
+            dict
+        ):
+
+            return None
+
+        return asset.get(
+            "asset_id"
+        )

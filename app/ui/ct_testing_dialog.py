@@ -574,11 +574,47 @@ class CTTestingDialog(QDialog):
         )
 
         self.phase_table.setMaximumHeight(
-            380
+            520
         )
 
         ratio_layout.addWidget(
             self.phase_table
+        )
+
+        # -------------------------------------------------
+        # ADD / REMOVE RATIO TEST ROWS
+        # -------------------------------------------------
+
+        ratio_buttons = QHBoxLayout()
+
+        self.add_ratio_row_button = QPushButton(
+            "+ Add Test Row"
+        )
+
+        self.remove_ratio_row_button = QPushButton(
+            "− Remove Selected Row"
+        )
+
+        self.add_ratio_row_button.clicked.connect(
+            self.add_ratio_test_row
+        )
+
+        self.remove_ratio_row_button.clicked.connect(
+            self.remove_ratio_test_row
+        )
+
+        ratio_buttons.addWidget(
+            self.add_ratio_row_button
+        )
+
+        ratio_buttons.addWidget(
+            self.remove_ratio_row_button
+        )
+
+        ratio_buttons.addStretch()
+
+        ratio_layout.addLayout(
+            ratio_buttons
         )
 
         # Ratio group remains in the same place in the
@@ -1259,10 +1295,144 @@ class CTTestingDialog(QDialog):
     # PHASE MODE
     # =====================================================
 
+    def _current_phases(self):
+        """Return the phases allowed by the current CT configuration."""
+        return (
+            ["R", "Y", "B"]
+            if self.three_phase_selector.currentText().strip().lower() == "yes"
+            else ["R"]
+        )
+
+    def _create_ratio_row(self, phase, primary="", secondary=""):
+        """Create one editable CT ratio test row."""
+        row = self.phase_table.rowCount()
+
+        self.phase_table.insertRow(row)
+
+        phase_item = QTableWidgetItem(str(phase))
+        phase_item.setFlags(
+            phase_item.flags()
+            & ~Qt.ItemFlag.ItemIsEditable
+        )
+        phase_item.setTextAlignment(
+            Qt.AlignmentFlag.AlignCenter
+        )
+
+        self.phase_table.setItem(
+            row,
+            0,
+            phase_item
+        )
+
+        primary_widget = QLineEdit()
+        primary_widget.setMinimumHeight(48)
+        primary_widget.setAlignment(
+            Qt.AlignmentFlag.AlignCenter
+        )
+        primary_widget.setText(
+            "" if primary is None else str(primary)
+        )
+
+        secondary_widget = QLineEdit()
+        secondary_widget.setMinimumHeight(48)
+        secondary_widget.setAlignment(
+            Qt.AlignmentFlag.AlignCenter
+        )
+        secondary_widget.setText(
+            "" if secondary is None else str(secondary)
+        )
+
+        ratio_widget = QLineEdit()
+        ratio_widget.setMinimumHeight(48)
+        ratio_widget.setAlignment(
+            Qt.AlignmentFlag.AlignCenter
+        )
+        ratio_widget.setReadOnly(True)
+
+        error_widget = QLineEdit()
+        error_widget.setMinimumHeight(48)
+        error_widget.setReadOnly(True)
+        error_widget.setAlignment(
+            Qt.AlignmentFlag.AlignCenter
+        )
+
+        result_widget = QLineEdit()
+        result_widget.setMinimumHeight(48)
+        result_widget.setReadOnly(True)
+        result_widget.setAlignment(
+            Qt.AlignmentFlag.AlignCenter
+        )
+
+        self.phase_table.setCellWidget(
+            row, 1, primary_widget
+        )
+        self.phase_table.setCellWidget(
+            row, 2, secondary_widget
+        )
+        self.phase_table.setCellWidget(
+            row, 3, ratio_widget
+        )
+        self.phase_table.setCellWidget(
+            row, 4, error_widget
+        )
+        self.phase_table.setCellWidget(
+            row, 5, result_widget
+        )
+
+        row_data = {
+            "phase": str(phase),
+            "primary": primary_widget,
+            "secondary": secondary_widget,
+            "ratio": ratio_widget,
+            "error": error_widget,
+            "result": result_widget,
+        }
+
+        self.phase_rows.setdefault(
+            str(phase), []
+        ).append(row_data)
+
+        primary_widget.textChanged.connect(
+            lambda _, r=row_data:
+            self.calculate_phase_ratio_row(r)
+        )
+
+        secondary_widget.textChanged.connect(
+            lambda _, r=row_data:
+            self.calculate_phase_ratio_row(r)
+        )
+
+        self.calculate_phase_ratio_row(
+            row_data
+        )
+
+        return row_data
+
+    def _snapshot_phase_rows(self):
+        """Preserve all currently entered ratio rows before rebuilding."""
+        snapshot = []
+
+        for phase, rows in self.phase_rows.items():
+            for row_data in rows:
+                snapshot.append({
+                    "phase": phase,
+                    "primary_current": row_data["primary"].text().strip(),
+                    "secondary_current": row_data["secondary"].text().strip(),
+                })
+
+        return snapshot
+
     def on_phase_mode_changed(
         self,
         text
     ):
+        """
+        Rebuild the ratio table for 1-phase or 3-phase operation.
+
+        Existing rows are preserved whenever their phase remains valid.
+        At least one row is created for every active phase.
+        """
+        previous_rows = self._snapshot_phase_rows()
 
         is_three_phase = (
             str(text).strip().lower()
@@ -1272,176 +1442,162 @@ class CTTestingDialog(QDialog):
         phases = (
             ["R", "Y", "B"]
             if is_three_phase
-            else
-            ["R"]
+            else ["R"]
         )
 
-        self.phase_table.setRowCount(
-            0
-        )
-
+        self.phase_table.setRowCount(0)
         self.phase_rows = {}
 
+        # Preserve existing rows belonging to valid phases.
         for phase in phases:
+            matching = [
+                item for item in previous_rows
+                if item["phase"] == phase
+            ]
 
-            row = (
-                self.phase_table.rowCount()
-            )
-
-            self.phase_table.insertRow(
-                row
-            )
-
-            phase_item = (
-                QTableWidgetItem(
+            if matching:
+                for item in matching:
+                    self._create_ratio_row(
+                        phase,
+                        item["primary_current"],
+                        item["secondary_current"]
+                    )
+            else:
+                self._create_ratio_row(
                     phase
                 )
-            )
-
-            phase_item.setFlags(
-                phase_item.flags()
-                &
-                ~Qt.ItemFlag.ItemIsEditable
-            )
-
-            self.phase_table.setItem(
-                row,
-                0,
-                phase_item
-            )
-
-            primary = QLineEdit()
-            primary.setMinimumHeight(48)
-            primary.setAlignment(
-                Qt.AlignmentFlag.AlignCenter
-            )
-
-            secondary = QLineEdit()
-            secondary.setMinimumHeight(48)
-            secondary.setAlignment(
-                Qt.AlignmentFlag.AlignCenter
-            )
-
-            ratio = QLineEdit()
-            ratio.setMinimumHeight(48)
-            ratio.setAlignment(
-                Qt.AlignmentFlag.AlignCenter
-            )
-
-            ratio.setReadOnly(
-                True
-            )
-
-            error = QLineEdit()
-            error.setMinimumHeight(48)
-
-            error.setReadOnly(
-                True
-            )
-
-            error.setAlignment(
-                Qt.AlignmentFlag.AlignCenter
-            )
-
-            result = QLineEdit()
-            result.setMinimumHeight(48)
-
-            result.setReadOnly(
-                True
-            )
-
-            result.setAlignment(
-                Qt.AlignmentFlag.AlignCenter
-            )
-
-            self.phase_table.setCellWidget(
-                row,
-                1,
-                primary
-            )
-
-            self.phase_table.setCellWidget(
-                row,
-                2,
-                secondary
-            )
-
-            self.phase_table.setCellWidget(
-                row,
-                3,
-                ratio
-            )
-
-            self.phase_table.setCellWidget(
-                row,
-                4,
-                error
-            )
-
-            self.phase_table.setCellWidget(
-                row,
-                5,
-                result
-            )
-
-            self.phase_rows[
-                phase
-            ] = {
-
-                "primary":
-                    primary,
-
-                "secondary":
-                    secondary,
-
-                "ratio":
-                    ratio,
-
-                "error":
-                    error,
-
-                "result":
-                    result,
-            }
-
-            primary.textChanged.connect(
-                lambda _, p=phase:
-                self.calculate_phase_ratio(p)
-            )
-
-            secondary.textChanged.connect(
-                lambda _, p=phase:
-                self.calculate_phase_ratio(p)
-            )
 
         self.update_ct_information()
+        self.update_overall_result()
 
-    # =====================================================
-    # PHASE CALCULATION
-    # =====================================================
+    def add_ratio_test_row(self):
+        """
+        Add another ratio test row.
 
-    def calculate_phase_ratio(
-        self,
-        phase
-    ):
+        The selected row's phase is used when possible. Otherwise the
+        first configured phase is used.
+        """
+        phases = self._current_phases()
 
-        row = self.phase_rows.get(
+        if not phases:
+            return
+
+        selected_row = (
+            self.phase_table.currentRow()
+        )
+
+        phase = phases[0]
+
+        if selected_row >= 0:
+            item = self.phase_table.item(
+                selected_row,
+                0
+            )
+
+            if item is not None:
+                selected_phase = item.text().strip()
+
+                if selected_phase in phases:
+                    phase = selected_phase
+
+        row_data = self._create_ratio_row(
             phase
         )
 
-        if row is None:
+        new_row = (
+            self.phase_table.rowCount() - 1
+        )
+
+        self.phase_table.selectRow(
+            new_row
+        )
+
+        row_data["primary"].setFocus()
+
+        self.update_overall_result()
+
+    def remove_ratio_test_row(self):
+        """
+        Remove the selected ratio-test row.
+
+        At least one row is retained for every configured phase.
+        """
+        row = self.phase_table.currentRow()
+
+        if row < 0:
+            QMessageBox.information(
+                self,
+                "Remove Test Row",
+                "Select a CT ratio test row first."
+            )
             return
 
+        phase_item = self.phase_table.item(
+            row,
+            0
+        )
+
+        if phase_item is None:
+            return
+
+        phase = phase_item.text().strip()
+
+        phase_rows = self.phase_rows.get(
+            phase,
+            []
+        )
+
+        if len(phase_rows) <= 1:
+            QMessageBox.information(
+                self,
+                "Cannot Remove Row",
+                (
+                    f"At least one ratio test row must remain "
+                    f"for phase {phase}."
+                )
+            )
+            return
+
+        # Find the corresponding row-data object.
+        row_data = None
+
+        for candidate in phase_rows:
+            if (
+                self.phase_table.indexAt(
+                    candidate["primary"].pos()
+                ).row()
+                == row
+            ):
+                row_data = candidate
+                break
+
+        if row_data is not None:
+            phase_rows.remove(
+                row_data
+            )
+
+        self.phase_table.removeRow(
+            row
+        )
+
+        self.update_overall_result()
+
+    # =====================================================
+    # PHASE CALCULATION
+
+    # =====================================================
+
+    def calculate_phase_ratio_row(
+        self,
+        row
+    ):
+        """Calculate measured ratio, error and pass/fail for one test row."""
         primary = self._get_float(
-            row[
-                "primary"
-            ].text()
+            row["primary"].text()
         )
 
         secondary = self._get_float(
-            row[
-                "secondary"
-            ].text()
+            row["secondary"].text()
         )
 
         if (
@@ -1449,21 +1605,10 @@ class CTTestingDialog(QDialog):
             or secondary is None
             or secondary == 0
         ):
-
-            row[
-                "ratio"
-            ].clear()
-
-            row[
-                "error"
-            ].clear()
-
-            row[
-                "result"
-            ].clear()
-
+            row["ratio"].clear()
+            row["error"].clear()
+            row["result"].clear()
             self.update_overall_result()
-
             return
 
         measured_ratio = (
@@ -1471,35 +1616,20 @@ class CTTestingDialog(QDialog):
             secondary
         )
 
-        row[
-            "ratio"
-        ].setText(
+        row["ratio"].setText(
             f"{measured_ratio:.4f}"
         )
 
-        configured_primary = (
-            self.get_ct_primary()
-        )
-
-        configured_secondary = (
-            self.get_ct_secondary()
-        )
+        configured_primary = self.get_ct_primary()
+        configured_secondary = self.get_ct_secondary()
 
         if (
             configured_primary <= 0
             or configured_secondary <= 0
         ):
-
-            row[
-                "error"
-            ].clear()
-
-            row[
-                "result"
-            ].clear()
-
+            row["error"].clear()
+            row["result"].clear()
             self.update_overall_result()
-
             return
 
         expected_ratio = (
@@ -1517,9 +1647,7 @@ class CTTestingDialog(QDialog):
             expected_ratio
         ) * 100.0
 
-        row[
-            "error"
-        ].setText(
+        row["error"].setText(
             f"{error:.2f}"
         )
 
@@ -1539,6 +1667,19 @@ class CTTestingDialog(QDialog):
         )
 
         self.update_overall_result()
+
+    def calculate_phase_ratio(
+        self,
+        phase
+    ):
+        """Backward-compatible helper: recalculate every row for a phase."""
+        for row in self.phase_rows.get(
+            phase,
+            []
+        ):
+            self.calculate_phase_ratio_row(
+                row
+            )
 
     # =====================================================
     # POLARITY
@@ -1678,25 +1819,21 @@ class CTTestingDialog(QDialog):
 
             tolerance = 5.0
 
-        for phase, row in (
-            self.phase_rows.items()
-        ):
+        for phase, rows in self.phase_rows.items():
 
-            error = self._get_float(
-                row[
-                    "error"
-                ].text()
-            )
+            for test_number, row in enumerate(rows, start=1):
 
-            if error is None:
-
-                continue
-
-            if abs(error) > tolerance:
-
-                failures.append(
-                    f"Ratio {phase}"
+                error = self._get_float(
+                    row["error"].text()
                 )
+
+                if error is None:
+                    continue
+
+                if abs(error) > tolerance:
+                    failures.append(
+                        f"Ratio {phase} Test {test_number}"
+                    )
 
         # -------------------------------------------------
         # BURDEN
@@ -1740,40 +1877,36 @@ class CTTestingDialog(QDialog):
     def get_phase_data(
         self
     ):
+        """
+        Return every CT ratio test row.
 
+        The list format remains compatible with the existing test-service
+        storage while allowing multiple tests per phase.
+        """
         result = []
 
-        for phase, row in (
-            self.phase_rows.items()
-        ):
+        for phase, rows in self.phase_rows.items():
 
-            result.append(
-                {
-
-                    "phase":
-                        phase,
-
-                    "primary_current":
-                        row[
-                            "primary"
-                        ].text().strip(),
-
-                    "secondary_current":
-                        row[
-                            "secondary"
-                        ].text().strip(),
-
-                    "measured_ratio":
-                        row[
-                            "ratio"
-                        ].text().strip(),
-
-                    "ratio_error":
-                        row[
-                            "error"
-                        ].text().strip(),
-                }
-            )
+            for test_number, row in enumerate(
+                rows,
+                start=1
+            ):
+                result.append(
+                    {
+                        "phase": phase,
+                        "test_no": test_number,
+                        "primary_current":
+                            row["primary"].text().strip(),
+                        "secondary_current":
+                            row["secondary"].text().strip(),
+                        "measured_ratio":
+                            row["ratio"].text().strip(),
+                        "ratio_error":
+                            row["error"].text().strip(),
+                        "result":
+                            row["result"].text().strip(),
+                    }
+                )
 
         return result
 
@@ -2108,6 +2241,17 @@ class CTTestingDialog(QDialog):
                     }
                 ]
 
+        # Rebuild ratio rows from saved data so multiple tests per phase
+        # are restored correctly.
+        valid_phases = set(
+            self._current_phases()
+        )
+
+        self.phase_table.setRowCount(0)
+        self.phase_rows = {}
+
+        grouped = {}
+
         for phase_data in phase_tests:
 
             phase = str(
@@ -2115,37 +2259,44 @@ class CTTestingDialog(QDialog):
                     "phase",
                     "R"
                 )
-            )
+            ).strip()
 
-            row = self.phase_rows.get(
-                phase
-            )
-
-            if row is None:
-
+            if phase not in valid_phases:
                 continue
 
-            row[
-                "primary"
-            ].setText(
-                str(
+            grouped.setdefault(
+                phase,
+                []
+            ).append(
+                phase_data
+            )
+
+        for phase in self._current_phases():
+
+            saved_rows = grouped.get(
+                phase,
+                []
+            )
+
+            if not saved_rows:
+                self._create_ratio_row(
+                    phase
+                )
+                continue
+
+            for phase_data in saved_rows:
+
+                self._create_ratio_row(
+                    phase,
                     phase_data.get(
                         "primary_current",
                         ""
-                    )
-                )
-            )
-
-            row[
-                "secondary"
-            ].setText(
-                str(
+                    ),
                     phase_data.get(
                         "secondary_current",
                         ""
                     )
                 )
-            )
 
         self.calculate_polarity()
 
@@ -2215,6 +2366,15 @@ class CTTestingDialog(QDialog):
         self.three_phase_selector.setCurrentText(
             "No"
         )
+
+        # Reset ratio testing to one blank row for each active phase.
+        self.phase_table.setRowCount(0)
+        self.phase_rows = {}
+
+        for phase in self._current_phases():
+            self._create_ratio_row(
+                phase
+            )
 
         self.calculate_polarity()
         self.calculate_burden()

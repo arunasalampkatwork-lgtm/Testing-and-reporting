@@ -7,7 +7,7 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QHBoxLayout,
 )
-
+from PySide6.QtCore import Qt
 
 class PanelConfigDialog(QDialog):
 
@@ -20,6 +20,7 @@ class PanelConfigDialog(QDialog):
         super().__init__(parent)
 
         self.node = node
+        self.copy_configuration_requested = False
 
         self.setWindowTitle(
             "Panel Configuration"
@@ -185,6 +186,21 @@ class PanelConfigDialog(QDialog):
 
         save_button = QPushButton("Save")
         cancel_button = QPushButton("Cancel")
+        # =================================================
+        # COPY CONFIGURATION
+        # =================================================
+
+        self.copy_configuration_button = QPushButton(
+            "Copy Configuration from Existing Panel"
+        )
+
+        self.copy_configuration_button.clicked.connect(
+            self.request_copy_configuration
+        )
+
+        layout.addWidget(
+            self.copy_configuration_button
+        )
 
         buttons.addWidget(save_button)
         buttons.addWidget(cancel_button)
@@ -236,3 +252,15 @@ class PanelConfigDialog(QDialog):
             "meter_count":
                 self.meter_count.value(),
         }
+
+    # =================================================
+    # REQUEST CONFIGURATION COPY
+    # =================================================
+
+    def request_copy_configuration(
+        self
+    ):
+
+        self.copy_configuration_requested = True
+
+        self.accept()

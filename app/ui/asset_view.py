@@ -1,9 +1,10 @@
 from pathlib import Path
 
-from PySide6.QtCore import Qt
 from PySide6.QtCore import (
-    QDate
+    Qt,
+    QDate,
 )
+
 from PySide6.QtWidgets import (
     QWidget,
     QVBoxLayout,
@@ -25,33 +26,73 @@ from PySide6.QtWidgets import (
     QDateEdit,
 )
 
-from app.services.asset_manager import AssetManager
-from app.services.component_manager import ComponentManager
-
-from app.ui.panel_config_dialog import PanelConfigDialog
-from app.ui.component_config_dialog import ComponentConfigDialog
-from app.ui.protection_function_dialog import ProtectionFunctionDialog
-
-from app.ui.relay_testing_dialog import RelayTestingDialog
-from app.ui.ct_testing_dialog import CTTestingDialog
-from app.ui.aux_relay_testing_dialog import AuxRelayTestingDialog
-
-from app.ui.test_history_view import TestHistoryView
-from app.ui.asset_link_dialog import AssetLinkDialog
-from app.ui.asset_edit_dialog import AssetEditDialog
-from app.services.panel_report_service import (
-    PanelReportService
+from app.services.asset_manager import (
+    AssetManager
 )
+
+from app.services.component_manager import (
+    ComponentManager
+)
+
+from app.ui.panel_config_dialog import (
+    PanelConfigDialog
+)
+
+from app.ui.component_config_dialog import (
+    ComponentConfigDialog
+)
+
+from app.ui.protection_function_dialog import (
+    ProtectionFunctionDialog
+)
+
+from app.ui.relay_testing_dialog import (
+    RelayTestingDialog
+)
+
+from app.ui.ct_testing_dialog import (
+    CTTestingDialog
+)
+
+from app.ui.aux_relay_testing_dialog import (
+    AuxRelayTestingDialog
+)
+
 from app.ui.meter_testing_dialog import (
     MeterTestingDialog
 )
 
+from app.ui.test_history_view import (
+    TestHistoryView
+)
+
+from app.ui.asset_link_dialog import (
+    AssetLinkDialog
+)
+
+from app.ui.asset_edit_dialog import (
+    AssetEditDialog
+)
+
+from app.services.panel_report_service import (
+    PanelReportService
+)
+
+from app.ui.panel_configuration_copy_dialog import (
+    PanelConfigurationCopyDialog
+)
+
+
+# =========================================================
+# PANEL CREATION DIALOG
+# =========================================================
 
 
 class PanelAssetDialog(QDialog):
 
     def __init__(
         self,
+        suggested_asset_tag="",
         parent=None,
     ):
 
@@ -69,7 +110,7 @@ class PanelAssetDialog(QDialog):
 
         self.resize(
             450,
-            140
+            180
         )
 
         layout = QVBoxLayout(
@@ -77,6 +118,10 @@ class PanelAssetDialog(QDialog):
         )
 
         form = QFormLayout()
+
+        # -------------------------------------------------
+        # PANEL NAME
+        # -------------------------------------------------
 
         self.name_edit = QLineEdit()
 
@@ -87,6 +132,27 @@ class PanelAssetDialog(QDialog):
         form.addRow(
             "Panel Name:",
             self.name_edit
+        )
+
+        # -------------------------------------------------
+        # ASSET TAG
+        # -------------------------------------------------
+
+        self.asset_tag_edit = QLineEdit()
+
+        self.asset_tag_edit.setPlaceholderText(
+            "Example: REF3-HV201A-P03"
+        )
+
+        if suggested_asset_tag:
+
+            self.asset_tag_edit.setText(
+                suggested_asset_tag
+            )
+
+        form.addRow(
+            "Asset Tag:",
+            self.asset_tag_edit
         )
 
         layout.addLayout(
@@ -113,18 +179,31 @@ class PanelAssetDialog(QDialog):
 
         self.name_edit.setFocus()
 
+    # =====================================================
+    # VALUES
+    # =====================================================
+
     def get_values(self):
 
         return (
-            self.name_edit
-            .text()
-            .strip()
+            self.name_edit.text().strip(),
+            self.asset_tag_edit.text().strip(),
         )
+
+    # =====================================================
+    # VALIDATION
+    # =====================================================
 
     def accept(self):
 
         name = (
             self.name_edit
+            .text()
+            .strip()
+        )
+
+        asset_tag = (
+            self.asset_tag_edit
             .text()
             .strip()
         )
@@ -141,7 +220,25 @@ class PanelAssetDialog(QDialog):
 
             return
 
+        if not asset_tag:
+
+            QMessageBox.warning(
+                self,
+                "Missing Asset Tag",
+                "Please enter the physical asset tag."
+            )
+
+            self.asset_tag_edit.setFocus()
+
+            return
+
         super().accept()
+
+
+# =========================================================
+# ASSET VIEW
+# =========================================================
+
 
 class AssetView(QWidget):
 
@@ -153,21 +250,28 @@ class AssetView(QWidget):
         parent=None,
     ):
 
-        super().__init__(parent)
+        super().__init__(
+            parent
+        )
 
         # =================================================
         # REFERENCES
         # =================================================
 
-        self.project_folder = project_folder
+        self.project_folder = (
+            project_folder
+        )
+
         self.project = project
-        self.test_service = test_service
+
+        self.test_service = (
+            test_service
+        )
 
         self.testing_dialog = None
+
         self.test_history_view = None
 
-        # Prevent accidental double execution of
-        # create_panel().
         self._creating_panel = False
 
         # =================================================
@@ -186,30 +290,36 @@ class AssetView(QWidget):
         # MAIN LAYOUT
         # =================================================
 
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(12, 12, 12, 12)
-        layout.setSpacing(10)
+        layout = QVBoxLayout(
+            self
+        )
 
-        # =================================================
-        # WORKSPACE
-        #
-        # Left  : asset hierarchy + components
-        # Right : context/action panel
-        # =================================================
+        layout.setContentsMargins(
+            12,
+            12,
+            12,
+            12,
+        )
+
+        layout.setSpacing(
+            10
+        )
 
         workspace = QHBoxLayout()
-        workspace.setSpacing(12)
+
+        workspace.setSpacing(
+            12
+        )
 
         # =================================================
-        # LEFT WORKSPACE
+        # LEFT
         # =================================================
 
         left_layout = QVBoxLayout()
-        left_layout.setSpacing(8)
 
-        # -------------------------------------------------
-        # ASSET TREE HEADER
-        # -------------------------------------------------
+        left_layout.setSpacing(
+            8
+        )
 
         asset_header = QLabel(
             "Asset Hierarchy"
@@ -223,9 +333,9 @@ class AssetView(QWidget):
             asset_header
         )
 
-        # -------------------------------------------------
-        # ASSET TREE
-        # -------------------------------------------------
+        # =================================================
+        # TREE
+        # =================================================
 
         self.tree = QTreeWidget()
 
@@ -233,25 +343,35 @@ class AssetView(QWidget):
             "Project Assets"
         )
 
-        self.tree.setMinimumHeight(280)
+        self.tree.setMinimumHeight(
+            280
+        )
 
         self.tree.setSizePolicy(
             QSizePolicy.Policy.Expanding,
             QSizePolicy.Policy.Expanding,
         )
 
-        self.tree.setIndentation(24)
-        self.tree.setAnimated(True)
-        self.tree.setUniformRowHeights(True)
+        self.tree.setIndentation(
+            24
+        )
+
+        self.tree.setAnimated(
+            True
+        )
+
+        self.tree.setUniformRowHeights(
+            True
+        )
 
         left_layout.addWidget(
             self.tree,
-            5,
+            5
         )
 
-        # -------------------------------------------------
-        # COMPONENT HEADER
-        # -------------------------------------------------
+        # =================================================
+        # COMPONENTS
+        # =================================================
 
         self.component_label = QLabel(
             "Test Components"
@@ -265,25 +385,28 @@ class AssetView(QWidget):
             self.component_label
         )
 
-        # -------------------------------------------------
-        # COMPONENT LIST
-        # -------------------------------------------------
-
         self.component_list = QListWidget()
 
-        self.component_list.setMinimumHeight(220)
+        self.component_list.setMinimumHeight(
+            220
+        )
 
         self.component_list.setSizePolicy(
             QSizePolicy.Policy.Expanding,
             QSizePolicy.Policy.Expanding,
         )
 
-        self.component_list.setSpacing(2)
-        self.component_list.setUniformItemSizes(True)
+        self.component_list.setSpacing(
+            2
+        )
+
+        self.component_list.setUniformItemSizes(
+            True
+        )
 
         left_layout.addWidget(
             self.component_list,
-            4,
+            4
         )
 
         # =================================================
@@ -297,7 +420,7 @@ class AssetView(QWidget):
         )
 
         action_panel.setFixedWidth(
-            245
+            270
         )
 
         action_layout = QVBoxLayout(
@@ -308,14 +431,12 @@ class AssetView(QWidget):
             12,
             12,
             12,
-            12,
+            12
         )
 
-        action_layout.setSpacing(7)
-
-        # -------------------------------------------------
-        # ACTION HEADER
-        # -------------------------------------------------
+        action_layout.setSpacing(
+            7
+        )
 
         action_title = QLabel(
             "Actions"
@@ -330,22 +451,25 @@ class AssetView(QWidget):
         )
 
         action_subtitle = QLabel(
-            "Select an asset or component, then choose an action."
+            "Select an asset or component, "
+            "then choose an action."
         )
 
         action_subtitle.setObjectName(
             "ActionSubtitle"
         )
 
-        action_subtitle.setWordWrap(True)
+        action_subtitle.setWordWrap(
+            True
+        )
 
         action_layout.addWidget(
             action_subtitle
         )
 
-        # -------------------------------------------------
+        # =================================================
         # BUTTONS
-        # -------------------------------------------------
+        # =================================================
 
         self.add_substation = QPushButton(
             "+  Substation"
@@ -371,16 +495,28 @@ class AssetView(QWidget):
             "Link Existing Panel"
         )
 
+        self.edit_asset_button = QPushButton(
+            "Edit Asset"
+        )
+
+        self.configure_panel = QPushButton(
+            "Edit Panel Configuration"
+        )
+
+        # =================================================
+        # NEW
+        # =================================================
+
+        self.copy_panel_configuration = QPushButton(
+            "Copy Configuration From Existing Panel"
+        )
+
         self.configure_component = QPushButton(
             "Edit Component"
         )
 
         self.configure_protection = QPushButton(
             "Edit Protection Functions"
-        )
-
-        self.configure_panel = QPushButton(
-            "Edit Panel Configuration"
         )
 
         self.open_testing = QPushButton(
@@ -395,33 +531,29 @@ class AssetView(QWidget):
             "Panel Report"
         )
 
-        self.edit_asset_button = QPushButton(
-            "Edit Asset"
+        self.test_history = (
+            self.test_history_button
         )
 
-        # Backward-compatible alias for code that may
-        # still refer to self.test_history.
-        self.test_history = self.test_history_button
-
-        # -------------------------------------------------
-        # GROUP LABEL HELPER
-        # -------------------------------------------------
+        # =================================================
+        # GROUP HELPER
+        # =================================================
 
         def add_action_group(
             title,
             buttons,
         ):
 
-            group_label = QLabel(
+            label = QLabel(
                 title.upper()
             )
 
-            group_label.setObjectName(
+            label.setObjectName(
                 "ActionGroup"
             )
 
             action_layout.addWidget(
-                group_label
+                label
             )
 
             for button in buttons:
@@ -439,9 +571,9 @@ class AssetView(QWidget):
                     button
                 )
 
-        # -------------------------------------------------
+        # =================================================
         # ASSET STRUCTURE
-        # -------------------------------------------------
+        # =================================================
 
         add_action_group(
             "Asset Structure",
@@ -455,23 +587,24 @@ class AssetView(QWidget):
             ],
         )
 
-        # -------------------------------------------------
+        # =================================================
         # EDITING
-        # -------------------------------------------------
+        # =================================================
 
         add_action_group(
             "Editing",
             [
                 self.edit_asset_button,
                 self.configure_panel,
+                self.copy_panel_configuration,
                 self.configure_component,
                 self.configure_protection,
             ],
         )
 
-        # -------------------------------------------------
-        # TESTING & REPORTING
-        # -------------------------------------------------
+        # =================================================
+        # TESTING
+        # =================================================
 
         add_action_group(
             "Testing & Reporting",
@@ -485,12 +618,12 @@ class AssetView(QWidget):
         action_layout.addStretch()
 
         # =================================================
-        # ADD WORKSPACE
+        # WORKSPACE
         # =================================================
 
         workspace.addLayout(
             left_layout,
-            1,
+            1
         )
 
         workspace.addWidget(
@@ -499,123 +632,57 @@ class AssetView(QWidget):
 
         layout.addLayout(
             workspace,
-            1,
+            1
         )
 
         # =================================================
-        # LOCAL UI STYLING
+        # STYLE
         # =================================================
 
         self.setStyleSheet(
             """
-            /* ------------------------------------------
-               SECTION HEADERS
-               ------------------------------------------ */
-
             QLabel#SectionHeader {
                 font-size: 15px;
-                font-weight: 600;
-                padding: 8px 11px;
-                color: #f2f2f2;
-                background-color: #353535;
-                border: 1px solid #454545;
-                border-radius: 6px;
-            }
-
-            /* ------------------------------------------
-               ACTION PANEL
-               ------------------------------------------ */
-
-            QFrame#ActionPanel {
-                background-color: #242424;
-                border: 1px solid #414141;
-                border-radius: 8px;
+                font-weight: 700;
+                padding: 4px;
             }
 
             QLabel#ActionTitle {
-                font-size: 19px;
+                font-size: 18px;
                 font-weight: 700;
-                padding: 2px 2px 0px 2px;
-                color: #f4f4f4;
-                background: transparent;
-                border: none;
             }
 
             QLabel#ActionSubtitle {
-                font-size: 11px;
                 color: #999999;
-                padding: 0px 2px 6px 2px;
-                background: transparent;
-                border: none;
+                padding-bottom: 4px;
             }
 
             QLabel#ActionGroup {
-                font-size: 10px;
+                color: #999999;
+                font-size: 11px;
                 font-weight: 700;
-                letter-spacing: 1px;
-                color: #a9a9a9;
-                padding: 7px 3px 2px 3px;
-                background: transparent;
-                border: none;
+                padding-top: 8px;
             }
 
-            /* ------------------------------------------
-               ACTION BUTTONS
-               ------------------------------------------ */
+            QFrame#ActionPanel {
+                background-color: #252525;
+                border: 1px solid #3e3e3e;
+                border-radius: 7px;
+            }
 
             QPushButton {
                 min-height: 36px;
-                padding: 6px 11px;
-                text-align: left;
-                border-radius: 6px;
-                border: 1px solid #444444;
-                background-color: #303030;
-                color: #eeeeee;
             }
 
-            QPushButton:hover {
-                background-color: #383838;
-                border: 1px solid #666666;
-            }
-
-            QPushButton:pressed {
-                background-color: #222222;
-                border: 1px solid #777777;
-            }
-
-            QPushButton:disabled {
-                color: #666666;
-                background-color: #272727;
-                border: 1px solid #333333;
-            }
-
-            /* Primary workflow */
             QPushButton#OpenTestingButton {
-                min-height: 44px;
-                font-size: 13px;
-                font-weight: 700;
-                border: 1px solid #e58a18;
-                background-color: #343434;
-            }
-
-            QPushButton#OpenTestingButton:hover {
-                background-color: #3d3d3d;
-                border: 1px solid #f09a27;
-            }
-
-            QPushButton#OpenTestingButton:pressed {
-                background-color: #292929;
-            }
-
-            /* Report action */
-            QPushButton#PanelReportButton {
                 min-height: 42px;
                 font-weight: 600;
             }
 
-            /* ------------------------------------------
-               TREE
-               ------------------------------------------ */
+            QPushButton#PanelReportButton {
+                min-height: 42px;
+                font-weight: 600;
+            }
 
             QTreeWidget {
                 background-color: #292929;
@@ -640,19 +707,6 @@ class AssetView(QWidget):
                 background-color: #3b3b3b;
                 border-left: 2px solid #e58a18;
             }
-
-            QHeaderView::section {
-                background-color: #333333;
-                color: #dddddd;
-                padding: 7px;
-                border: none;
-                border-bottom: 1px solid #444444;
-                font-weight: 600;
-            }
-
-            /* ------------------------------------------
-               COMPONENT LIST
-               ------------------------------------------ */
 
             QListWidget {
                 background-color: #292929;
@@ -680,7 +734,6 @@ class AssetView(QWidget):
             """
         )
 
-        # Make the primary actions visually distinct.
         self.open_testing.setObjectName(
             "OpenTestingButton"
         )
@@ -711,6 +764,10 @@ class AssetView(QWidget):
 
         self.configure_panel.clicked.connect(
             self.configure_selected_panel
+        )
+
+        self.copy_panel_configuration.clicked.connect(
+            self.copy_configuration_from_existing_panel
         )
 
         self.add_substation.clicked.connect(
@@ -744,9 +801,11 @@ class AssetView(QWidget):
         self.test_history_button.clicked.connect(
             self.open_test_history
         )
+
         self.edit_asset_button.clicked.connect(
             self.edit_selected_asset
         )
+
         self.panel_report_button.clicked.connect(
             self.generate_panel_report
         )
@@ -756,130 +815,69 @@ class AssetView(QWidget):
         # =================================================
 
         self._update_button_states()
-        self._tree_initialized = False
+
         self.refresh_tree()
 
-    # =================================================
+    # =====================================================
     # TREE
-    # =================================================
+    # =====================================================
 
-
-    def refresh_tree(self):
-
-        expanded_node_ids = set()
-
-        def collect_expanded(item):
-
-            node_id = item.data(
-                0,
-                Qt.ItemDataRole.UserRole
-            )
-
-            if node_id and item.isExpanded():
-                expanded_node_ids.add(node_id)
-
-            for index in range(item.childCount()):
-
-                collect_expanded(
-                    item.child(index)
-                )
-
-        for index in range(
-            self.tree.topLevelItemCount()
-        ):
-
-            collect_expanded(
-                self.tree.topLevelItem(index)
-            )
-
-        # =================================================
-        # REMEMBER CURRENT SELECTION
-        # =================================================
+    def refresh_tree(
+        self,
+    ):
 
         selected_node_id = None
 
-        current_item = self.tree.currentItem()
+        current_item = (
+            self.tree.currentItem()
+        )
 
         if current_item is not None:
 
-            selected_node_id = current_item.data(
-                0,
-                Qt.ItemDataRole.UserRole
+            selected_node_id = (
+                current_item.data(
+                    Qt.ItemDataRole.UserRole
+                )
+            )
+
+        self.tree.blockSignals(
+            True
+        )
+
+        self.component_list.clear()
+
+        self.tree.clear()
+
+        roots = (
+            self.asset_manager
+            .get_children(None)
+        )
+
+        for node in roots:
+
+            item = (
+                self._create_tree_item(
+                    node
+                )
+            )
+
+            self.tree.addTopLevelItem(
+                item
             )
 
         # =================================================
-        # REBUILD TREE
+        # IMPORTANT
+        #
+        # Project opens COLLAPSED.
         # =================================================
 
-        self.tree.blockSignals(True)
+        self.tree.collapseAll()
 
-        try:
+        self.tree.blockSignals(
+            False
+        )
 
-            self.tree.clear()
-
-            self.component_list.clear()
-
-            roots = self.asset_manager.get_children(None)
-
-            for node in roots:
-
-                item = self._create_tree_item(
-                    node
-                )
-
-                self.tree.addTopLevelItem(
-                    item
-                )
-
-            # =================================================
-            # INITIAL LOAD
-            #
-            # First load is collapsed.
-            # Later refreshes preserve the user's state.
-            # =================================================
-
-            if not self._tree_initialized:
-
-                self.tree.collapseAll()
-
-            else:
-
-                def restore_expansion(item):
-
-                    node_id = item.data(
-                        0,
-                        Qt.ItemDataRole.UserRole
-                    )
-
-                    if node_id in expanded_node_ids:
-
-                        item.setExpanded(
-                            True
-                        )
-
-                    for index in range(
-                        item.childCount()
-                    ):
-
-                        restore_expansion(
-                            item.child(index)
-                        )
-
-                for index in range(
-                    self.tree.topLevelItemCount()
-                ):
-
-                    restore_expansion(
-                        self.tree.topLevelItem(index)
-                    )
-
-        finally:
-
-            self.tree.blockSignals(False)
-
-        # =================================================
-        # RESTORE SELECTION
-        # =================================================
+        # Restore selection only if possible.
 
         if selected_node_id:
 
@@ -887,18 +885,62 @@ class AssetView(QWidget):
                 selected_node_id
             )
 
-        # =================================================
-        # UPDATE STATE
-        # =================================================
-
-        self._tree_initialized = True
-
         self._update_button_states()
 
         self.display_selected_components()
-    # =================================================
+
+    # =====================================================
+    # TREE ITEM
+    # =====================================================
+
+    def _create_tree_item(
+        self,
+        node,
+    ):
+
+        item = QTreeWidgetItem()
+
+        item.setText(
+            0,
+            str(
+                getattr(
+                    node,
+                    "name",
+                    ""
+                )
+            )
+        )
+
+        item.setData(
+            0,
+            Qt.ItemDataRole.UserRole,
+            getattr(
+                node,
+                "node_id",
+                None
+            )
+        )
+
+        children = (
+            self.asset_manager
+            .get_children(
+                node.node_id
+            )
+        )
+
+        for child in children:
+
+            item.addChild(
+                self._create_tree_item(
+                    child
+                )
+            )
+
+        return item
+
+    # =====================================================
     # SELECT TREE NODE
-    # =================================================
+    # =====================================================
 
     def select_tree_node(
         self,
@@ -918,16 +960,17 @@ class AssetView(QWidget):
                 )
 
                 child_id = child.data(
-                    0,
-                    Qt.ItemDataRole.UserRole,
+                    Qt.ItemDataRole.UserRole
                 )
 
                 if child_id == node_id:
 
                     return child
 
-                result = find_item(
-                    child
+                result = (
+                    find_item(
+                        child
+                    )
                 )
 
                 if result is not None:
@@ -947,8 +990,7 @@ class AssetView(QWidget):
             )
 
             item_id = item.data(
-                0,
-                Qt.ItemDataRole.UserRole,
+                Qt.ItemDataRole.UserRole
             )
 
             if item_id == node_id:
@@ -959,11 +1001,26 @@ class AssetView(QWidget):
 
                 return True
 
-            result = find_item(
-                item
+            result = (
+                find_item(
+                    item
+                )
             )
 
             if result is not None:
+
+                # Expand ancestors so that the
+                # selected item can actually be seen.
+
+                parent = result.parent()
+
+                while parent is not None:
+
+                    parent.setExpanded(
+                        True
+                    )
+
+                    parent = parent.parent()
 
                 self.tree.setCurrentItem(
                     result
@@ -973,47 +1030,20 @@ class AssetView(QWidget):
 
         return False
 
-    def _create_tree_item(
+    # =====================================================
+    # SELECTED NODE
+    # =====================================================
+
+    def get_selected_node(
         self,
-        node,
     ):
 
-        item = QTreeWidgetItem()
-
-        item.setText(
-            0,
-            str(node.name)
+        item = (
+            self.tree.currentItem()
         )
-
-        item.setData(
-            0,
-            Qt.ItemDataRole.UserRole,
-            node.node_id
-        )
-
-        children = self.asset_manager.get_children(
-            node.node_id
-        )
-
-        for child in children:
-
-            child_item = self._create_tree_item(
-                child
-            )
-
-            item.addChild(child_item)
-
-        return item
-
-    # =================================================
-    # SELECTED NODE
-    # =================================================
-
-    def get_selected_node(self):
-
-        item = self.tree.currentItem()
 
         if item is None:
+
             return None
 
         node_id = item.data(
@@ -1022,17 +1052,30 @@ class AssetView(QWidget):
         )
 
         if node_id is None:
+
             return None
 
-        return self.asset_manager.get_node(
-            node_id
+        return (
+            self.asset_manager
+            .get_node(
+                node_id
+            )
         )
 
-    def get_selected_panel(self):
+    # =====================================================
+    # SELECTED PANEL
+    # =====================================================
 
-        node = self.get_selected_node()
+    def get_selected_panel(
+        self,
+    ):
+
+        node = (
+            self.get_selected_node()
+        )
 
         if node is None:
+
             return None
 
         if str(
@@ -1041,25 +1084,30 @@ class AssetView(QWidget):
                 "node_type",
                 ""
             )
-        ).upper() == "PANEL":
+        ).strip().upper() == "PANEL":
 
             return node
 
         return None
 
-    # =================================================
+    # =====================================================
     # COMPONENTS
-    # =================================================
+    # =====================================================
 
-    def display_selected_components(self):
+    def display_selected_components(
+        self,
+    ):
 
         self.component_list.clear()
 
-        node = self.get_selected_node()
+        node = (
+            self.get_selected_node()
+        )
 
         if node is None:
 
             self._update_button_states()
+
             return
 
         if str(
@@ -1068,13 +1116,15 @@ class AssetView(QWidget):
                 "node_type",
                 ""
             )
-        ).upper() != "PANEL":
+        ).strip().upper() != "PANEL":
 
             self._update_button_states()
+
             return
 
         components = (
-            self.component_manager.get_panel_components(
+            self.component_manager
+            .get_panel_components(
                 node.node_id
             )
         )
@@ -1093,21 +1143,36 @@ class AssetView(QWidget):
                 component.component_id
             )
 
-            self.component_list.addItem(item)
+            self.component_list.addItem(
+                item
+            )
 
         self._update_button_states()
 
-    def on_component_selection_changed(self):
+    # =====================================================
+    # COMPONENT SELECTION
+    # =====================================================
+
+    def on_component_selection_changed(
+        self,
+    ):
 
         self._update_button_states()
 
-    def get_selected_component(self):
+    # =====================================================
+    # SELECTED COMPONENT
+    # =====================================================
+
+    def get_selected_component(
+        self,
+    ):
 
         item = self.component_list.currentItem()
 
         if item is None:
             return None
 
+        # QListWidgetItem.data() takes ONLY the role.
         component_id = item.data(
             Qt.ItemDataRole.UserRole
         )
@@ -1115,8 +1180,6 @@ class AssetView(QWidget):
         if component_id is None:
             return None
 
-        # Current ComponentManager implementations expose
-        # either get_component() or the components dict.
         if hasattr(
             self.component_manager,
             "get_component"
@@ -1126,9 +1189,16 @@ class AssetView(QWidget):
                 component_id
             )
 
-        return self.component_manager.components.get(
-            component_id
+        return (
+            self.component_manager
+            .components
+            .get(
+                component_id
+            )
         )
+    # =====================================================
+    # SELECT COMPONENT
+    # =====================================================
 
     def select_component_by_id(
         self,
@@ -1139,7 +1209,11 @@ class AssetView(QWidget):
             self.component_list.count()
         ):
 
-            item = self.component_list.item(index)
+            item = (
+                self.component_list.item(
+                    index
+                )
+            )
 
             stored_id = item.data(
                 Qt.ItemDataRole.UserRole
@@ -1147,19 +1221,29 @@ class AssetView(QWidget):
 
             if stored_id == component_id:
 
-                self.component_list.setCurrentRow(index)
+                self.component_list.setCurrentRow(
+                    index
+                )
+
                 return True
 
         return False
 
-    # =================================================
+    # =====================================================
     # BUTTON STATE
-    # =================================================
+    # =====================================================
 
-    def _update_button_states(self):
+    def _update_button_states(
+        self,
+    ):
 
-        node = self.get_selected_node()
-        component = self.get_selected_component()
+        node = (
+            self.get_selected_node()
+        )
+
+        component = (
+            self.get_selected_component()
+        )
 
         node_type = (
             str(
@@ -1168,7 +1252,7 @@ class AssetView(QWidget):
                     "node_type",
                     ""
                 )
-            ).upper()
+            ).strip().upper()
             if node is not None
             else ""
         )
@@ -1221,7 +1305,19 @@ class AssetView(QWidget):
             switchboard_selected
         )
 
+        self.edit_asset_button.setEnabled(
+            node_type in (
+                "SUBSTATION",
+                "SWITCHBOARD",
+                "PANEL",
+            )
+        )
+
         self.configure_panel.setEnabled(
+            panel_selected
+        )
+
+        self.copy_panel_configuration.setEnabled(
             panel_selected
         )
 
@@ -1240,29 +1336,24 @@ class AssetView(QWidget):
         self.test_history_button.setEnabled(
             panel_selected
         )
+
         self.panel_report_button.setEnabled(
             panel_selected
         )
-        physical_asset_selected = (
-            node_type in (
-                "SUBSTATION",
-                "SWITCHBOARD",
-                "PANEL",
-            )
-        )
 
-        self.edit_asset_button.setEnabled(
-            physical_asset_selected
-        )
+    # =====================================================
+    # COMPATIBILITY
+    # =====================================================
 
-    # Compatibility name used by older versions.
-    def update_button_state(self):
+    def update_button_state(
+        self,
+    ):
 
         self._update_button_states()
 
-    # =================================================
+    # =====================================================
     # INPUT
-    # =================================================
+    # =====================================================
 
     def ask_name(
         self,
@@ -1276,21 +1367,27 @@ class AssetView(QWidget):
         )
 
         if not ok:
+
             return ""
 
         return text.strip()
 
-    # =================================================
+    # =====================================================
     # CREATE SUBSTATION
-    # =================================================
+    # =====================================================
 
-    def create_substation(self):
+    def create_substation(
+        self,
+    ):
 
-        name = self.ask_name(
-            "Add Substation"
+        name = (
+            self.ask_name(
+                "Add Substation"
+            )
         )
 
         if not name:
+
             return
 
         try:
@@ -1310,11 +1407,13 @@ class AssetView(QWidget):
                 str(error),
             )
 
-    # =================================================
-    # LINK EXISTING SUBSTATION
-    # =================================================
+    # =====================================================
+    # LINK SUBSTATION
+    # =====================================================
 
-    def link_existing_substation(self):
+    def link_existing_substation(
+        self,
+    ):
 
         try:
 
@@ -1360,18 +1459,25 @@ class AssetView(QWidget):
 
             return
 
-        selected = dialog.get_selected_asset()
+        selected = (
+            dialog.get_selected_asset()
+        )
 
         if not selected:
+
             return
 
         try:
 
             linked_node = (
                 self.asset_manager.link_asset(
-                    asset_id=selected["asset_id"],
+                    asset_id=selected[
+                        "asset_id"
+                    ],
                     parent_id=None,
-                    name=selected.get("name"),
+                    name=selected.get(
+                        "name"
+                    ),
                 )
             )
 
@@ -1384,14 +1490,6 @@ class AssetView(QWidget):
                 "has been linked to this project.",
             )
 
-        except ValueError as error:
-
-            QMessageBox.warning(
-                self,
-                "Cannot Link Substation",
-                str(error),
-            )
-
         except Exception as error:
 
             QMessageBox.critical(
@@ -1400,13 +1498,17 @@ class AssetView(QWidget):
                 str(error),
             )
 
-    # =================================================
+    # =====================================================
     # CREATE SWITCHBOARD
-    # =================================================
+    # =====================================================
 
-    def create_switchboard(self):
+    def create_switchboard(
+        self,
+    ):
 
-        parent = self.get_selected_node()
+        parent = (
+            self.get_selected_node()
+        )
 
         if parent is None:
 
@@ -1424,7 +1526,7 @@ class AssetView(QWidget):
                 "node_type",
                 ""
             )
-        ).upper() != "SUBSTATION":
+        ).strip().upper() != "SUBSTATION":
 
             QMessageBox.warning(
                 self,
@@ -1434,11 +1536,14 @@ class AssetView(QWidget):
 
             return
 
-        name = self.ask_name(
-            "Add Switchboard"
+        name = (
+            self.ask_name(
+                "Add Switchboard"
+            )
         )
 
         if not name:
+
             return
 
         try:
@@ -1459,15 +1564,20 @@ class AssetView(QWidget):
                 str(error),
             )
 
-    # =================================================
+    # =====================================================
     # AVAILABLE SWITCHBOARDS
-    # =================================================
+    # =====================================================
 
-    def get_available_master_switchboards(self):
+    def get_available_master_switchboards(
+        self,
+    ):
 
-        parent = self.get_selected_node()
+        parent = (
+            self.get_selected_node()
+        )
 
         if parent is None:
+
             return []
 
         if str(
@@ -1476,7 +1586,7 @@ class AssetView(QWidget):
                 "node_type",
                 ""
             )
-        ).upper() != "SUBSTATION":
+        ).strip().upper() != "SUBSTATION":
 
             return []
 
@@ -1488,13 +1598,17 @@ class AssetView(QWidget):
             )
         )
 
-    # =================================================
-    # LINK EXISTING SWITCHBOARD
-    # =================================================
+    # =====================================================
+    # LINK SWITCHBOARD
+    # =====================================================
 
-    def link_existing_switchboard(self):
+    def link_existing_switchboard(
+        self,
+    ):
 
-        parent = self.get_selected_node()
+        parent = (
+            self.get_selected_node()
+        )
 
         if parent is None:
 
@@ -1512,7 +1626,7 @@ class AssetView(QWidget):
                 "node_type",
                 ""
             )
-        ).upper() != "SUBSTATION":
+        ).strip().upper() != "SUBSTATION":
 
             QMessageBox.warning(
                 self,
@@ -1523,21 +1637,9 @@ class AssetView(QWidget):
 
             return
 
-        try:
-
-            available = (
-                self.get_available_master_switchboards()
-            )
-
-        except Exception as error:
-
-            QMessageBox.critical(
-                self,
-                "Asset Database Error",
-                str(error),
-            )
-
-            return
+        available = (
+            self.get_available_master_switchboards()
+        )
 
         if not available:
 
@@ -1563,18 +1665,25 @@ class AssetView(QWidget):
 
             return
 
-        selected = dialog.get_selected_asset()
+        selected = (
+            dialog.get_selected_asset()
+        )
 
         if not selected:
+
             return
 
         try:
 
             linked_node = (
                 self.asset_manager.link_asset(
-                    asset_id=selected["asset_id"],
+                    asset_id=selected[
+                        "asset_id"
+                    ],
                     parent_id=parent.node_id,
-                    name=selected.get("name"),
+                    name=selected.get(
+                        "name"
+                    ),
                 )
             )
 
@@ -1587,14 +1696,6 @@ class AssetView(QWidget):
                 "has been linked to this substation.",
             )
 
-        except ValueError as error:
-
-            QMessageBox.warning(
-                self,
-                "Cannot Link Switchboard",
-                str(error),
-            )
-
         except Exception as error:
 
             QMessageBox.critical(
@@ -1603,21 +1704,25 @@ class AssetView(QWidget):
                 str(error),
             )
 
-    # =================================================
+    # =====================================================
     # CREATE PANEL
-    # =================================================
+    # =====================================================
 
-
-    def create_panel(self):
+    def create_panel(
+        self,
+    ):
 
         if self._creating_panel:
+
             return
 
         self._creating_panel = True
 
         try:
 
-            parent = self.get_selected_node()
+            parent = (
+                self.get_selected_node()
+            )
 
             if parent is None:
 
@@ -1635,7 +1740,7 @@ class AssetView(QWidget):
                     "node_type",
                     ""
                 )
-            ).upper() != "SWITCHBOARD":
+            ).strip().upper() != "SWITCHBOARD":
 
                 QMessageBox.warning(
                     self,
@@ -1645,10 +1750,65 @@ class AssetView(QWidget):
 
                 return
 
-            parent_id = parent.node_id
+            # =================================================
+            # SUGGEST ASSET TAG
+            # =================================================
+
+            hierarchy = []
+
+            current = parent
+
+            while current is not None:
+
+                name = str(
+                    getattr(
+                        current,
+                        "name",
+                        ""
+                    )
+                ).strip()
+
+                if name:
+
+                    hierarchy.insert(
+                        0,
+                        name
+                    )
+
+                parent_id = getattr(
+                    current,
+                    "parent_id",
+                    None
+                )
+
+                if parent_id is None:
+
+                    break
+
+                current = (
+                    self.asset_manager
+                    .get_node(
+                        parent_id
+                    )
+                )
+
+            prefix = "-".join(
+                value.replace(
+                    " ",
+                    "-"
+                )
+                for value in hierarchy
+            )
+
+            suggested_tag = (
+                f"{prefix}-PANEL"
+                if prefix
+                else ""
+            )
 
             dialog = PanelAssetDialog(
-                parent=self
+                suggested_asset_tag=suggested_tag,
+                parent=self,
             )
 
             if (
@@ -1658,118 +1818,22 @@ class AssetView(QWidget):
 
                 return
 
-            name = dialog.get_values()
-
-            if not name:
-                return
-
-            # =================================================
-            # AUTO-GENERATE PHYSICAL ASSET TAG
-            #
-            # Hierarchy:
-            #     REF-III SS-2
-            #         HV-203A
-            #
-            # Panel:
-            #     P-03
-            #
-            # Result:
-            #     REF-III-SS-2-HV-203A-P-03
-            # =================================================
-
-            hierarchy_names = []
-
-            current = parent
-
-            while current is not None:
-
-                current_name = str(
-                    getattr(
-                        current,
-                        "name",
-                        ""
-                    )
-                ).strip()
-
-                if current_name:
-
-                    hierarchy_names.append(
-                        current_name
-                    )
-
-                current_parent_id = getattr(
-                    current,
-                    "parent_id",
-                    None
-                )
-
-                if current_parent_id is None:
-                    break
-
-                current = (
-                    self.asset_manager.get_node(
-                        current_parent_id
-                    )
-                )
-
-            hierarchy_names.reverse()
-
-            tag_parts = []
-
-            for value in hierarchy_names:
-
-                cleaned = (
-                    str(value)
-                    .strip()
-                    .replace(" ", "-")
-                )
-
-                if cleaned:
-                    tag_parts.append(cleaned)
-
-            panel_tag_name = (
-                str(name)
-                .strip()
-                .replace(" ", "-")
+            name, asset_tag = (
+                dialog.get_values()
             )
 
-            if panel_tag_name:
-                tag_parts.append(
-                    panel_tag_name
-                )
-
-            asset_tag = "-".join(
-                tag_parts
-            )
-
-            # =================================================
-            # CREATE
-            # =================================================
-
-            try:
-
-                new_panel = (
-                    self.asset_manager.create_node(
-                        name=name,
-                        node_type="PANEL",
-                        parent_id=parent_id,
-                        asset_tag=asset_tag
-                    )
-                )
-
-            except ValueError as error:
-
-                QMessageBox.warning(
-                    self,
-                    "Cannot Create Panel",
-                    str(error)
-                )
+            if not name or not asset_tag:
 
                 return
 
-            # =================================================
-            # REFRESH WHILE PRESERVING TREE STATE
-            # =================================================
+            new_panel = (
+                self.asset_manager.create_node(
+                    name=name,
+                    node_type="PANEL",
+                    parent_id=parent.node_id,
+                    asset_tag=asset_tag,
+                )
+            )
 
             self.refresh_tree()
 
@@ -1781,20 +1845,40 @@ class AssetView(QWidget):
 
                 self.display_selected_components()
 
-            self._update_button_states()
+        except ValueError as error:
+
+            QMessageBox.warning(
+                self,
+                "Cannot Create Panel",
+                str(error),
+            )
+
+        except Exception as error:
+
+            QMessageBox.critical(
+                self,
+                "Panel Creation Failed",
+                str(error),
+            )
 
         finally:
 
             self._creating_panel = False
-    # =================================================
+
+    # =====================================================
     # AVAILABLE PANELS
-    # =================================================
+    # =====================================================
 
-    def get_available_master_panels(self):
+    def get_available_master_panels(
+        self,
+    ):
 
-        parent = self.get_selected_node()
+        parent = (
+            self.get_selected_node()
+        )
 
         if parent is None:
+
             return []
 
         if str(
@@ -1803,7 +1887,7 @@ class AssetView(QWidget):
                 "node_type",
                 ""
             )
-        ).upper() != "SWITCHBOARD":
+        ).strip().upper() != "SWITCHBOARD":
 
             return []
 
@@ -1815,13 +1899,17 @@ class AssetView(QWidget):
             )
         )
 
-    # =================================================
-    # LINK EXISTING PANEL + CONFIGURATION
-    # =================================================
+    # =====================================================
+    # LINK PANEL
+    # =====================================================
 
-    def link_existing_panel(self):
+    def link_existing_panel(
+        self,
+    ):
 
-        parent = self.get_selected_node()
+        parent = (
+            self.get_selected_node()
+        )
 
         if parent is None:
 
@@ -1839,7 +1927,7 @@ class AssetView(QWidget):
                 "node_type",
                 ""
             )
-        ).upper() != "SWITCHBOARD":
+        ).strip().upper() != "SWITCHBOARD":
 
             QMessageBox.warning(
                 self,
@@ -1849,23 +1937,11 @@ class AssetView(QWidget):
 
             return
 
-        try:
+        available = (
+            self.get_available_master_panels()
+        )
 
-            available_panels = (
-                self.get_available_master_panels()
-            )
-
-        except Exception as error:
-
-            QMessageBox.critical(
-                self,
-                "Asset Database Error",
-                str(error),
-            )
-
-            return
-
-        if not available_panels:
+        if not available:
 
             QMessageBox.information(
                 self,
@@ -1877,7 +1953,7 @@ class AssetView(QWidget):
             return
 
         dialog = AssetLinkDialog(
-            available_panels,
+            available,
             asset_type="PANEL",
             parent=self,
         )
@@ -1889,38 +1965,39 @@ class AssetView(QWidget):
 
             return
 
-        selected = dialog.get_selected_asset()
+        selected = (
+            dialog.get_selected_asset()
+        )
 
         if not selected:
+
             return
 
         try:
 
-            # ---------------------------------------------
-            # CREATE PROJECT-LOCAL LINK
-            # ---------------------------------------------
-
             linked_node = (
                 self.asset_manager.link_asset(
-                    asset_id=selected["asset_id"],
+                    asset_id=selected[
+                        "asset_id"
+                    ],
                     parent_id=parent.node_id,
-                    name=selected.get("name"),
+                    name=selected.get(
+                        "name"
+                    ),
                 )
             )
 
-            # ---------------------------------------------
-            # RESTORE PANEL CONFIGURATION
-            # ---------------------------------------------
-
             metadata = (
-                selected.get("metadata")
+                selected.get(
+                    "metadata"
+                )
                 or {}
             )
 
             panel_configuration = (
                 metadata.get(
                     "panel_configuration",
-                    {},
+                    {}
                 )
             )
 
@@ -1934,18 +2011,13 @@ class AssetView(QWidget):
                     )
 
                 except Exception:
-                    # Do not fail the link if only the optional
-                    # panel metadata is malformed.
-                    pass
 
-            # ---------------------------------------------
-            # RESTORE COMPONENTS
-            # ---------------------------------------------
+                    pass
 
             component_data = (
                 metadata.get(
                     "components",
-                    [],
+                    []
                 )
             )
 
@@ -1953,7 +2025,7 @@ class AssetView(QWidget):
 
                 if hasattr(
                     self.component_manager,
-                    "clone_panel_components",
+                    "clone_panel_components"
                 ):
 
                     self.component_manager.clone_panel_components(
@@ -1963,7 +2035,7 @@ class AssetView(QWidget):
 
                 elif hasattr(
                     self.component_manager,
-                    "restore_global_panel_components",
+                    "restore_global_panel_components"
                 ):
 
                     self.component_manager.restore_global_panel_components(
@@ -1981,14 +2053,6 @@ class AssetView(QWidget):
                 "imported successfully.",
             )
 
-        except ValueError as error:
-
-            QMessageBox.warning(
-                self,
-                "Cannot Link Panel",
-                str(error),
-            )
-
         except Exception as error:
 
             QMessageBox.critical(
@@ -1997,13 +2061,17 @@ class AssetView(QWidget):
                 str(error),
             )
 
-    # =================================================
+    # =====================================================
     # PANEL CONFIGURATION
-    # =================================================
+    # =====================================================
 
-    def configure_selected_panel(self):
+    def configure_selected_panel(
+        self,
+    ):
 
-        panel = self.get_selected_panel()
+        panel = (
+            self.get_selected_panel()
+        )
 
         if panel is None:
 
@@ -2027,7 +2095,9 @@ class AssetView(QWidget):
 
             return
 
-        configuration = dialog.get_configuration()
+        configuration = (
+            dialog.get_configuration()
+        )
 
         try:
 
@@ -2038,10 +2108,34 @@ class AssetView(QWidget):
 
             self.component_manager.generate_panel_components(
                 panel_id=panel.node_id,
-                ct_count=int(configuration.get("ct_count", 0) or 0),
-                relay_count=int(configuration.get("relay_count", 0) or 0),
-                aux_count=int(configuration.get("aux_count", 0) or 0),
-                meter_count=int(configuration.get("meter_count", 0) or 0),
+                ct_count=int(
+                    configuration.get(
+                        "ct_count",
+                        0
+                    )
+                    or 0
+                ),
+                relay_count=int(
+                    configuration.get(
+                        "relay_count",
+                        0
+                    )
+                    or 0
+                ),
+                aux_count=int(
+                    configuration.get(
+                        "aux_count",
+                        0
+                    )
+                    or 0
+                ),
+                meter_count=int(
+                    configuration.get(
+                        "meter_count",
+                        0
+                    )
+                    or 0
+                ),
             )
 
             self.display_selected_components()
@@ -2072,13 +2166,561 @@ class AssetView(QWidget):
                 str(error),
             )
 
-    # =================================================
+    # =====================================================
+    # COPY CONFIGURATION FROM EXISTING PANEL
+    # =====================================================
+
+    def copy_configuration_from_existing_panel(
+        self,
+    ):
+
+        target_panel = (
+            self.get_selected_panel()
+        )
+
+        if target_panel is None:
+
+            QMessageBox.warning(
+                self,
+                "No Target Panel",
+                "Please select the panel into which "
+                "the configuration should be copied."
+            )
+
+            return
+
+        dialog = PanelConfigurationCopyDialog(
+            asset_manager=self.asset_manager,
+            target_panel_id=target_panel.node_id,
+            parent=self,
+        )
+
+        if (
+            dialog.exec()
+            != QDialog.DialogCode.Accepted
+        ):
+
+            return
+
+        source_panel = (
+            dialog.source_panel
+        )
+
+        selected_attributes = (
+            dialog.get_selected_attributes()
+        )
+
+        if source_panel is None:
+
+            return
+
+        try:
+
+            # =================================================
+            # CONFIRM
+            # =================================================
+
+            hierarchy = (
+                self.get_panel_hierarchy_names(
+                    source_panel
+                )
+            )
+
+            source_description = (
+                " / ".join(
+                    hierarchy
+                )
+            )
+
+            target_hierarchy = (
+                self.get_panel_hierarchy_names(
+                    target_panel
+                )
+            )
+
+            target_description = (
+                " / ".join(
+                    target_hierarchy
+                )
+            )
+
+            answer = QMessageBox.question(
+                self,
+                "Confirm Configuration Copy",
+                (
+                    "Copy selected configuration from:\n\n"
+                    f"{source_description}\n\n"
+                    "to:\n\n"
+                    f"{target_description}\n\n"
+                    "Panel name, asset tag and unchecked "
+                    "panel-specific values will remain unchanged."
+                ),
+                QMessageBox.StandardButton.Yes
+                |
+                QMessageBox.StandardButton.No,
+            )
+
+            if answer != QMessageBox.StandardButton.Yes:
+
+                return
+
+            # =================================================
+            # PANEL CONFIGURATION
+            # =================================================
+
+            panel_fields = (
+                "equipment_name",
+                "equipment_type",
+                "ct_count",
+                "relay_count",
+                "aux_count",
+                "meter_count",
+            )
+
+            panel_configuration = {}
+
+            for field in panel_fields:
+
+                if field not in selected_attributes:
+
+                    continue
+
+                if not hasattr(
+                    source_panel,
+                    field
+                ):
+
+                    continue
+
+                panel_configuration[
+                    field
+                ] = getattr(
+                    source_panel,
+                    field
+                )
+
+            if panel_configuration:
+
+                self.asset_manager.update_panel_configuration(
+                    target_panel.node_id,
+                    panel_configuration,
+                )
+
+            # =================================================
+            # COMPONENT COUNTS
+            # =================================================
+
+            target_ct_count = self.safe_int(
+                getattr(
+                    target_panel,
+                    "ct_count",
+                    0
+                )
+            )
+
+            target_relay_count = self.safe_int(
+                getattr(
+                    target_panel,
+                    "relay_count",
+                    0
+                )
+            )
+
+            target_aux_count = self.safe_int(
+                getattr(
+                    target_panel,
+                    "aux_count",
+                    0
+                )
+            )
+
+            target_meter_count = self.safe_int(
+                getattr(
+                    target_panel,
+                    "meter_count",
+                    0
+                )
+            )
+
+            if "ct_count" in selected_attributes:
+
+                target_ct_count = self.safe_int(
+                    getattr(
+                        source_panel,
+                        "ct_count",
+                        0
+                    )
+                )
+
+            if "relay_count" in selected_attributes:
+
+                target_relay_count = self.safe_int(
+                    getattr(
+                        source_panel,
+                        "relay_count",
+                        0
+                    )
+                )
+
+            if "aux_count" in selected_attributes:
+
+                target_aux_count = self.safe_int(
+                    getattr(
+                        source_panel,
+                        "aux_count",
+                        0
+                    )
+                )
+
+            if "meter_count" in selected_attributes:
+
+                target_meter_count = self.safe_int(
+                    getattr(
+                        source_panel,
+                        "meter_count",
+                        0
+                    )
+                )
+
+            # =================================================
+            # REGENERATE COMPONENT STRUCTURE
+            # =================================================
+
+            if any(
+                field in selected_attributes
+
+                for field in (
+                    "ct_count",
+                    "relay_count",
+                    "aux_count",
+                    "meter_count",
+                )
+            ):
+
+                self.component_manager.generate_panel_components(
+                    panel_id=target_panel.node_id,
+                    ct_count=target_ct_count,
+                    relay_count=target_relay_count,
+                    aux_count=target_aux_count,
+                    meter_count=target_meter_count,
+                )
+
+            # =================================================
+            # SOURCE COMPONENTS
+            # =================================================
+
+            source_components = (
+                self.component_manager
+                .get_panel_components(
+                    source_panel.node_id
+                )
+            )
+
+            target_components = (
+                self.component_manager
+                .get_panel_components(
+                    target_panel.node_id
+                )
+            )
+
+            # =================================================
+            # INDEX COMPONENTS
+            #
+            # CT-01 -> CT-01
+            # CT-02 -> CT-02
+            # REL-01 -> REL-01
+            # AUX-01 -> AUX-01
+            # M-01 -> M-01
+            # =================================================
+
+            source_by_key = {}
+
+            for component in source_components:
+
+                key = (
+                    self.component_identity_key(
+                        component
+                    )
+                )
+
+                source_by_key[
+                    key
+                ] = component
+
+            target_by_key = {}
+
+            for component in target_components:
+
+                key = (
+                    self.component_identity_key(
+                        component
+                    )
+                )
+
+                target_by_key[
+                    key
+                ] = component
+
+            # =================================================
+            # COMPONENT FIELDS
+            # =================================================
+
+            component_fields = [
+
+                "manufacturer",
+
+                "model",
+
+                "serial_number",
+
+                "description",
+
+                "ct_primary",
+
+                "ct_secondary",
+
+                "ct_ratio",
+
+                "ct_class",
+
+                "burden",
+
+                "core",
+
+                "vt_ratio",
+
+                "firmware",
+
+                "coil_voltage",
+
+                "contact_configuration",
+
+                "meter_type",
+
+                "meter_functions",
+
+                "accuracy_class",
+
+                "protection_functions",
+            ]
+
+            copied_components = 0
+
+            skipped_components = 0
+
+            for key, source_component in (
+                source_by_key.items()
+            ):
+
+                target_component = (
+                    target_by_key.get(
+                        key
+                    )
+                )
+
+                if target_component is None:
+
+                    skipped_components += 1
+
+                    continue
+
+                configuration = {}
+
+                for field in component_fields:
+
+                    if field not in selected_attributes:
+
+                        continue
+
+                    if not hasattr(
+                        source_component,
+                        field
+                    ):
+
+                        continue
+
+                    value = getattr(
+                        source_component,
+                        field
+                    )
+
+                    if isinstance(
+                        value,
+                        list
+                    ):
+
+                        value = list(
+                            value
+                        )
+
+                    configuration[
+                        field
+                    ] = value
+
+                if not configuration:
+
+                    continue
+
+                self.component_manager.update_component_configuration(
+                    target_component.component_id,
+                    configuration,
+                )
+
+                copied_components += 1
+
+            # =================================================
+            # REFRESH
+            # =================================================
+
+            self.refresh_tree()
+
+            self.select_tree_node(
+                target_panel.node_id
+            )
+
+            self.display_selected_components()
+
+            # =================================================
+            # SUCCESS
+            # =================================================
+
+            QMessageBox.information(
+                self,
+                "Configuration Copied",
+                (
+                    "Panel configuration copied successfully.\n\n"
+                    f"Source: {source_panel.name}\n"
+                    f"Target: {target_panel.name}\n\n"
+                    f"Components updated: "
+                    f"{copied_components}\n"
+                    f"Components skipped: "
+                    f"{skipped_components}"
+                )
+            )
+
+        except (
+            ValueError,
+            TypeError,
+        ) as error:
+
+            QMessageBox.warning(
+                self,
+                "Cannot Copy Configuration",
+                str(error),
+            )
+
+        except Exception as error:
+
+            QMessageBox.critical(
+                self,
+                "Copy Failed",
+                str(error),
+            )
+
+    # =====================================================
+    # HELPERS FOR COPY
+    # =====================================================
+
+    @staticmethod
+    def safe_int(
+        value,
+    ):
+
+        try:
+
+            return int(
+                value or 0
+            )
+
+        except (
+            TypeError,
+            ValueError,
+        ):
+
+            return 0
+
+    @staticmethod
+    def component_identity_key(
+        component,
+    ):
+
+        component_type = str(
+            getattr(
+                component,
+                "component_type",
+                ""
+            )
+        ).strip().upper()
+
+        name = str(
+            getattr(
+                component,
+                "name",
+                ""
+            )
+        ).strip().upper()
+
+        return (
+            component_type,
+            name,
+        )
+
+    def get_panel_hierarchy_names(
+        self,
+        panel,
+    ):
+
+        result = []
+
+        current = panel
+
+        while current is not None:
+
+            name = str(
+                getattr(
+                    current,
+                    "name",
+                    ""
+                )
+            ).strip()
+
+            if name:
+
+                result.insert(
+                    0,
+                    name
+                )
+
+            parent_id = getattr(
+                current,
+                "parent_id",
+                None
+            )
+
+            if parent_id is None:
+
+                break
+
+            current = (
+                self.asset_manager
+                .get_node(
+                    parent_id
+                )
+            )
+
+        return result
+
+    # =====================================================
     # COMPONENT CONFIGURATION
-    # =================================================
+    # =====================================================
 
-    def configure_selected_component(self):
+    def configure_selected_component(
+        self,
+    ):
 
-        component = self.get_selected_component()
+        component = (
+            self.get_selected_component()
+        )
 
         if component is None:
 
@@ -2102,7 +2744,9 @@ class AssetView(QWidget):
 
             return
 
-        configuration = dialog.get_configuration()
+        configuration = (
+            dialog.get_configuration()
+        )
 
         try:
 
@@ -2123,14 +2767,6 @@ class AssetView(QWidget):
                 f"{component.name} configuration saved.",
             )
 
-        except ValueError as error:
-
-            QMessageBox.warning(
-                self,
-                "Cannot Save",
-                str(error),
-            )
-
         except Exception as error:
 
             QMessageBox.critical(
@@ -2139,20 +2775,24 @@ class AssetView(QWidget):
                 str(error),
             )
 
-    # =================================================
-    # PROTECTION FUNCTION CONFIGURATION
-    # =================================================
+    # =====================================================
+    # PROTECTION FUNCTIONS
+    # =====================================================
 
-    def configure_selected_protection(self):
+    def configure_selected_protection(
+        self,
+    ):
 
-        component = self.get_selected_component()
+        component = (
+            self.get_selected_component()
+        )
 
         if component is None:
 
             QMessageBox.warning(
                 self,
                 "No Component Selected",
-                "Please select a numerical relay first.",
+                "Please select a component first.",
             )
 
             return
@@ -2161,9 +2801,9 @@ class AssetView(QWidget):
             getattr(
                 component,
                 "component_type",
-                "",
+                ""
             )
-        ).upper()
+        ).strip().upper()
 
         if component_type != "NUMERICAL_RELAY":
 
@@ -2195,7 +2835,7 @@ class AssetView(QWidget):
                 getattr(
                     component,
                     "protection_functions",
-                    [],
+                    []
                 ),
             )
 
@@ -2205,126 +2845,146 @@ class AssetView(QWidget):
                 component.component_id
             )
 
-        except ValueError as error:
+        except Exception as error:
+
+            QMessageBox.critical(
+                self,
+                "Save Failed",
+                str(error),
+            )
+
+    # =====================================================
+    # EDIT ASSET
+    # =====================================================
+
+    def edit_selected_asset(
+        self,
+    ):
+
+        node = (
+            self.get_selected_node()
+        )
+
+        if node is None:
 
             QMessageBox.warning(
                 self,
-                "Cannot Save",
-                str(error),
+                "No Asset Selected",
+                "Please select an asset first.",
             )
 
-        except Exception as error:
+            return
 
-            QMessageBox.critical(
-                self,
-                "Save Failed",
-                str(error),
+        node_type = str(
+            getattr(
+                node,
+                "node_type",
+                ""
             )
+        ).strip().upper()
 
-    # =================================================
-    # SAVE COMPONENT CONFIGURATION
-    # =================================================
+        if node_type not in (
+            "SUBSTATION",
+            "SWITCHBOARD",
+            "PANEL",
+        ):
 
-    def save_component_configuration(
-        self,
-        component,
-    ):
+            return
 
-        if component is None:
-            return False
+        global_asset = None
+
+        asset_id = getattr(
+            node,
+            "asset_id",
+            None
+        )
+
+        if asset_id:
+
+            try:
+
+                self.asset_manager.asset_library.load()
+
+                global_asset = (
+                    self.asset_manager
+                    .asset_library
+                    .get_asset(
+                        asset_id
+                    )
+                )
+
+            except Exception:
+
+                global_asset = None
+
+        dialog = AssetEditDialog(
+            node=node,
+            global_asset=global_asset,
+            parent=self,
+        )
+
+        if (
+            dialog.exec()
+            != QDialog.DialogCode.Accepted
+        ):
+
+            return
+
+        values = (
+            dialog.get_values()
+        )
 
         try:
 
-            self.component_manager.update_component_configuration(
-                component.component_id,
-                {
-                    "manufacturer": getattr(
-                        component,
-                        "manufacturer",
-                        "",
-                    ),
-                    "model": getattr(
-                        component,
-                        "model",
-                        "",
-                    ),
-                    "serial_number": getattr(
-                        component,
-                        "serial_number",
-                        "",
-                    ),
-                    "ct_ratio": getattr(
-                        component,
-                        "ct_ratio",
-                        "",
-                    ),
-                    "ct_class": getattr(
-                        component,
-                        "ct_class",
-                        "",
-                    ),
-                    "burden": getattr(
-                        component,
-                        "burden",
-                        "",
-                    ),
-                    "core": getattr(
-                        component,
-                        "core",
-                        "",
-                    ),
-                    "vt_ratio": getattr(
-                        component,
-                        "vt_ratio",
-                        "",
-                    ),
-                    "firmware": getattr(
-                        component,
-                        "firmware",
-                        "",
-                    ),
-                    "coil_voltage": getattr(
-                        component,
-                        "coil_voltage",
-                        "",
-                    ),
-                    "contact_configuration": getattr(
-                        component,
-                        "contact_configuration",
-                        "",
-                    ),
-                    "protection_functions": getattr(
-                        component,
-                        "protection_functions",
-                        [],
-                    ),
-                },
+            updated_node = (
+                self.asset_manager
+                .update_asset_details(
+                    node_id=node.node_id,
+                    name=values["name"],
+                    asset_tag=values["asset_tag"],
+                    manufacturer=values[
+                        "manufacturer"
+                    ],
+                    model=values[
+                        "model"
+                    ],
+                    serial_number=values[
+                        "serial_number"
+                    ],
+                )
             )
 
-            return True
+            self.refresh_tree()
+
+            self.select_tree_node(
+                updated_node.node_id
+            )
 
         except Exception as error:
 
             QMessageBox.critical(
                 self,
-                "Save Failed",
-                f"Unable to save component configuration:\n\n"
-                f"{error}",
+                "Update Failed",
+                str(error),
             )
 
-            return False
+    # =====================================================
+    # TESTING
+    # =====================================================
 
-    # =================================================
-    # OPEN TESTING
-    # =================================================
-
-    def open_component_testing(self):
+    def open_component_testing(
+        self,
+    ):
 
         self.open_testing_view()
 
-    def open_testing_view(self):
+    def open_testing_view(
+        self,
+    ):
 
-        component = self.get_selected_component()
+        component = (
+            self.get_selected_component()
+        )
 
         if component is None:
 
@@ -2336,8 +2996,6 @@ class AssetView(QWidget):
 
             return
 
-        # Prevent duplicate testing windows.
-
         if self.testing_dialog is not None:
 
             try:
@@ -2345,6 +3003,7 @@ class AssetView(QWidget):
                 if self.testing_dialog.isVisible():
 
                     self.testing_dialog.raise_()
+
                     self.testing_dialog.activateWindow()
 
                     return
@@ -2356,7 +3015,7 @@ class AssetView(QWidget):
         project_id = getattr(
             self.project,
             "project_id",
-            None,
+            None
         )
 
         if not project_id:
@@ -2369,25 +3028,23 @@ class AssetView(QWidget):
 
             return
 
-        panel = self.get_selected_panel()
+        panel = (
+            self.get_selected_panel()
+        )
 
-        panel_id = None
-
-        if panel is not None:
-
-            panel_id = getattr(
+        panel_id = (
+            getattr(
                 panel,
                 "node_id",
-                None,
+                None
             )
-
-        if not panel_id:
-
-            panel_id = getattr(
+            if panel is not None
+            else getattr(
                 component,
                 "panel_id",
-                None,
+                None
             )
+        )
 
         if not panel_id:
 
@@ -2404,15 +3061,11 @@ class AssetView(QWidget):
             getattr(
                 component,
                 "component_type",
-                "",
+                ""
             )
         ).strip().upper()
 
         if component_type == "NUMERICAL_RELAY":
-
-            # =================================================
-            # GET CTs BELONGING TO THIS PANEL
-            # =================================================
 
             try:
 
@@ -2425,11 +3078,7 @@ class AssetView(QWidget):
 
             except AttributeError:
 
-                # Compatibility fallback for an older
-                # ComponentManager.
-
                 available_cts = [
-
                     item
 
                     for item
@@ -2451,28 +3100,16 @@ class AssetView(QWidget):
                     )
                 ]
 
-            # =================================================
-            # OPEN RELAY TESTING
-            # =================================================
-
             self.testing_dialog = RelayTestingDialog(
-
                 project_id=project_id,
-
                 panel_id=panel_id,
-
                 relay_id=component.component_id,
-
-                # Numerical relay
                 component=component,
-
-                # CTs mapped to this panel
                 available_cts=available_cts,
-
                 test_service=self.test_service,
-
                 parent=self,
             )
+
         elif component_type in (
             "CT",
             "CURRENT TRANSFORMER",
@@ -2498,6 +3135,7 @@ class AssetView(QWidget):
                 test_service=self.test_service,
                 parent=self,
             )
+
         elif component_type in (
             "METER",
             "AMMETER",
@@ -2506,15 +3144,10 @@ class AssetView(QWidget):
         ):
 
             self.testing_dialog = MeterTestingDialog(
-
                 project_id=project_id,
-
                 panel_id=panel_id,
-
                 component=component,
-
                 test_service=self.test_service,
-
                 parent=self,
             )
 
@@ -2541,21 +3174,29 @@ class AssetView(QWidget):
         )
 
         self.testing_dialog.show()
+
         self.testing_dialog.raise_()
+
         self.testing_dialog.activateWindow()
 
-    # =================================================
-    # TESTING DIALOG LIFETIME
-    # =================================================
+    # =====================================================
+    # TESTING LIFETIME
+    # =====================================================
 
-    def close_testing_dialog(self):
+    def close_testing_dialog(
+        self,
+    ):
 
         if self.testing_dialog is None:
+
             return
 
         try:
+
             self.testing_dialog.close()
+
         except RuntimeError:
+
             pass
 
         self.testing_dialog = None
@@ -2567,13 +3208,17 @@ class AssetView(QWidget):
 
         self.testing_dialog = None
 
-    # =================================================
+    # =====================================================
     # TEST HISTORY
-    # =================================================
+    # =====================================================
 
-    def open_test_history(self):
+    def open_test_history(
+        self,
+    ):
 
-        panel = self.get_selected_panel()
+        panel = (
+            self.get_selected_panel()
+        )
 
         if panel is None:
 
@@ -2588,32 +3233,16 @@ class AssetView(QWidget):
         project_id = getattr(
             self.project,
             "project_id",
-            None,
+            None
         )
-
-        if project_id is None:
-
-            QMessageBox.warning(
-                self,
-                "Project Error",
-                "Unable to determine project ID.",
-            )
-
-            return
 
         panel_id = getattr(
             panel,
             "node_id",
-            None,
+            None
         )
 
-        if panel_id is None:
-
-            QMessageBox.warning(
-                self,
-                "Panel Error",
-                "Unable to determine panel ID.",
-            )
+        if not project_id or not panel_id:
 
             return
 
@@ -2627,166 +3256,17 @@ class AssetView(QWidget):
 
         self.test_history_view.exec()
 
-    # =================================================
-    # REFRESH
-    # =================================================
-
-    def refresh_component_view(self):
-
-        self.display_selected_components()
-
-    # =================================================
-    # EDIT PHYSICAL ASSET
-    # =================================================
-
-    def edit_selected_asset(self):
-
-        node = self.get_selected_node()
-
-        if node is None:
-
-            QMessageBox.warning(
-                self,
-                "No Asset Selected",
-                "Please select a substation, "
-                "switchboard or panel first.",
-            )
-
-            return
-
-        node_type = str(
-            getattr(
-                node,
-                "node_type",
-                "",
-            )
-        ).upper()
-
-        if node_type not in (
-            "SUBSTATION",
-            "SWITCHBOARD",
-            "PANEL",
-        ):
-
-            QMessageBox.warning(
-                self,
-                "Invalid Selection",
-                "This asset cannot be edited here.",
-            )
-
-            return
-
-        # =================================================
-        # LOAD GLOBAL ASSET
-        # =================================================
-
-        global_asset = None
-
-        asset_id = getattr(
-            node,
-            "asset_id",
-            None,
-        )
-
-        if asset_id:
-
-            try:
-
-                self.asset_manager.asset_library.load()
-
-                global_asset = (
-                    self.asset_manager
-                    .asset_library
-                    .get_asset(
-                        asset_id
-                    )
-                )
-
-            except Exception:
-
-                global_asset = None
-        # =================================================
-        # OPEN EDIT DIALOG
-        # =================================================
-
-        dialog = AssetEditDialog(
-            node=node,
-            global_asset=global_asset,
-            parent=self,
-        )
-
-        if (
-            dialog.exec()
-            != QDialog.DialogCode.Accepted
-        ):
-
-            return
-
-        values = (
-            dialog.get_values()
-        )
-
-        # =================================================
-        # SAVE
-        # =================================================
-
-        try:
-
-            updated_node = (
-                self.asset_manager
-                .update_asset_details(
-                    node_id=node.node_id,
-                    name=values["name"],
-                    asset_tag=values["asset_tag"],
-                    manufacturer=values["manufacturer"],
-                    model=values["model"],
-                    serial_number=values["serial_number"],
-                )
-            )
-
-            self.refresh_tree()
-
-            # Try to restore the selection after refresh.
-            self.select_tree_node(
-                updated_node.node_id
-            )
-
-            QMessageBox.information(
-                self,
-                "Asset Updated",
-                f"{updated_node.name} "
-                "has been updated successfully.",
-            )
-
-        except ValueError as error:
-
-            QMessageBox.warning(
-                self,
-                "Cannot Update Asset",
-                str(error),
-            )
-
-        except Exception as error:
-
-            QMessageBox.critical(
-                self,
-                "Update Failed",
-                str(error),
-            )
-
     # =====================================================
     # PANEL REPORT
     # =====================================================
 
-# =====================================================
-# PANEL REPORT
-# =====================================================
-
     def generate_panel_report(
-        self
+        self,
     ):
 
-        panel = self.get_selected_panel()
+        panel = (
+            self.get_selected_panel()
+        )
 
         if panel is None:
 
@@ -2804,35 +3284,15 @@ class AssetView(QWidget):
             None
         )
 
-        if project_id is None:
-
-            QMessageBox.warning(
-                self,
-                "Project Error",
-                "Unable to determine project ID."
-            )
-
-            return
-
         panel_id = getattr(
             panel,
             "node_id",
             None
         )
 
-        if panel_id is None:
-
-            QMessageBox.warning(
-                self,
-                "Panel Error",
-                "Unable to determine panel ID."
-            )
+        if project_id is None or panel_id is None:
 
             return
-
-        # =================================================
-        # SELECT REPORT DATE
-        # =================================================
 
         report_date = (
             self.select_panel_report_date()
@@ -2844,10 +3304,6 @@ class AssetView(QWidget):
 
         try:
 
-            # =================================================
-            # COMPONENTS
-            # =================================================
-
             components = (
                 self.component_manager
                 .get_panel_components(
@@ -2855,36 +3311,24 @@ class AssetView(QWidget):
                 )
             )
 
-            # =================================================
-            # PROTECTION TESTS
-            # =================================================
-
-            protection_rows = (
-                self.test_service
-                .get_all_tests()
-            )
-
             protection_tests = []
 
-            for row in protection_rows:
+            for row in (
+                self.test_service
+                .get_all_tests()
+                or []
+            ):
 
-                # ---------------------------------------------
-                # Expected:
-                #
-                # 0 test_id
-                # 1 project_id
-                # 2 panel_id
-                # 3 relay_id
-                # 4 protection_code
-                # 5 test_date
-                # 6 result
-                # 7 remarks
-                # ---------------------------------------------
+                if len(row) < 6:
+
+                    continue
 
                 if row[1] != project_id:
+
                     continue
 
                 if row[2] != panel_id:
+
                     continue
 
                 test = (
@@ -2895,50 +3339,38 @@ class AssetView(QWidget):
                 )
 
                 if test is None:
+
                     continue
 
-                if not self.test_matches_date(
+                if self.test_matches_date(
                     test.get(
                         "test_date"
                     ),
                     report_date
                 ):
-                    continue
 
-                protection_tests.append(
-                    test
-                )
-
-            # =================================================
-            # COMPONENT TESTS
-            # =================================================
-
-            component_rows = (
-                self.test_service
-                .get_all_component_tests()
-            )
+                    protection_tests.append(
+                        test
+                    )
 
             component_tests = []
 
-            for row in component_rows:
+            for row in (
+                self.test_service
+                .get_all_component_tests()
+                or []
+            ):
 
-                # ---------------------------------------------
-                # Expected:
-                #
-                # 0 test_id
-                # 1 project_id
-                # 2 panel_id
-                # 3 component_id
-                # 4 test_type
-                # 5 test_date
-                # 6 result
-                # 7 remarks
-                # ---------------------------------------------
+                if len(row) < 6:
+
+                    continue
 
                 if row[1] != project_id:
+
                     continue
 
                 if row[2] != panel_id:
+
                     continue
 
                 test = (
@@ -2949,23 +3381,19 @@ class AssetView(QWidget):
                 )
 
                 if test is None:
+
                     continue
 
-                if not self.test_matches_date(
+                if self.test_matches_date(
                     test.get(
                         "test_date"
                     ),
                     report_date
                 ):
-                    continue
 
-                component_tests.append(
-                    test
-                )
-
-            # =================================================
-            # NOTHING TESTED ON SELECTED DATE
-            # =================================================
+                    component_tests.append(
+                        test
+                    )
 
             if not protection_tests and not component_tests:
 
@@ -2974,104 +3402,69 @@ class AssetView(QWidget):
                     "No Tests Found",
                     (
                         "No tests were conducted on "
-                        f"{report_date} for panel "
-                        f"{getattr(panel, 'name', panel_id)}."
+                        f"{report_date} for "
+                        f"{panel.name}."
                     )
                 )
 
                 return
 
-            # =================================================
-            # RESOLVE ELECTRICAL HIERARCHY
-            #
-            # Panel
-            #   -> Switchboard
-            #       -> Substation
-            #
-            # These names are passed to the report service so
-            # the generated document is self-identifying.
-            # =================================================
+            hierarchy = (
+                self.get_panel_hierarchy_names(
+                    panel
+                )
+            )
 
             substation_name = ""
+
             switchboard_name = ""
 
-            current_node = panel
+            for node in hierarchy:
 
-            while current_node is not None:
+                current = str(
+                    node
+                )
+
+                node_obj = (
+                    self.asset_manager
+                    .find_node(
+                        current
+                    )
+                )
+
+                if node_obj is None:
+
+                    continue
 
                 node_type = str(
                     getattr(
-                        current_node,
+                        node_obj,
                         "node_type",
                         ""
                     )
                 ).upper()
 
-                node_name = str(
-                    getattr(
-                        current_node,
-                        "name",
-                        ""
-                    )
-                ).strip()
+                if node_type == "SUBSTATION":
 
-                if node_type == "SWITCHBOARD":
+                    substation_name = current
 
-                    switchboard_name = node_name
+                elif node_type == "SWITCHBOARD":
 
-                elif node_type == "SUBSTATION":
-
-                    substation_name = node_name
-
-                parent_node_id = getattr(
-                    current_node,
-                    "parent_id",
-                    None
-                )
-
-                if parent_node_id is None:
-
-                    break
-
-                current_node = (
-                    self.asset_manager.get_node(
-                        parent_node_id
-                    )
-                )
-
-            # =================================================
-            # GENERATE REPORT
-            # =================================================
+                    switchboard_name = current
 
             service = PanelReportService(
                 self.project_folder
             )
 
             service.generate_report(
-
                 panel=panel,
-
                 components=components,
-
-                protection_tests=(
-                    protection_tests
-                ),
-
-                component_tests=(
-                    component_tests
-                ),
-
+                protection_tests=protection_tests,
+                component_tests=component_tests,
                 report_date=report_date,
-
-                substation_name=(
-                    substation_name
-                ),
-
-                switchboard_name=(
-                    switchboard_name
-                ),
-
-                parent=self
+                substation_name=substation_name,
+                switchboard_name=switchboard_name,
+                parent=self,
             )
 
         except Exception as error:
@@ -3082,13 +3475,12 @@ class AssetView(QWidget):
                 str(error)
             )
 
-
     # =====================================================
-    # SELECT REPORT DATE
+    # REPORT DATE
     # =====================================================
 
     def select_panel_report_date(
-        self
+        self,
     ):
 
         dialog = QDialog(
@@ -3186,64 +3578,67 @@ class AssetView(QWidget):
             )
         )
 
-
     # =====================================================
-    # TEST DATE MATCH
+    # DATE MATCH
     # =====================================================
 
     @staticmethod
     def test_matches_date(
         test_date,
-        report_date
+        report_date,
     ):
 
         if not test_date:
+
             return False
 
-        test_date = str(
+        value = str(
             test_date
         ).strip()
 
-        report_date = str(
-            report_date
-        ).strip()
+        if "T" in value:
 
-        # -------------------------------------------------
-        # ISO datetime
-        #
-        # 2026-08-15T16:42:32
-        #
-        # becomes
-        #
-        # 2026-08-15
-        # -------------------------------------------------
-
-        if "T" in test_date:
-
-            test_date = (
-                test_date
-                .split("T")[0]
+            value = (
+                value.split(
+                    "T"
+                )[0]
             )
 
-        # -------------------------------------------------
-        # ISO datetime with space
-        #
-        # 2026-08-15 16:42:32
-        # -------------------------------------------------
+        elif " " in value:
 
-        elif " " in test_date:
-
-            test_date = (
-                test_date
-                .split(" ")[0]
+            value = (
+                value.split(
+                    " "
+                )[0]
             )
-
-        # -------------------------------------------------
-        # Already YYYY-MM-DD
-        # -------------------------------------------------
 
         return (
-            test_date
+            value
             ==
-            report_date
+            str(
+                report_date
+            ).strip()
         )
+
+    # =====================================================
+    # REFRESH COMPONENT VIEW
+    # =====================================================
+
+    def refresh_component_view(
+        self,
+    ):
+
+        self.display_selected_components()
+
+    # =====================================================
+    # CLOSE EVENT
+    # =====================================================
+
+    def closeEvent(
+        self,
+        event,
+    ):
+
+        self.close_testing_dialog()
+
+        event.accept()

@@ -186,12 +186,12 @@
         "name": "P-05",
         "node_type": "PANEL",
         "parent_id": "AST-663B8E1F",
-        "equipment_name": "",
-        "equipment_type": "",
-        "ct_count": 0,
-        "relay_count": 0,
-        "aux_count": 0,
-        "meter_count": 0,
+        "equipment_name": "201-MK-2",
+        "equipment_type": "Motor",
+        "ct_count": 3,
+        "relay_count": 1,
+        "aux_count": 2,
+        "meter_count": 2,
         "asset_id": "ASSET-331928B0B2",
         "linked_asset_id": null
     },
@@ -208,5 +208,31 @@
         "meter_count": 0,
         "asset_id": "ASSET-05AEDA2D26",
         "linked_asset_id": null
+    },
+    {
+        "node_id": "AST-B4AB8C4D",
+        "name": "COKE YARD",
+        "node_type": "SUBSTATION",
+        "parent_id": null
+    },
+    {
+        "node_id": "AST-6455C156",
+        "name": "SEC-A",
+        "node_type": "SWITCHBOARD",
+        "parent_id": "AST-B4AB8C4D"
+    },
+    {
+        "node_id": "AST-50405489",
+        "name": "P-01",
+        "node_type": "PANEL",
+        "parent_id": "AST-6455C156",
+        "equipment_name": "POND MOTOR",
+        "equipment_type": "MOTOR",
+        "ct_count": 3,
+        "relay_count": 1,
+        "aux_count": 2,
+        "meter_count": 1,
+        "asset_id": "ASSET-07697045C9",
+        "linked_asset_id": "ASSET-07697045C9"
     }
 ]

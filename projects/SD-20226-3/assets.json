@@ -1,0 +1,28 @@
+[
+    {
+        "node_id": "AST-0F1855FA",
+        "name": "REF-3 SS-1",
+        "node_type": "SUBSTATION",
+        "parent_id": null
+    },
+    {
+        "node_id": "AST-B602A76F",
+        "name": "HV-201A",
+        "node_type": "SWITCHBOARD",
+        "parent_id": "AST-0F1855FA"
+    },
+    {
+        "node_id": "AST-3BC1D840",
+        "name": "P-01",
+        "node_type": "PANEL",
+        "parent_id": "AST-B602A76F",
+        "equipment_name": "201-MG-01A",
+        "equipment_type": "Motor",
+        "ct_count": 3,
+        "relay_count": 1,
+        "aux_count": 2,
+        "meter_count": 0,
+        "asset_id": "ASSET-A8F8D13E77",
+        "linked_asset_id": "ASSET-A8F8D13E77"
+    }
+]
