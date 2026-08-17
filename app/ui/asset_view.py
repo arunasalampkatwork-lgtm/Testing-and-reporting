@@ -1,11 +1,16 @@
 from pathlib import Path
 
 from PySide6.QtCore import Qt
+from PySide6.QtCore import (
+    QDate
+)
 from PySide6.QtWidgets import (
     QWidget,
     QVBoxLayout,
     QHBoxLayout,
     QFormLayout,
+    QFrame,
+    QSizePolicy,
     QTreeWidget,
     QTreeWidgetItem,
     QPushButton,
@@ -17,6 +22,7 @@ from PySide6.QtWidgets import (
     QDialog,
     QLineEdit,
     QDialogButtonBox,
+    QDateEdit,
 )
 
 from app.services.asset_manager import AssetManager
@@ -33,6 +39,13 @@ from app.ui.aux_relay_testing_dialog import AuxRelayTestingDialog
 from app.ui.test_history_view import TestHistoryView
 from app.ui.asset_link_dialog import AssetLinkDialog
 from app.ui.asset_edit_dialog import AssetEditDialog
+from app.services.panel_report_service import (
+    PanelReportService
+)
+from app.ui.meter_testing_dialog import (
+    MeterTestingDialog
+)
+
 
 
 class PanelAssetDialog(QDialog):
@@ -42,85 +55,93 @@ class PanelAssetDialog(QDialog):
         parent=None,
     ):
 
-        super().__init__(parent)
+        super().__init__(
+            parent
+        )
 
         self.setWindowTitle(
             "Add Panel"
         )
 
-        self.setModal(True)
+        self.setModal(
+            True
+        )
 
-        layout = QVBoxLayout(self)
+        self.resize(
+            450,
+            140
+        )
+
+        layout = QVBoxLayout(
+            self
+        )
 
         form = QFormLayout()
 
         self.name_edit = QLineEdit()
+
         self.name_edit.setPlaceholderText(
-            "Example: Panel-1"
+            "Example: P-03"
         )
 
         form.addRow(
             "Panel Name:",
-            self.name_edit,
+            self.name_edit
         )
 
-        # self.asset_tag_edit = QLineEdit()
-        # self.asset_tag_edit.setPlaceholderText(
-        #     "Example: 101-P-001A"
-        # )
-
-        # form.addRow(
-        #     "Asset Tag:",
-        #     self.asset_tag_edit,
-        # )
-
-        layout.addLayout(form)
+        layout.addLayout(
+            form
+        )
 
         buttons = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Ok
-            | QDialogButtonBox.StandardButton.Cancel
+            |
+            QDialogButtonBox.StandardButton.Cancel
         )
 
-        buttons.accepted.connect(self.accept)
-        buttons.rejected.connect(self.reject)
+        buttons.accepted.connect(
+            self.accept
+        )
 
-        layout.addWidget(buttons)
+        buttons.rejected.connect(
+            self.reject
+        )
+
+        layout.addWidget(
+            buttons
+        )
 
         self.name_edit.setFocus()
 
     def get_values(self):
-        return self.name_edit.text().strip()
 
+        return (
+            self.name_edit
+            .text()
+            .strip()
+        )
 
     def accept(self):
 
-        name = self.name_edit.text().strip()
-        #asset_tag = self.asset_tag_edit.text().strip()
+        name = (
+            self.name_edit
+            .text()
+            .strip()
+        )
 
         if not name:
 
             QMessageBox.warning(
                 self,
                 "Missing Panel Name",
-                "Please enter a panel name.",
+                "Please enter a panel name."
             )
 
             self.name_edit.setFocus()
+
             return
 
-        # if not asset_tag:
-
-        #     QMessageBox.warning(
-        #         self,
-        #         "Missing Asset Tag",
-        #         "Please enter the panel asset tag.",
-        #     )
-
-        #     self.asset_tag_edit.setFocus()
-        #    return
-
         super().accept()
-
 
 class AssetView(QWidget):
 
@@ -166,63 +187,168 @@ class AssetView(QWidget):
         # =================================================
 
         layout = QVBoxLayout(self)
+        layout.setContentsMargins(12, 12, 12, 12)
+        layout.setSpacing(10)
 
         # =================================================
-        # ASSET TREE
+        # WORKSPACE
+        #
+        # Left  : asset hierarchy + components
+        # Right : context/action panel
         # =================================================
+
+        workspace = QHBoxLayout()
+        workspace.setSpacing(12)
+
+        # =================================================
+        # LEFT WORKSPACE
+        # =================================================
+
+        left_layout = QVBoxLayout()
+        left_layout.setSpacing(8)
+
+        # -------------------------------------------------
+        # ASSET TREE HEADER
+        # -------------------------------------------------
+
+        asset_header = QLabel(
+            "Asset Hierarchy"
+        )
+
+        asset_header.setObjectName(
+            "SectionHeader"
+        )
+
+        left_layout.addWidget(
+            asset_header
+        )
+
+        # -------------------------------------------------
+        # ASSET TREE
+        # -------------------------------------------------
 
         self.tree = QTreeWidget()
 
         self.tree.setHeaderLabel(
-            "Asset Hierarchy"
+            "Project Assets"
         )
 
-        self.tree.setMinimumHeight(250)
+        self.tree.setMinimumHeight(280)
 
-        layout.addWidget(self.tree)
+        self.tree.setSizePolicy(
+            QSizePolicy.Policy.Expanding,
+            QSizePolicy.Policy.Expanding,
+        )
 
-        # =================================================
-        # COMPONENT SECTION
-        # =================================================
+        self.tree.setIndentation(24)
+        self.tree.setAnimated(True)
+        self.tree.setUniformRowHeights(True)
+
+        left_layout.addWidget(
+            self.tree,
+            5,
+        )
+
+        # -------------------------------------------------
+        # COMPONENT HEADER
+        # -------------------------------------------------
 
         self.component_label = QLabel(
             "Test Components"
         )
 
-        layout.addWidget(self.component_label)
+        self.component_label.setObjectName(
+            "SectionHeader"
+        )
+
+        left_layout.addWidget(
+            self.component_label
+        )
+
+        # -------------------------------------------------
+        # COMPONENT LIST
+        # -------------------------------------------------
 
         self.component_list = QListWidget()
 
-        layout.addWidget(self.component_list)
+        self.component_list.setMinimumHeight(220)
 
-        # =================================================
-        # COMPONENT CONFIGURATION
-        # =================================================
-
-        self.configure_component = QPushButton(
-            "Edit Component"
+        self.component_list.setSizePolicy(
+            QSizePolicy.Policy.Expanding,
+            QSizePolicy.Policy.Expanding,
         )
 
-        layout.addWidget(self.configure_component)
+        self.component_list.setSpacing(2)
+        self.component_list.setUniformItemSizes(True)
 
-        # =================================================
-        # PROTECTION FUNCTION CONFIGURATION
-        # =================================================
-
-        self.configure_protection = QPushButton(
-            "Edit Protection Functions"
+        left_layout.addWidget(
+            self.component_list,
+            4,
         )
 
-        layout.addWidget(self.configure_protection)
-
         # =================================================
-        # BOTTOM BUTTONS
+        # RIGHT ACTION PANEL
         # =================================================
 
-        buttons = QHBoxLayout()
+        action_panel = QFrame()
+
+        action_panel.setObjectName(
+            "ActionPanel"
+        )
+
+        action_panel.setFixedWidth(
+            245
+        )
+
+        action_layout = QVBoxLayout(
+            action_panel
+        )
+
+        action_layout.setContentsMargins(
+            12,
+            12,
+            12,
+            12,
+        )
+
+        action_layout.setSpacing(7)
+
+        # -------------------------------------------------
+        # ACTION HEADER
+        # -------------------------------------------------
+
+        action_title = QLabel(
+            "Actions"
+        )
+
+        action_title.setObjectName(
+            "ActionTitle"
+        )
+
+        action_layout.addWidget(
+            action_title
+        )
+
+        action_subtitle = QLabel(
+            "Select an asset or component, then choose an action."
+        )
+
+        action_subtitle.setObjectName(
+            "ActionSubtitle"
+        )
+
+        action_subtitle.setWordWrap(True)
+
+        action_layout.addWidget(
+            action_subtitle
+        )
+
+        # -------------------------------------------------
+        # BUTTONS
+        # -------------------------------------------------
 
         self.add_substation = QPushButton(
-            "+ Substation"
+            "+  Substation"
         )
 
         self.link_substation = QPushButton(
@@ -230,7 +356,7 @@ class AssetView(QWidget):
         )
 
         self.add_switchboard = QPushButton(
-            "+ Switchboard"
+            "+  Switchboard"
         )
 
         self.link_switchboard = QPushButton(
@@ -238,11 +364,19 @@ class AssetView(QWidget):
         )
 
         self.add_panel = QPushButton(
-            "+ Panel"
+            "+  Panel"
         )
 
         self.link_panel = QPushButton(
             "Link Existing Panel"
+        )
+
+        self.configure_component = QPushButton(
+            "Edit Component"
+        )
+
+        self.configure_protection = QPushButton(
+            "Edit Protection Functions"
         )
 
         self.configure_panel = QPushButton(
@@ -256,6 +390,11 @@ class AssetView(QWidget):
         self.test_history_button = QPushButton(
             "Test History"
         )
+
+        self.panel_report_button = QPushButton(
+            "Panel Report"
+        )
+
         self.edit_asset_button = QPushButton(
             "Edit Asset"
         )
@@ -264,47 +403,291 @@ class AssetView(QWidget):
         # still refer to self.test_history.
         self.test_history = self.test_history_button
 
-        buttons.addWidget(
-            self.add_substation
+        # -------------------------------------------------
+        # GROUP LABEL HELPER
+        # -------------------------------------------------
+
+        def add_action_group(
+            title,
+            buttons,
+        ):
+
+            group_label = QLabel(
+                title.upper()
+            )
+
+            group_label.setObjectName(
+                "ActionGroup"
+            )
+
+            action_layout.addWidget(
+                group_label
+            )
+
+            for button in buttons:
+
+                button.setMinimumHeight(
+                    38
+                )
+
+                button.setSizePolicy(
+                    QSizePolicy.Policy.Expanding,
+                    QSizePolicy.Policy.Fixed,
+                )
+
+                action_layout.addWidget(
+                    button
+                )
+
+        # -------------------------------------------------
+        # ASSET STRUCTURE
+        # -------------------------------------------------
+
+        add_action_group(
+            "Asset Structure",
+            [
+                self.add_substation,
+                self.link_substation,
+                self.add_switchboard,
+                self.link_switchboard,
+                self.add_panel,
+                self.link_panel,
+            ],
         )
 
-        buttons.addWidget(
-            self.link_substation
+        # -------------------------------------------------
+        # EDITING
+        # -------------------------------------------------
+
+        add_action_group(
+            "Editing",
+            [
+                self.edit_asset_button,
+                self.configure_panel,
+                self.configure_component,
+                self.configure_protection,
+            ],
         )
 
-        buttons.addWidget(
-            self.add_switchboard
+        # -------------------------------------------------
+        # TESTING & REPORTING
+        # -------------------------------------------------
+
+        add_action_group(
+            "Testing & Reporting",
+            [
+                self.open_testing,
+                self.test_history_button,
+                self.panel_report_button,
+            ],
         )
 
-        buttons.addWidget(
-            self.link_switchboard
+        action_layout.addStretch()
+
+        # =================================================
+        # ADD WORKSPACE
+        # =================================================
+
+        workspace.addLayout(
+            left_layout,
+            1,
         )
 
-        buttons.addWidget(
-            self.add_panel
+        workspace.addWidget(
+            action_panel
         )
 
-        buttons.addWidget(
-            self.link_panel
+        layout.addLayout(
+            workspace,
+            1,
         )
 
-        buttons.addWidget(
-            self.edit_asset_button
+        # =================================================
+        # LOCAL UI STYLING
+        # =================================================
+
+        self.setStyleSheet(
+            """
+            /* ------------------------------------------
+               SECTION HEADERS
+               ------------------------------------------ */
+
+            QLabel#SectionHeader {
+                font-size: 15px;
+                font-weight: 600;
+                padding: 8px 11px;
+                color: #f2f2f2;
+                background-color: #353535;
+                border: 1px solid #454545;
+                border-radius: 6px;
+            }
+
+            /* ------------------------------------------
+               ACTION PANEL
+               ------------------------------------------ */
+
+            QFrame#ActionPanel {
+                background-color: #242424;
+                border: 1px solid #414141;
+                border-radius: 8px;
+            }
+
+            QLabel#ActionTitle {
+                font-size: 19px;
+                font-weight: 700;
+                padding: 2px 2px 0px 2px;
+                color: #f4f4f4;
+                background: transparent;
+                border: none;
+            }
+
+            QLabel#ActionSubtitle {
+                font-size: 11px;
+                color: #999999;
+                padding: 0px 2px 6px 2px;
+                background: transparent;
+                border: none;
+            }
+
+            QLabel#ActionGroup {
+                font-size: 10px;
+                font-weight: 700;
+                letter-spacing: 1px;
+                color: #a9a9a9;
+                padding: 7px 3px 2px 3px;
+                background: transparent;
+                border: none;
+            }
+
+            /* ------------------------------------------
+               ACTION BUTTONS
+               ------------------------------------------ */
+
+            QPushButton {
+                min-height: 36px;
+                padding: 6px 11px;
+                text-align: left;
+                border-radius: 6px;
+                border: 1px solid #444444;
+                background-color: #303030;
+                color: #eeeeee;
+            }
+
+            QPushButton:hover {
+                background-color: #383838;
+                border: 1px solid #666666;
+            }
+
+            QPushButton:pressed {
+                background-color: #222222;
+                border: 1px solid #777777;
+            }
+
+            QPushButton:disabled {
+                color: #666666;
+                background-color: #272727;
+                border: 1px solid #333333;
+            }
+
+            /* Primary workflow */
+            QPushButton#OpenTestingButton {
+                min-height: 44px;
+                font-size: 13px;
+                font-weight: 700;
+                border: 1px solid #e58a18;
+                background-color: #343434;
+            }
+
+            QPushButton#OpenTestingButton:hover {
+                background-color: #3d3d3d;
+                border: 1px solid #f09a27;
+            }
+
+            QPushButton#OpenTestingButton:pressed {
+                background-color: #292929;
+            }
+
+            /* Report action */
+            QPushButton#PanelReportButton {
+                min-height: 42px;
+                font-weight: 600;
+            }
+
+            /* ------------------------------------------
+               TREE
+               ------------------------------------------ */
+
+            QTreeWidget {
+                background-color: #292929;
+                alternate-background-color: #2d2d2d;
+                border: 1px solid #3e3e3e;
+                border-radius: 6px;
+                outline: none;
+                padding: 4px;
+            }
+
+            QTreeWidget::item {
+                height: 30px;
+                padding: 3px 6px;
+                border-radius: 4px;
+            }
+
+            QTreeWidget::item:hover {
+                background-color: #353535;
+            }
+
+            QTreeWidget::item:selected {
+                background-color: #3b3b3b;
+                border-left: 2px solid #e58a18;
+            }
+
+            QHeaderView::section {
+                background-color: #333333;
+                color: #dddddd;
+                padding: 7px;
+                border: none;
+                border-bottom: 1px solid #444444;
+                font-weight: 600;
+            }
+
+            /* ------------------------------------------
+               COMPONENT LIST
+               ------------------------------------------ */
+
+            QListWidget {
+                background-color: #292929;
+                alternate-background-color: #2d2d2d;
+                border: 1px solid #3e3e3e;
+                border-radius: 6px;
+                outline: none;
+                padding: 4px;
+            }
+
+            QListWidget::item {
+                min-height: 34px;
+                padding: 4px 9px;
+                border-radius: 5px;
+            }
+
+            QListWidget::item:hover {
+                background-color: #353535;
+            }
+
+            QListWidget::item:selected {
+                background-color: #3b3b3b;
+                border-left: 2px solid #e58a18;
+            }
+            """
         )
 
-        buttons.addWidget(
-            self.configure_panel
+        # Make the primary actions visually distinct.
+        self.open_testing.setObjectName(
+            "OpenTestingButton"
         )
 
-        buttons.addWidget(
-            self.open_testing
+        self.panel_report_button.setObjectName(
+            "PanelReportButton"
         )
-
-        buttons.addWidget(
-            self.test_history_button
-        )
-
-        layout.addLayout(buttons)
 
         # =================================================
         # SIGNALS
@@ -364,34 +747,155 @@ class AssetView(QWidget):
         self.edit_asset_button.clicked.connect(
             self.edit_selected_asset
         )
+        self.panel_report_button.clicked.connect(
+            self.generate_panel_report
+        )
 
         # =================================================
         # INITIAL STATE
         # =================================================
 
         self._update_button_states()
+        self._tree_initialized = False
         self.refresh_tree()
 
     # =================================================
     # TREE
     # =================================================
 
+
     def refresh_tree(self):
 
-        self.tree.clear()
-        self.component_list.clear()
+        expanded_node_ids = set()
 
-        roots = self.asset_manager.get_children(None)
+        def collect_expanded(item):
 
-        for node in roots:
+            node_id = item.data(
+                0,
+                Qt.ItemDataRole.UserRole
+            )
 
-            item = self._create_tree_item(node)
+            if node_id and item.isExpanded():
+                expanded_node_ids.add(node_id)
 
-            self.tree.addTopLevelItem(item)
+            for index in range(item.childCount()):
 
-        self.tree.expandAll()
+                collect_expanded(
+                    item.child(index)
+                )
+
+        for index in range(
+            self.tree.topLevelItemCount()
+        ):
+
+            collect_expanded(
+                self.tree.topLevelItem(index)
+            )
+
+        # =================================================
+        # REMEMBER CURRENT SELECTION
+        # =================================================
+
+        selected_node_id = None
+
+        current_item = self.tree.currentItem()
+
+        if current_item is not None:
+
+            selected_node_id = current_item.data(
+                0,
+                Qt.ItemDataRole.UserRole
+            )
+
+        # =================================================
+        # REBUILD TREE
+        # =================================================
+
+        self.tree.blockSignals(True)
+
+        try:
+
+            self.tree.clear()
+
+            self.component_list.clear()
+
+            roots = self.asset_manager.get_children(None)
+
+            for node in roots:
+
+                item = self._create_tree_item(
+                    node
+                )
+
+                self.tree.addTopLevelItem(
+                    item
+                )
+
+            # =================================================
+            # INITIAL LOAD
+            #
+            # First load is collapsed.
+            # Later refreshes preserve the user's state.
+            # =================================================
+
+            if not self._tree_initialized:
+
+                self.tree.collapseAll()
+
+            else:
+
+                def restore_expansion(item):
+
+                    node_id = item.data(
+                        0,
+                        Qt.ItemDataRole.UserRole
+                    )
+
+                    if node_id in expanded_node_ids:
+
+                        item.setExpanded(
+                            True
+                        )
+
+                    for index in range(
+                        item.childCount()
+                    ):
+
+                        restore_expansion(
+                            item.child(index)
+                        )
+
+                for index in range(
+                    self.tree.topLevelItemCount()
+                ):
+
+                    restore_expansion(
+                        self.tree.topLevelItem(index)
+                    )
+
+        finally:
+
+            self.tree.blockSignals(False)
+
+        # =================================================
+        # RESTORE SELECTION
+        # =================================================
+
+        if selected_node_id:
+
+            self.select_tree_node(
+                selected_node_id
+            )
+
+        # =================================================
+        # UPDATE STATE
+        # =================================================
+
+        self._tree_initialized = True
 
         self._update_button_states()
+
+        self.display_selected_components()
     # =================================================
     # SELECT TREE NODE
     # =================================================
@@ -734,6 +1238,9 @@ class AssetView(QWidget):
         )
 
         self.test_history_button.setEnabled(
+            panel_selected
+        )
+        self.panel_report_button.setEnabled(
             panel_selected
         )
         physical_asset_selected = (
@@ -1100,6 +1607,7 @@ class AssetView(QWidget):
     # CREATE PANEL
     # =================================================
 
+
     def create_panel(self):
 
         if self._creating_panel:
@@ -1116,7 +1624,7 @@ class AssetView(QWidget):
                 QMessageBox.warning(
                     self,
                     "Invalid Selection",
-                    "Please select a switchboard first.",
+                    "Please select a switchboard first."
                 )
 
                 return
@@ -1132,10 +1640,12 @@ class AssetView(QWidget):
                 QMessageBox.warning(
                     self,
                     "Invalid Selection",
-                    "A panel must belong to a switchboard.",
+                    "A panel must belong to a switchboard."
                 )
 
                 return
+
+            parent_id = parent.node_id
 
             dialog = PanelAssetDialog(
                 parent=self
@@ -1153,13 +1663,98 @@ class AssetView(QWidget):
             if not name:
                 return
 
+            # =================================================
+            # AUTO-GENERATE PHYSICAL ASSET TAG
+            #
+            # Hierarchy:
+            #     REF-III SS-2
+            #         HV-203A
+            #
+            # Panel:
+            #     P-03
+            #
+            # Result:
+            #     REF-III-SS-2-HV-203A-P-03
+            # =================================================
+
+            hierarchy_names = []
+
+            current = parent
+
+            while current is not None:
+
+                current_name = str(
+                    getattr(
+                        current,
+                        "name",
+                        ""
+                    )
+                ).strip()
+
+                if current_name:
+
+                    hierarchy_names.append(
+                        current_name
+                    )
+
+                current_parent_id = getattr(
+                    current,
+                    "parent_id",
+                    None
+                )
+
+                if current_parent_id is None:
+                    break
+
+                current = (
+                    self.asset_manager.get_node(
+                        current_parent_id
+                    )
+                )
+
+            hierarchy_names.reverse()
+
+            tag_parts = []
+
+            for value in hierarchy_names:
+
+                cleaned = (
+                    str(value)
+                    .strip()
+                    .replace(" ", "-")
+                )
+
+                if cleaned:
+                    tag_parts.append(cleaned)
+
+            panel_tag_name = (
+                str(name)
+                .strip()
+                .replace(" ", "-")
+            )
+
+            if panel_tag_name:
+                tag_parts.append(
+                    panel_tag_name
+                )
+
+            asset_tag = "-".join(
+                tag_parts
+            )
+
+            # =================================================
+            # CREATE
+            # =================================================
+
             try:
 
-                self.asset_manager.create_node(
-                    name=name,
-                    node_type="PANEL",
-                    parent_id=parent.node_id,
-                    # asset_tag=asset_tag,
+                new_panel = (
+                    self.asset_manager.create_node(
+                        name=name,
+                        node_type="PANEL",
+                        parent_id=parent_id,
+                        asset_tag=asset_tag
+                    )
                 )
 
             except ValueError as error:
@@ -1167,17 +1762,30 @@ class AssetView(QWidget):
                 QMessageBox.warning(
                     self,
                     "Cannot Create Panel",
-                    str(error),
+                    str(error)
                 )
 
                 return
 
+            # =================================================
+            # REFRESH WHILE PRESERVING TREE STATE
+            # =================================================
+
             self.refresh_tree()
+
+            if new_panel is not None:
+
+                self.select_tree_node(
+                    new_panel.node_id
+                )
+
+                self.display_selected_components()
+
+            self._update_button_states()
 
         finally:
 
             self._creating_panel = False
-
     # =================================================
     # AVAILABLE PANELS
     # =================================================
@@ -1430,24 +2038,10 @@ class AssetView(QWidget):
 
             self.component_manager.generate_panel_components(
                 panel_id=panel.node_id,
-                ct_count=int(
-                    configuration.get(
-                        "ct_count",
-                        0,
-                    ) or 0
-                ),
-                relay_count=int(
-                    configuration.get(
-                        "relay_count",
-                        0,
-                    ) or 0
-                ),
-                aux_count=int(
-                    configuration.get(
-                        "aux_count",
-                        0,
-                    ) or 0
-                ),
+                ct_count=int(configuration.get("ct_count", 0) or 0),
+                relay_count=int(configuration.get("relay_count", 0) or 0),
+                aux_count=int(configuration.get("aux_count", 0) or 0),
+                meter_count=int(configuration.get("meter_count", 0) or 0),
             )
 
             self.display_selected_components()
@@ -1904,6 +2498,25 @@ class AssetView(QWidget):
                 test_service=self.test_service,
                 parent=self,
             )
+        elif component_type in (
+            "METER",
+            "AMMETER",
+            "VOLTMETER",
+            "MULTIFUNCTION_METER",
+        ):
+
+            self.testing_dialog = MeterTestingDialog(
+
+                project_id=project_id,
+
+                panel_id=panel_id,
+
+                component=component,
+
+                test_service=self.test_service,
+
+                parent=self,
+            )
 
         else:
 
@@ -2092,12 +2705,6 @@ class AssetView(QWidget):
             except Exception:
 
                 global_asset = None
-        dialog = AssetEditDialog(
-            node=node,
-            global_asset=global_asset,
-            parent=self,
-        )
-
         # =================================================
         # OPEN EDIT DIALOG
         # =================================================
@@ -2166,3 +2773,477 @@ class AssetView(QWidget):
                 "Update Failed",
                 str(error),
             )
+
+    # =====================================================
+    # PANEL REPORT
+    # =====================================================
+
+# =====================================================
+# PANEL REPORT
+# =====================================================
+
+    def generate_panel_report(
+        self
+    ):
+
+        panel = self.get_selected_panel()
+
+        if panel is None:
+
+            QMessageBox.warning(
+                self,
+                "No Panel Selected",
+                "Please select a panel first."
+            )
+
+            return
+
+        project_id = getattr(
+            self.project,
+            "project_id",
+            None
+        )
+
+        if project_id is None:
+
+            QMessageBox.warning(
+                self,
+                "Project Error",
+                "Unable to determine project ID."
+            )
+
+            return
+
+        panel_id = getattr(
+            panel,
+            "node_id",
+            None
+        )
+
+        if panel_id is None:
+
+            QMessageBox.warning(
+                self,
+                "Panel Error",
+                "Unable to determine panel ID."
+            )
+
+            return
+
+        # =================================================
+        # SELECT REPORT DATE
+        # =================================================
+
+        report_date = (
+            self.select_panel_report_date()
+        )
+
+        if not report_date:
+
+            return
+
+        try:
+
+            # =================================================
+            # COMPONENTS
+            # =================================================
+
+            components = (
+                self.component_manager
+                .get_panel_components(
+                    panel_id
+                )
+            )
+
+            # =================================================
+            # PROTECTION TESTS
+            # =================================================
+
+            protection_rows = (
+                self.test_service
+                .get_all_tests()
+            )
+
+            protection_tests = []
+
+            for row in protection_rows:
+
+                # ---------------------------------------------
+                # Expected:
+                #
+                # 0 test_id
+                # 1 project_id
+                # 2 panel_id
+                # 3 relay_id
+                # 4 protection_code
+                # 5 test_date
+                # 6 result
+                # 7 remarks
+                # ---------------------------------------------
+
+                if row[1] != project_id:
+                    continue
+
+                if row[2] != panel_id:
+                    continue
+
+                test = (
+                    self.test_service
+                    .get_test(
+                        row[0]
+                    )
+                )
+
+                if test is None:
+                    continue
+
+                if not self.test_matches_date(
+                    test.get(
+                        "test_date"
+                    ),
+                    report_date
+                ):
+                    continue
+
+                protection_tests.append(
+                    test
+                )
+
+            # =================================================
+            # COMPONENT TESTS
+            # =================================================
+
+            component_rows = (
+                self.test_service
+                .get_all_component_tests()
+            )
+
+            component_tests = []
+
+            for row in component_rows:
+
+                # ---------------------------------------------
+                # Expected:
+                #
+                # 0 test_id
+                # 1 project_id
+                # 2 panel_id
+                # 3 component_id
+                # 4 test_type
+                # 5 test_date
+                # 6 result
+                # 7 remarks
+                # ---------------------------------------------
+
+                if row[1] != project_id:
+                    continue
+
+                if row[2] != panel_id:
+                    continue
+
+                test = (
+                    self.test_service
+                    .get_component_test(
+                        row[0]
+                    )
+                )
+
+                if test is None:
+                    continue
+
+                if not self.test_matches_date(
+                    test.get(
+                        "test_date"
+                    ),
+                    report_date
+                ):
+                    continue
+
+                component_tests.append(
+                    test
+                )
+
+            # =================================================
+            # NOTHING TESTED ON SELECTED DATE
+            # =================================================
+
+            if not protection_tests and not component_tests:
+
+                QMessageBox.information(
+                    self,
+                    "No Tests Found",
+                    (
+                        "No tests were conducted on "
+                        f"{report_date} for panel "
+                        f"{getattr(panel, 'name', panel_id)}."
+                    )
+                )
+
+                return
+
+            # =================================================
+            # RESOLVE ELECTRICAL HIERARCHY
+            #
+            # Panel
+            #   -> Switchboard
+            #       -> Substation
+            #
+            # These names are passed to the report service so
+            # the generated document is self-identifying.
+            # =================================================
+
+            substation_name = ""
+            switchboard_name = ""
+
+            current_node = panel
+
+            while current_node is not None:
+
+                node_type = str(
+                    getattr(
+                        current_node,
+                        "node_type",
+                        ""
+                    )
+                ).upper()
+
+                node_name = str(
+                    getattr(
+                        current_node,
+                        "name",
+                        ""
+                    )
+                ).strip()
+
+                if node_type == "SWITCHBOARD":
+
+                    switchboard_name = node_name
+
+                elif node_type == "SUBSTATION":
+
+                    substation_name = node_name
+
+                parent_node_id = getattr(
+                    current_node,
+                    "parent_id",
+                    None
+                )
+
+                if parent_node_id is None:
+
+                    break
+
+                current_node = (
+                    self.asset_manager.get_node(
+                        parent_node_id
+                    )
+                )
+
+            # =================================================
+            # GENERATE REPORT
+            # =================================================
+
+            service = PanelReportService(
+                self.project_folder
+            )
+
+            service.generate_report(
+
+                panel=panel,
+
+                components=components,
+
+                protection_tests=(
+                    protection_tests
+                ),
+
+                component_tests=(
+                    component_tests
+                ),
+
+                report_date=report_date,
+
+                substation_name=(
+                    substation_name
+                ),
+
+                switchboard_name=(
+                    switchboard_name
+                ),
+
+                parent=self
+            )
+
+        except Exception as error:
+
+            QMessageBox.critical(
+                self,
+                "Panel Report Failed",
+                str(error)
+            )
+
+
+    # =====================================================
+    # SELECT REPORT DATE
+    # =====================================================
+
+    def select_panel_report_date(
+        self
+    ):
+
+        dialog = QDialog(
+            self
+        )
+
+        dialog.setWindowTitle(
+            "Panel Report Date"
+        )
+
+        dialog.resize(
+            350,
+            150
+        )
+
+        layout = QVBoxLayout(
+            dialog
+        )
+
+        label = QLabel(
+            "Select the date for which the panel report "
+            "shall be generated:"
+        )
+
+        label.setWordWrap(
+            True
+        )
+
+        layout.addWidget(
+            label
+        )
+
+        date_edit = QDateEdit()
+
+        date_edit.setCalendarPopup(
+            True
+        )
+
+        date_edit.setDisplayFormat(
+            "dd-MM-yyyy"
+        )
+
+        date_edit.setDate(
+            QDate.currentDate()
+        )
+
+        layout.addWidget(
+            date_edit
+        )
+
+        buttons = QHBoxLayout()
+
+        cancel_button = QPushButton(
+            "Cancel"
+        )
+
+        generate_button = QPushButton(
+            "Generate"
+        )
+
+        buttons.addStretch()
+
+        buttons.addWidget(
+            cancel_button
+        )
+
+        buttons.addWidget(
+            generate_button
+        )
+
+        layout.addLayout(
+            buttons
+        )
+
+        cancel_button.clicked.connect(
+            dialog.reject
+        )
+
+        generate_button.clicked.connect(
+            dialog.accept
+        )
+
+        if (
+            dialog.exec()
+            != QDialog.DialogCode.Accepted
+        ):
+
+            return None
+
+        return (
+            date_edit
+            .date()
+            .toString(
+                "yyyy-MM-dd"
+            )
+        )
+
+
+    # =====================================================
+    # TEST DATE MATCH
+    # =====================================================
+
+    @staticmethod
+    def test_matches_date(
+        test_date,
+        report_date
+    ):
+
+        if not test_date:
+            return False
+
+        test_date = str(
+            test_date
+        ).strip()
+
+        report_date = str(
+            report_date
+        ).strip()
+
+        # -------------------------------------------------
+        # ISO datetime
+        #
+        # 2026-08-15T16:42:32
+        #
+        # becomes
+        #
+        # 2026-08-15
+        # -------------------------------------------------
+
+        if "T" in test_date:
+
+            test_date = (
+                test_date
+                .split("T")[0]
+            )
+
+        # -------------------------------------------------
+        # ISO datetime with space
+        #
+        # 2026-08-15 16:42:32
+        # -------------------------------------------------
+
+        elif " " in test_date:
+
+            test_date = (
+                test_date
+                .split(" ")[0]
+            )
+
+        # -------------------------------------------------
+        # Already YYYY-MM-DD
+        # -------------------------------------------------
+
+        return (
+            test_date
+            ==
+            report_date
+        )

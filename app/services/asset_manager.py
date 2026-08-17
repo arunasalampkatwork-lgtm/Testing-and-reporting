@@ -756,6 +756,12 @@ class AssetManager:
                 0
             ) or 0
         )
+        node.meter_count = int(
+            configuration.get(
+                "meter_count",
+                0
+            ) or 0
+        )
 
         # -------------------------------------------------
         # Synchronize the physical panel configuration with
@@ -857,6 +863,12 @@ class AssetManager:
                     node,
                     "aux_count",
                     0
+                ),
+            "meter_count":
+                getattr(
+                    node,
+                    "meter_count",
+                    0
                 )
         }
 
@@ -925,6 +937,12 @@ class AssetManager:
                         getattr(
                             node,
                             "aux_count",
+                            0
+                        ),
+                    "meter_count":
+                        getattr(
+                            node,
+                            "meter_count",
                             0
                         ),
                     "asset_id":
@@ -1053,6 +1071,12 @@ class AssetManager:
                     node.aux_count = int(
                         item.get(
                             "aux_count",
+                            0
+                        ) or 0
+                    )
+                    node.meter_count = int(
+                        item.get(
+                            "meter_count",
                             0
                         ) or 0
                     )

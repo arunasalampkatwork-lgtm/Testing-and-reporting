@@ -21,6 +21,8 @@ class AuxRelayTestingDialog(QDialog):
         panel_id,
         component,
         test_service=None,
+        existing_test=None,
+        test_id=None,
         parent=None,
     ):
         super().__init__(parent)
@@ -29,6 +31,8 @@ class AuxRelayTestingDialog(QDialog):
         self.panel_id = panel_id
         self.component = component
         self.test_service = test_service
+        self.test_id = test_id
+        self.existing_test = existing_test
 
         self.fields = {}
 
@@ -40,6 +44,9 @@ class AuxRelayTestingDialog(QDialog):
         self.resize(850, 700)
 
         self.build_ui()
+        if self.existing_test:
+
+            self.populate_existing_test()
 
     # =====================================================
     # BUILD UI
@@ -763,8 +770,13 @@ class AuxRelayTestingDialog(QDialog):
     # =====================================================
     # SAVE
     # =====================================================
+# =====================================================
+# SAVE / UPDATE
+# =====================================================
 
-    def save_test(self):
+    def save_test(
+        self
+    ):
 
         values = self.get_field_values()
 
@@ -773,55 +785,265 @@ class AuxRelayTestingDialog(QDialog):
             QMessageBox.warning(
                 self,
                 "Save Failed",
-                "Test service is not available.",
+                "Test service is not available."
             )
 
             return
 
         try:
 
+            result = (
+                values.get(
+                    "result",
+                    "NOT TESTED"
+                )
+                or
+                "NOT TESTED"
+            )
+
+            remarks = (
+                values.get(
+                    "remarks",
+                    ""
+                )
+            )
+
+            # -------------------------------------------------
+            # UPDATE EXISTING TEST
+            # -------------------------------------------------
+
+            if self.test_id:
+
+                self.test_service.update_component_test(
+
+                    test_id=(
+                        self.test_id
+                    ),
+
+                    measurements=(
+                        values
+                    ),
+
+                    result=(
+                        result
+                    ),
+
+                    remarks=(
+                        remarks
+                    )
+                )
+
+                QMessageBox.information(
+                    self,
+                    "Test Updated",
+                    (
+                        "Auxiliary relay test "
+                        "updated successfully.\n\n"
+                        f"Test ID: {self.test_id}"
+                    )
+                )
+
+                self.accept()
+
+                return
+
+            # -------------------------------------------------
+            # NEW TEST
+            # -------------------------------------------------
+
             test_id = (
                 self.test_service
                 .save_component_test(
-                    project_id=self.project_id,
-                    panel_id=self.panel_id,
-                    component_id=self.component.component_id,
+
+                    project_id=(
+                        self.project_id
+                    ),
+
+                    panel_id=(
+                        self.panel_id
+                    ),
+
+                    component_id=(
+                        self.component.component_id
+                    ),
+
                     test_type="AUX_RELAY",
-                    measurements=values,
-                    result=values.get(
-                        "result",
-                        "NOT TESTED",
+
+                    measurements=(
+                        values
                     ),
-                    remarks=values.get(
-                        "remarks",
-                        "",
+
+                    result=(
+                        result
                     ),
+
+                    remarks=(
+                        remarks
+                    )
                 )
             )
 
             QMessageBox.information(
                 self,
                 "Test Saved",
-                f"Auxiliary relay test saved successfully.\n\n"
-                f"Test ID: {test_id}",
+                (
+                    "Auxiliary relay test "
+                    "saved successfully.\n\n"
+                    f"Test ID: {test_id}"
+                )
             )
 
-        except AttributeError:
-
-            QMessageBox.warning(
-                self,
-                "Save Method Missing",
-                "The test service does not yet have "
-                "save_component_test().",
-            )
+            self.accept()
 
         except Exception as error:
 
             QMessageBox.critical(
                 self,
                 "Save Failed",
-                str(error),
+                str(error)
             )
+ 
+    # =====================================================
+    # POPULATE EXISTING TEST
+    # =====================================================
+
+    def populate_existing_test(
+        self
+    ):
+
+        if not self.existing_test:
+
+            return
+
+        measurements = (
+            self.existing_test.get(
+                "measurements",
+                {}
+            )
+            or {}
+        )
+
+        # -------------------------------------------------
+        # POPULATE SAVED VALUES
+        # -------------------------------------------------
+
+        for field_id, widget in (
+            self.fields.items()
+        ):
+
+            if field_id not in measurements:
+
+                continue
+
+            value = measurements.get(
+                field_id
+            )
+
+            if isinstance(
+                widget,
+                QLineEdit
+            ):
+
+                widget.setText(
+                    ""
+                    if value is None
+                    else str(value)
+                )
+
+            elif isinstance(
+                widget,
+                QComboBox
+            ):
+
+                index = widget.findText(
+                    str(value)
+                )
+
+                if index >= 0:
+
+                    widget.setCurrentIndex(
+                        index
+                    )
+
+        # -------------------------------------------------
+        # REMARKS
+        # -------------------------------------------------
+
+        if hasattr(
+            self,
+            "remarks_widget"
+        ):
+
+            self.remarks_widget.setText(
+                str(
+                    self.existing_test.get(
+                        "remarks",
+                        measurements.get(
+                            "remarks",
+                            ""
+                        )
+                    )
+                    or ""
+                )
+            )
+
+        # -------------------------------------------------
+        # TOLERANCE
+        # -------------------------------------------------
+
+        if (
+            "tolerance_percent"
+            in measurements
+            and
+            hasattr(
+                self,
+                "tolerance_widget"
+            )
+        ):
+
+            self.tolerance_widget.setText(
+                str(
+                    measurements[
+                        "tolerance_percent"
+                    ]
+                )
+            )
+
+        # -------------------------------------------------
+        # RECALCULATE EVERYTHING
+        # -------------------------------------------------
+
+        try:
+
+            self.calculate_coil()
+
+        except Exception:
+
+            pass
+
+        try:
+
+            self.calculate_timing()
+
+        except Exception:
+
+            pass
+
+        try:
+
+            self.calculate_functional()
+
+        except Exception:
+
+            pass
+
+        try:
+
+            self.calculate_overall_result()
+
+        except Exception:
+
+            pass
 
     # =====================================================
     # CLEAR

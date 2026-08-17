@@ -5,7 +5,7 @@ from PySide6.QtWidgets import (
     QSpinBox,
     QPushButton,
     QVBoxLayout,
-    QHBoxLayout
+    QHBoxLayout,
 )
 
 
@@ -27,16 +27,16 @@ class PanelConfigDialog(QDialog):
 
         self.resize(
             450,
-            350
+            400
         )
 
         layout = QVBoxLayout(self)
 
         form = QFormLayout()
 
-        # =============================================
+        # =================================================
         # PANEL
-        # =============================================
+        # =================================================
 
         self.panel_name = QLineEdit()
 
@@ -50,18 +50,16 @@ class PanelConfigDialog(QDialog):
             )
         )
 
-        self.panel_name.setReadOnly(
-            True
-        )
+        self.panel_name.setReadOnly(True)
 
         form.addRow(
             "Panel:",
             self.panel_name
         )
 
-        # =============================================
-        # EQUIPMENT / FEED EQUIPMENT
-        # =============================================
+        # =================================================
+        # EQUIPMENT
+        # =================================================
 
         self.equipment_name = QLineEdit()
 
@@ -80,10 +78,6 @@ class PanelConfigDialog(QDialog):
             self.equipment_name
         )
 
-        # =============================================
-        # EQUIPMENT TYPE
-        # =============================================
-
         self.equipment_type = QLineEdit()
 
         self.equipment_type.setText(
@@ -101,16 +95,12 @@ class PanelConfigDialog(QDialog):
             self.equipment_type
         )
 
-        # =============================================
-        # CT COUNT
-        # =============================================
+        # =================================================
+        # CT
+        # =================================================
 
         self.ct_count = QSpinBox()
-
-        self.ct_count.setRange(
-            0,
-            20
-        )
+        self.ct_count.setRange(0, 20)
 
         self.ct_count.setValue(
             self._get_int_value(
@@ -125,16 +115,12 @@ class PanelConfigDialog(QDialog):
             self.ct_count
         )
 
-        # =============================================
-        # NUMERICAL RELAY COUNT
-        # =============================================
+        # =================================================
+        # NUMERICAL RELAYS
+        # =================================================
 
         self.relay_count = QSpinBox()
-
-        self.relay_count.setRange(
-            0,
-            20
-        )
+        self.relay_count.setRange(0, 20)
 
         self.relay_count.setValue(
             self._get_int_value(
@@ -149,16 +135,12 @@ class PanelConfigDialog(QDialog):
             self.relay_count
         )
 
-        # =============================================
-        # AUXILIARY RELAY COUNT
-        # =============================================
+        # =================================================
+        # AUXILIARY RELAYS
+        # =================================================
 
         self.aux_count = QSpinBox()
-
-        self.aux_count.setRange(
-            0,
-            50
-        )
+        self.aux_count.setRange(0, 50)
 
         self.aux_count.setValue(
             self._get_int_value(
@@ -173,47 +155,44 @@ class PanelConfigDialog(QDialog):
             self.aux_count
         )
 
-        layout.addLayout(
-            form
+        # =================================================
+        # METERS
+        # =================================================
+
+        self.meter_count = QSpinBox()
+        self.meter_count.setRange(0, 50)
+
+        self.meter_count.setValue(
+            self._get_int_value(
+                node,
+                "meter_count",
+                0
+            )
         )
 
-        # =============================================
+        form.addRow(
+            "Meters:",
+            self.meter_count
+        )
+
+        layout.addLayout(form)
+
+        # =================================================
         # BUTTONS
-        # =============================================
+        # =================================================
 
         buttons = QHBoxLayout()
 
-        save_button = QPushButton(
-            "Save"
-        )
+        save_button = QPushButton("Save")
+        cancel_button = QPushButton("Cancel")
 
-        cancel_button = QPushButton(
-            "Cancel"
-        )
+        buttons.addWidget(save_button)
+        buttons.addWidget(cancel_button)
 
-        buttons.addWidget(
-            save_button
-        )
+        layout.addLayout(buttons)
 
-        buttons.addWidget(
-            cancel_button
-        )
-
-        layout.addLayout(
-            buttons
-        )
-
-        save_button.clicked.connect(
-            self.accept
-        )
-
-        cancel_button.clicked.connect(
-            self.reject
-        )
-
-    # =================================================
-    # SAFE INTEGER VALUE
-    # =================================================
+        save_button.clicked.connect(self.accept)
+        cancel_button.clicked.connect(self.reject)
 
     @staticmethod
     def _get_int_value(
@@ -229,40 +208,21 @@ class PanelConfigDialog(QDialog):
         )
 
         try:
-
-            return int(
-                value or default
-            )
-
-        except (
-            TypeError,
-            ValueError
-        ):
-
+            return int(value or default)
+        except (TypeError, ValueError):
             return default
-
-    # =================================================
-    # GET CONFIGURATION
-    # =================================================
 
     def get_configuration(self):
 
         return {
-
             "panel_name":
-                self.panel_name
-                .text()
-                .strip(),
+                self.panel_name.text().strip(),
 
             "equipment_name":
-                self.equipment_name
-                .text()
-                .strip(),
+                self.equipment_name.text().strip(),
 
             "equipment_type":
-                self.equipment_type
-                .text()
-                .strip(),
+                self.equipment_type.text().strip(),
 
             "ct_count":
                 self.ct_count.value(),
@@ -271,5 +231,8 @@ class PanelConfigDialog(QDialog):
                 self.relay_count.value(),
 
             "aux_count":
-                self.aux_count.value()
+                self.aux_count.value(),
+
+            "meter_count":
+                self.meter_count.value(),
         }

@@ -172,9 +172,9 @@ class TestService:
 
         return test_id
 
-    # =====================================================
-    # UPDATE COMPONENT TEST
-    # =====================================================
+# =====================================================
+# UPDATE COMPONENT TEST
+# =====================================================
 
     def update_component_test(
         self,
@@ -184,10 +184,8 @@ class TestService:
         remarks=""
     ):
 
-        existing = (
-            self.get_component_test(
-                test_id
-            )
+        existing = self.get_component_test(
+            test_id
         )
 
         if existing is None:
@@ -219,7 +217,6 @@ class TestService:
         )
 
         return test_id
-
     # =====================================================
     # GET ALL PROTECTION TESTS
     # =====================================================

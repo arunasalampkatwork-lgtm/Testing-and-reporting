@@ -21,6 +21,7 @@
         "ct_count": 3,
         "relay_count": 1,
         "aux_count": 2,
+        "meter_count": 2,
         "asset_id": "ASSET-A8F8D13E77",
         "linked_asset_id": null
     },
@@ -34,6 +35,7 @@
         "ct_count": 3,
         "relay_count": 1,
         "aux_count": 3,
+        "meter_count": 0,
         "asset_id": "ASSET-65779DD66E",
         "linked_asset_id": null
     },
@@ -42,11 +44,12 @@
         "name": "P-03",
         "node_type": "PANEL",
         "parent_id": "AST-663B8E1F",
-        "equipment_name": "",
-        "equipment_type": "",
-        "ct_count": 0,
-        "relay_count": 0,
-        "aux_count": 0,
+        "equipment_name": "201-MG-122A",
+        "equipment_type": "Motor",
+        "ct_count": 3,
+        "relay_count": 1,
+        "aux_count": 2,
+        "meter_count": 0,
         "asset_id": "ASSET-B9753C4A40",
         "linked_asset_id": null
     },
@@ -66,6 +69,7 @@
         "ct_count": 3,
         "relay_count": 1,
         "aux_count": 2,
+        "meter_count": 0,
         "asset_id": "ASSET-87796194A8",
         "linked_asset_id": null
     },
@@ -79,7 +83,130 @@
         "ct_count": 0,
         "relay_count": 0,
         "aux_count": 0,
+        "meter_count": 0,
         "asset_id": "ASSET-9B385C5B7F",
+        "linked_asset_id": null
+    },
+    {
+        "node_id": "AST-B8AD5FF3",
+        "name": "REF-III SS-2",
+        "node_type": "SUBSTATION",
+        "parent_id": null
+    },
+    {
+        "node_id": "AST-42B83DCE",
+        "name": "HV-203A",
+        "node_type": "SWITCHBOARD",
+        "parent_id": "AST-B8AD5FF3"
+    },
+    {
+        "node_id": "AST-6B179723",
+        "name": "P-01",
+        "node_type": "PANEL",
+        "parent_id": "AST-42B83DCE",
+        "equipment_name": "222-K-1B",
+        "equipment_type": "Motor",
+        "ct_count": 3,
+        "relay_count": 1,
+        "aux_count": 2,
+        "meter_count": 0,
+        "asset_id": "ASSET-80E4E1A7EA",
+        "linked_asset_id": null
+    },
+    {
+        "node_id": "AST-84823118",
+        "name": "P-02",
+        "node_type": "PANEL",
+        "parent_id": "AST-42B83DCE",
+        "equipment_name": "",
+        "equipment_type": "",
+        "ct_count": 0,
+        "relay_count": 0,
+        "aux_count": 0,
+        "meter_count": 0,
+        "asset_id": "ASSET-495DC3B451",
+        "linked_asset_id": null
+    },
+    {
+        "node_id": "AST-B7F9DEA0",
+        "name": "P-04",
+        "node_type": "PANEL",
+        "parent_id": "AST-42B83DCE",
+        "equipment_name": "",
+        "equipment_type": "",
+        "ct_count": 0,
+        "relay_count": 0,
+        "aux_count": 0,
+        "meter_count": 0,
+        "asset_id": "ASSET-0D8C9696F4",
+        "linked_asset_id": null
+    },
+    {
+        "node_id": "AST-07A135F8",
+        "name": "REF-3 EURO-IV",
+        "node_type": "SUBSTATION",
+        "parent_id": null
+    },
+    {
+        "node_id": "AST-A823540B",
+        "name": "HV-207A",
+        "node_type": "SWITCHBOARD",
+        "parent_id": "AST-07A135F8"
+    },
+    {
+        "node_id": "AST-68E7D63F",
+        "name": "P-03",
+        "node_type": "PANEL",
+        "parent_id": "AST-42B83DCE",
+        "equipment_name": "",
+        "equipment_type": "",
+        "ct_count": 0,
+        "relay_count": 0,
+        "aux_count": 0,
+        "meter_count": 0,
+        "asset_id": "ASSET-3FA86F5D47",
+        "linked_asset_id": null
+    },
+    {
+        "node_id": "AST-906705DF",
+        "name": "P-04",
+        "node_type": "PANEL",
+        "parent_id": "AST-663B8E1F",
+        "equipment_name": "",
+        "equipment_type": "",
+        "ct_count": 0,
+        "relay_count": 0,
+        "aux_count": 0,
+        "meter_count": 0,
+        "asset_id": "ASSET-A2B3DD2E77",
+        "linked_asset_id": null
+    },
+    {
+        "node_id": "AST-ECC61B2B",
+        "name": "P-05",
+        "node_type": "PANEL",
+        "parent_id": "AST-663B8E1F",
+        "equipment_name": "",
+        "equipment_type": "",
+        "ct_count": 0,
+        "relay_count": 0,
+        "aux_count": 0,
+        "meter_count": 0,
+        "asset_id": "ASSET-331928B0B2",
+        "linked_asset_id": null
+    },
+    {
+        "node_id": "AST-A5E5A029",
+        "name": "P-05",
+        "node_type": "PANEL",
+        "parent_id": "AST-42B83DCE",
+        "equipment_name": "",
+        "equipment_type": "",
+        "ct_count": 0,
+        "relay_count": 0,
+        "aux_count": 0,
+        "meter_count": 0,
+        "asset_id": "ASSET-05AEDA2D26",
         "linked_asset_id": null
     }
 ]
