@@ -24,7 +24,7 @@ from PySide6.QtWidgets import (
     QDialogButtonBox,
     QDateEdit,
 )
-
+from app.ui.panel_config_dialog import PanelConfigDialog
 from app.services.asset_manager import AssetManager
 from app.services.component_manager import ComponentManager
 
@@ -2017,6 +2017,8 @@ class AssetView(QWidget):
 
         dialog = PanelConfigDialog(
             node=panel,
+            projects_dir=self.project_folder.parent,
+            target_project_folder=self.project_folder,
             parent=self,
         )
 
@@ -2043,6 +2045,19 @@ class AssetView(QWidget):
                 aux_count=int(configuration.get("aux_count", 0) or 0),
                 meter_count=int(configuration.get("meter_count", 0) or 0),
             )
+            copied_components = (
+                configuration.get(
+                    "_copied_component_configuration",
+                    []
+                )
+            )
+
+            if copied_components:
+
+                self.apply_copied_component_configuration(
+                    panel.node_id,
+                    copied_components,
+                )
 
             self.display_selected_components()
 
@@ -3247,3 +3262,130 @@ class AssetView(QWidget):
             ==
             report_date
         )
+
+    # =====================================================
+    # APPLY COPIED COMPONENT CONFIGURATION
+    # =====================================================
+
+    def apply_copied_component_configuration(
+        self,
+        target_panel_id,
+        source_components,
+    ):
+
+        target_components = (
+            self.component_manager
+            .get_panel_components(
+                target_panel_id
+            )
+        )
+
+        # -------------------------------------------------
+        # Group target components by type
+        # -------------------------------------------------
+
+        target_by_type = {}
+
+        for component in target_components:
+
+            component_type = str(
+                getattr(
+                    component,
+                    "component_type",
+                    ""
+                )
+            ).strip().upper()
+
+            target_by_type.setdefault(
+                component_type,
+                []
+            ).append(
+                component
+            )
+
+        # -------------------------------------------------
+        # Group source components by type
+        # -------------------------------------------------
+
+        source_by_type = {}
+
+        for source in source_components:
+
+            component_type = str(
+                source.get(
+                    "_source_component_type",
+                    ""
+                )
+            ).strip().upper()
+
+            source_by_type.setdefault(
+                component_type,
+                []
+            ).append(
+                source
+            )
+
+        # -------------------------------------------------
+        # Match component #1 → component #1
+        # CT-01 → CT-01
+        # CT-02 → CT-02
+        # REL-01 → REL-01
+        # -------------------------------------------------
+
+        for component_type, sources in (
+            source_by_type.items()
+        ):
+
+            targets = (
+                target_by_type.get(
+                    component_type,
+                    []
+                )
+            )
+
+            for index, source in enumerate(
+                sources
+            ):
+
+                if index >= len(targets):
+                    break
+
+                target = targets[index]
+
+                configuration = {}
+
+                for key in (
+                    "manufacturer",
+                    "model",
+                    "description",
+
+                    "ct_primary",
+                    "ct_secondary",
+                    "ct_ratio",
+                    "ct_class",
+                    "burden",
+                    "core",
+
+                    "vt_ratio",
+                    "firmware",
+
+                    "coil_voltage",
+                    "contact_configuration",
+
+                    "meter_type",
+                    "meter_functions",
+                    "accuracy_class",
+
+                    "protection_functions",
+                ):
+
+                    if key in source:
+
+                        configuration[
+                            key
+                        ] = source[key]
+
+                self.component_manager.update_component_configuration(
+                    target.component_id,
+                    configuration,
+                )
