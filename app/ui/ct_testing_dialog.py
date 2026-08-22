@@ -1,6 +1,7 @@
 from types import SimpleNamespace
 
 from PySide6.QtCore import Qt
+
 from PySide6.QtWidgets import (
     QDialog,
     QVBoxLayout,
@@ -17,27 +18,28 @@ from PySide6.QtWidgets import (
     QTableWidgetItem,
     QHeaderView,
 )
+
+
 class CTTestingDialog(QDialog):
 
     """
-    CT testing dialog.
+    Current Transformer Testing Dialog.
 
-    Supports:
+    Configuration is supplied by TestComponent:
 
-        - New CT test
-        - Editing an existing CT test
-        - Single-phase CT
-        - Three-phase CT
-        - Ratio calculation
-        - Ratio error
-        - Polarity
-        - Insulation resistance
-        - Winding resistance
-        - Knee point
-        - Burden
-        - Historical CT test snapshots
+        ct_primary
+        ct_secondary
+        ct_ratio
+        ct_class
+        burden
+        core
+        manufacturer
+        model
+        serial_number
 
-    Three-phase ratio data is stored as:
+    Test measurements are entered separately.
+
+    Ratio test data is stored as:
 
         phase_tests = [
             {
@@ -45,9 +47,9 @@ class CTTestingDialog(QDialog):
                 "primary_current": "...",
                 "secondary_current": "...",
                 "measured_ratio": "...",
-                "ratio_error": "..."
-            },
-            ...
+                "ratio_error": "...",
+                "result": "PASS"
+            }
         ]
     """
 
@@ -66,32 +68,14 @@ class CTTestingDialog(QDialog):
             parent
         )
 
-        self.project_id = (
-            project_id
-        )
-
-        self.panel_id = (
-            panel_id
-        )
-
-        self.component = (
-            component
-        )
-
-        self.test_service = (
-            test_service
-        )
-
-        self.test_id = (
-            test_id
-        )
-
-        self.existing_test = (
-            existing_test
-        )
+        self.project_id = project_id
+        self.panel_id = panel_id
+        self.component = component
+        self.test_service = test_service
+        self.test_id = test_id
+        self.existing_test = existing_test
 
         self.fields = {}
-
         self.phase_rows = {}
 
         self.setWindowTitle(
@@ -100,14 +84,16 @@ class CTTestingDialog(QDialog):
             else "Edit CT Test"
         )
 
+        self.setModal(False)
+
         self.resize(
             1050,
             850
         )
 
-        # -------------------------------------------------
-        # HISTORICAL COMPONENT SNAPSHOT
-        # -------------------------------------------------
+        # =================================================
+        # HISTORICAL TEST SNAPSHOT
+        # =================================================
 
         if (
             self.component is None
@@ -122,62 +108,98 @@ class CTTestingDialog(QDialog):
                 or {}
             )
 
-            self.component = (
-                SimpleNamespace(
+            self.component = SimpleNamespace(
 
-                    name=measurements.get(
-                        "ct_name",
-                        existing_test.get(
-                            "component_id",
-                            ""
-                        )
-                    ),
-
-                    ct_primary=measurements.get(
-                        "ct_primary",
+                component_id=(
+                    existing_test.get(
+                        "component_id",
                         ""
-                    ),
+                    )
+                ),
 
-                    ct_secondary=measurements.get(
-                        "ct_secondary",
+                name=measurements.get(
+                    "ct_name",
+                    existing_test.get(
+                        "component_id",
                         ""
-                    ),
+                    )
+                ),
 
-                    ct_ratio=measurements.get(
-                        "ct_ratio",
-                        ""
-                    ),
+                ct_primary=measurements.get(
+                    "ct_primary",
+                    ""
+                ),
 
-                    core=measurements.get(
-                        "core",
-                        ""
-                    ),
+                ct_secondary=measurements.get(
+                    "ct_secondary",
+                    ""
+                ),
 
-                    ct_class=measurements.get(
-                        "ct_class",
-                        ""
-                    ),
+                ct_ratio=measurements.get(
+                    "ct_ratio",
+                    ""
+                ),
 
-                    burden=measurements.get(
-                        "burden",
-                        ""
-                    ),
+                core=measurements.get(
+                    "core",
+                    ""
+                ),
 
-                    manufacturer=measurements.get(
-                        "manufacturer",
-                        ""
-                    ),
+                ct_class=measurements.get(
+                    "ct_class",
+                    ""
+                ),
 
-                    model=measurements.get(
-                        "model",
-                        ""
-                    ),
+                burden=measurements.get(
+                    "burden",
+                    ""
+                ),
 
-                    serial_number=measurements.get(
-                        "serial_number",
-                        ""
-                    ),
-                )
+                manufacturer=measurements.get(
+                    "manufacturer",
+                    ""
+                ),
+
+                model=measurements.get(
+                    "model",
+                    ""
+                ),
+
+                serial_number=measurements.get(
+                    "serial_number",
+                    ""
+                ),
+            )
+
+        # -------------------------------------------------
+        # SAFETY FALLBACK
+        # -------------------------------------------------
+
+        if self.component is None:
+
+            self.component = SimpleNamespace(
+
+                component_id="",
+
+                name="CT",
+
+                ct_primary=0,
+
+                ct_secondary=0,
+
+                ct_ratio="",
+
+                core="",
+
+                ct_class="",
+
+                burden="",
+
+                manufacturer="",
+
+                model="",
+
+                serial_number="",
             )
 
         self.build_ui()
@@ -190,12 +212,21 @@ class CTTestingDialog(QDialog):
     # BUILD UI
     # =====================================================
 
-    def build_ui(
-        self
-    ):
+    def build_ui(self):
 
         main_layout = QVBoxLayout(
             self
+        )
+
+        main_layout.setContentsMargins(
+            14,
+            14,
+            14,
+            14
+        )
+
+        main_layout.setSpacing(
+            10
         )
 
         # =================================================
@@ -236,6 +267,17 @@ class CTTestingDialog(QDialog):
             container
         )
 
+        container_layout.setContentsMargins(
+            10,
+            10,
+            10,
+            10
+        )
+
+        container_layout.setSpacing(
+            12
+        )
+
         # =================================================
         # CT IDENTIFICATION
         # =================================================
@@ -244,9 +286,26 @@ class CTTestingDialog(QDialog):
             "CT Identification"
         )
 
-        identification_layout = QFormLayout()
+        identification_layout = QFormLayout(
+            identification
+        )
 
-        self.add_field(
+        identification_layout.setSpacing(
+            9
+        )
+
+        self.add_readonly(
+            identification_layout,
+            "ct_name",
+            "CT",
+            getattr(
+                self.component,
+                "name",
+                ""
+            )
+        )
+
+        self.add_readonly(
             identification_layout,
             "ct_primary",
             "CT Primary",
@@ -258,7 +317,7 @@ class CTTestingDialog(QDialog):
             "A"
         )
 
-        self.add_field(
+        self.add_readonly(
             identification_layout,
             "ct_secondary",
             "CT Secondary",
@@ -274,16 +333,18 @@ class CTTestingDialog(QDialog):
             identification_layout,
             "nominal_current",
             "Nominal Current (In)",
+            "",
             "A"
         )
 
         self.add_readonly(
             identification_layout,
             "ct_ratio",
-            "CT Ratio"
+            "CT Ratio",
+            ""
         )
 
-        self.add_field(
+        self.add_readonly(
             identification_layout,
             "core",
             "Core",
@@ -294,7 +355,7 @@ class CTTestingDialog(QDialog):
             )
         )
 
-        self.add_field(
+        self.add_readonly(
             identification_layout,
             "ct_class",
             "CT Class",
@@ -305,7 +366,7 @@ class CTTestingDialog(QDialog):
             )
         )
 
-        self.add_field(
+        self.add_readonly(
             identification_layout,
             "burden",
             "Rated Burden",
@@ -316,7 +377,7 @@ class CTTestingDialog(QDialog):
             )
         )
 
-        self.add_field(
+        self.add_readonly(
             identification_layout,
             "manufacturer",
             "Manufacturer",
@@ -327,7 +388,7 @@ class CTTestingDialog(QDialog):
             )
         )
 
-        self.add_field(
+        self.add_readonly(
             identification_layout,
             "model",
             "Model",
@@ -338,7 +399,7 @@ class CTTestingDialog(QDialog):
             )
         )
 
-        self.add_field(
+        self.add_readonly(
             identification_layout,
             "serial_number",
             "Serial Number",
@@ -349,23 +410,23 @@ class CTTestingDialog(QDialog):
             )
         )
 
-        identification.setLayout(
-            identification_layout
-        )
-
         container_layout.addWidget(
             identification
         )
 
+        self.update_ct_information()
+
         # =================================================
-        # THREE PHASE SELECTION
+        # PHASE CONFIGURATION
         # =================================================
 
         phase_group = QGroupBox(
             "CT Phase Configuration"
         )
 
-        phase_layout = QFormLayout()
+        phase_layout = QFormLayout(
+            phase_group
+        )
 
         self.three_phase_selector = QComboBox()
 
@@ -381,10 +442,6 @@ class CTTestingDialog(QDialog):
             self.three_phase_selector
         )
 
-        phase_group.setLayout(
-            phase_layout
-        )
-
         container_layout.addWidget(
             phase_group
         )
@@ -392,9 +449,6 @@ class CTTestingDialog(QDialog):
         # =================================================
         # RATIO TEST
         # =================================================
-        # Keep the ratio test in its original position:
-        # CT Identification -> Phase Configuration -> Ratio Test.
-        # Only the table dimensions are enlarged.
 
         self.ratio_group = QGroupBox(
             "CT Ratio Test"
@@ -404,21 +458,11 @@ class CTTestingDialog(QDialog):
             self.ratio_group
         )
 
-        ratio_layout.setContentsMargins(
-            12,
-            16,
-            12,
-            12
-        )
-
-        ratio_layout.setSpacing(
-            10
-        )
-
         ratio_help = QLabel(
-            "Inject the specified primary current and record the "
-            "corresponding CT secondary current. Measured ratio "
-            "and ratio error are calculated automatically."
+            "Enter the injected primary current and the "
+            "corresponding recorded secondary current. "
+            "Measured ratio and ratio error are calculated "
+            "against the configured CT ratio."
         )
 
         ratio_help.setWordWrap(
@@ -428,7 +472,8 @@ class CTTestingDialog(QDialog):
         ratio_help.setStyleSheet(
             """
             QLabel {
-                font-size: 14px;
+                font-size: 13px;
+                color: #aaaaaa;
                 padding: 4px;
             }
             """
@@ -479,95 +524,62 @@ class CTTestingDialog(QDialog):
             False
         )
 
-        self.phase_table.setShowGrid(
-            True
+        header_view = (
+            self.phase_table
+            .horizontalHeader()
         )
 
-        self.phase_table.setStyleSheet(
-            """
-            QTableWidget {
-                font-size: 14px;
-                alternate-background-color: #333333;
-                background: #2b2b2b;
-                gridline-color: #555555;
-            }
-
-            QTableWidget::item {
-                padding: 8px;
-            }
-
-            QHeaderView::section {
-                font-weight: bold;
-                padding: 10px;
-            }
-            """
-        )
-
-        # -------------------------------------------------
-        # TABLE HEADER
-        # -------------------------------------------------
-
-        table_header = (
-            self.phase_table.horizontalHeader()
-        )
-
-        table_header.setMinimumHeight(
+        header_view.setMinimumHeight(
             52
         )
 
-        table_header.setDefaultAlignment(
+        header_view.setDefaultAlignment(
             Qt.AlignmentFlag.AlignCenter
         )
 
-        table_header.setStretchLastSection(
+        header_view.setStretchLastSection(
             False
         )
 
-        table_header.setSectionResizeMode(
+        header_view.setSectionResizeMode(
             0,
             QHeaderView.ResizeMode.Fixed
         )
 
         self.phase_table.setColumnWidth(
             0,
-            90
+            80
         )
 
-        for column in (1, 2, 3, 4):
-            table_header.setSectionResizeMode(
+        for column in (
+            1,
+            2,
+            3,
+            4
+        ):
+
+            header_view.setSectionResizeMode(
                 column,
                 QHeaderView.ResizeMode.Stretch
             )
 
-        table_header.setSectionResizeMode(
+        header_view.setSectionResizeMode(
             5,
             QHeaderView.ResizeMode.Fixed
         )
 
         self.phase_table.setColumnWidth(
             5,
-            110
+            100
         )
-
-        # -------------------------------------------------
-        # ROW HEIGHT
-        # -------------------------------------------------
 
         self.phase_table.verticalHeader().setDefaultSectionSize(
-            62
-        )
-
-        self.phase_table.verticalHeader().setMinimumSectionSize(
-            56
+            60
         )
 
         self.phase_table.verticalHeader().setVisible(
             False
         )
-
-        # -------------------------------------------------
-        # BIGGER TABLE, SAME POSITION
-        # -------------------------------------------------
 
         self.phase_table.setMinimumHeight(
             150
@@ -580,10 +592,6 @@ class CTTestingDialog(QDialog):
         ratio_layout.addWidget(
             self.phase_table
         )
-
-        # -------------------------------------------------
-        # ADD / REMOVE RATIO TEST ROWS
-        # -------------------------------------------------
 
         ratio_buttons = QHBoxLayout()
 
@@ -617,8 +625,6 @@ class CTTestingDialog(QDialog):
             ratio_buttons
         )
 
-        # Ratio group remains in the same place in the
-        # scrolling content, immediately after phase configuration.
         container_layout.addWidget(
             self.ratio_group
         )
@@ -631,7 +637,9 @@ class CTTestingDialog(QDialog):
             "Polarity Test"
         )
 
-        polarity_layout = QFormLayout()
+        polarity_layout = QFormLayout(
+            polarity_group
+        )
 
         self.add_combo(
             polarity_layout,
@@ -659,10 +667,6 @@ class CTTestingDialog(QDialog):
             "Polarity Result"
         )
 
-        polarity_group.setLayout(
-            polarity_layout
-        )
-
         container_layout.addWidget(
             polarity_group
         )
@@ -687,7 +691,9 @@ class CTTestingDialog(QDialog):
             "Insulation Resistance"
         )
 
-        ir_layout = QFormLayout()
+        ir_layout = QFormLayout(
+            ir_group
+        )
 
         self.add_field(
             ir_layout,
@@ -729,10 +735,6 @@ class CTTestingDialog(QDialog):
             "s"
         )
 
-        ir_group.setLayout(
-            ir_layout
-        )
-
         container_layout.addWidget(
             ir_group
         )
@@ -745,7 +747,9 @@ class CTTestingDialog(QDialog):
             "Winding Resistance"
         )
 
-        winding_layout = QFormLayout()
+        winding_layout = QFormLayout(
+            winding_group
+        )
 
         self.add_field(
             winding_layout,
@@ -771,10 +775,6 @@ class CTTestingDialog(QDialog):
             "Ω"
         )
 
-        winding_group.setLayout(
-            winding_layout
-        )
-
         container_layout.addWidget(
             winding_group
         )
@@ -787,7 +787,9 @@ class CTTestingDialog(QDialog):
             "Knee Point / Excitation"
         )
 
-        knee_layout = QFormLayout()
+        knee_layout = QFormLayout(
+            knee_group
+        )
 
         self.add_field(
             knee_layout,
@@ -821,10 +823,6 @@ class CTTestingDialog(QDialog):
             "A"
         )
 
-        knee_group.setLayout(
-            knee_layout
-        )
-
         container_layout.addWidget(
             knee_group
         )
@@ -837,7 +835,9 @@ class CTTestingDialog(QDialog):
             "Burden Test"
         )
 
-        burden_layout = QFormLayout()
+        burden_layout = QFormLayout(
+            burden_group
+        )
 
         self.add_field(
             burden_layout,
@@ -860,10 +860,6 @@ class CTTestingDialog(QDialog):
             "burden_error",
             "Burden Error",
             "%"
-        )
-
-        burden_group.setLayout(
-            burden_layout
         )
 
         container_layout.addWidget(
@@ -909,6 +905,8 @@ class CTTestingDialog(QDialog):
             ""
         )
 
+        container_layout.addStretch()
+
         scroll.setWidget(
             container
         )
@@ -924,14 +922,13 @@ class CTTestingDialog(QDialog):
         buttons = QHBoxLayout()
 
         self.clear_button = QPushButton(
-            "Clear"
+            "Clear Test Data"
         )
 
         self.save_button = QPushButton(
             "Update Test"
             if self.test_id
-            else
-            "Save Test"
+            else "Save Test"
         )
 
         self.cancel_button = QPushButton(
@@ -969,14 +966,12 @@ class CTTestingDialog(QDialog):
         )
 
         # =================================================
-        # PHASE SELECTOR
+        # PHASE SIGNAL
         # =================================================
 
         self.three_phase_selector.currentTextChanged.connect(
             self.on_phase_mode_changed
         )
-
-        # Build initial phase rows.
 
         self.on_phase_mode_changed(
             self.three_phase_selector.currentText()
@@ -984,6 +979,75 @@ class CTTestingDialog(QDialog):
 
         self.calculate_polarity()
         self.calculate_burden()
+
+        self.setStyleSheet(
+            """
+            QDialog {
+                background-color: #242424;
+            }
+
+            QGroupBox {
+                font-weight: 600;
+                border: 1px solid #414141;
+                border-radius: 7px;
+                margin-top: 10px;
+                padding: 12px;
+                background-color: #292929;
+            }
+
+            QGroupBox::title {
+                subcontrol-origin: margin;
+                left: 12px;
+                padding: 0px 5px;
+                color: #dddddd;
+            }
+
+            QLineEdit,
+            QComboBox {
+                min-height: 32px;
+                padding: 4px 8px;
+                border: 1px solid #444444;
+                border-radius: 5px;
+                background-color: #202020;
+                color: #eeeeee;
+            }
+
+            QLineEdit:read-only {
+                background-color: #303030;
+                color: #bbbbbb;
+            }
+
+            QPushButton {
+                min-height: 35px;
+                padding: 6px 12px;
+                border-radius: 6px;
+                border: 1px solid #444444;
+                background-color: #333333;
+                color: #eeeeee;
+            }
+
+            QPushButton:hover {
+                background-color: #3d3d3d;
+                border-color: #666666;
+            }
+
+            QTableWidget {
+                background-color: #292929;
+                alternate-background-color: #303030;
+                border: 1px solid #444444;
+                gridline-color: #505050;
+            }
+
+            QTableWidget::item {
+                padding: 7px;
+            }
+
+            QHeaderView::section {
+                font-weight: bold;
+                padding: 9px;
+            }
+            """
+        )
 
     # =====================================================
     # FIELD HELPERS
@@ -1001,45 +1065,32 @@ class CTTestingDialog(QDialog):
         widget = QLineEdit()
 
         widget.setText(
-            str(
-                default
-                if default is not None
-                else ""
-            )
+            ""
+            if default is None
+            else str(default)
         )
 
         self.fields[
             field_id
         ] = widget
 
-        # -------------------------------------------------
-        # QFormLayout
-        # -------------------------------------------------
-
         if isinstance(
             layout,
             QFormLayout
         ):
 
-            if unit:
+            display_label = (
+                f"{label} ({unit})"
+                if unit
+                else label
+            )
 
-                layout.addRow(
-                    f"{label} ({unit})",
-                    widget
-                )
-
-            else:
-
-                layout.addRow(
-                    label,
-                    widget
-                )
+            layout.addRow(
+                display_label,
+                widget
+            )
 
             return
-
-        # -------------------------------------------------
-        # QVBoxLayout / Other Layout
-        # -------------------------------------------------
 
         row_layout = QHBoxLayout()
 
@@ -1068,12 +1119,12 @@ class CTTestingDialog(QDialog):
             row_layout
         )
 
-
     def add_readonly(
         self,
         layout,
         field_id,
         label,
+        default="",
         unit=""
     ):
 
@@ -1083,38 +1134,33 @@ class CTTestingDialog(QDialog):
             True
         )
 
+        if default is not None:
+
+            widget.setText(
+                str(default)
+            )
+
         self.fields[
             field_id
         ] = widget
-
-        # -------------------------------------------------
-        # QFormLayout
-        # -------------------------------------------------
 
         if isinstance(
             layout,
             QFormLayout
         ):
 
-            if unit:
+            display_label = (
+                f"{label} ({unit})"
+                if unit
+                else label
+            )
 
-                layout.addRow(
-                    f"{label} ({unit})",
-                    widget
-                )
-
-            else:
-
-                layout.addRow(
-                    label,
-                    widget
-                )
+            layout.addRow(
+                display_label,
+                widget
+            )
 
             return
-
-        # -------------------------------------------------
-        # QVBoxLayout / Other Layout
-        # -------------------------------------------------
 
         row_layout = QHBoxLayout()
 
@@ -1142,7 +1188,6 @@ class CTTestingDialog(QDialog):
         layout.addLayout(
             row_layout
         )
-
 
     def add_combo(
         self,
@@ -1162,63 +1207,32 @@ class CTTestingDialog(QDialog):
             field_id
         ] = widget
 
-        # -------------------------------------------------
-        # QFormLayout
-        # -------------------------------------------------
-
-        if isinstance(
-            layout,
-            QFormLayout
-        ):
-
-            layout.addRow(
-                label,
-                widget
-            )
-
-            return
-
-        # -------------------------------------------------
-        # QVBoxLayout / Other Layout
-        # -------------------------------------------------
-
-        row_layout = QHBoxLayout()
-
-        label_widget = QLabel(
-            label
-        )
-
-        label_widget.setMinimumWidth(
-            220
-        )
-
-        row_layout.addWidget(
-            label_widget
-        )
-
-        row_layout.addWidget(
+        layout.addRow(
+            label,
             widget
         )
 
-        layout.addLayout(
-            row_layout
-        )
-
     # =====================================================
-    # CT RATIO
+    # NUMBER
     # =====================================================
 
+    @staticmethod
     def _get_float(
-        self,
         value
     ):
 
         try:
 
+            text = str(
+                value
+            ).strip()
+
+            if not text:
+
+                return None
+
             return float(
-                str(
-                    value
-                ).strip()
+                text
             )
 
         except (
@@ -1227,6 +1241,10 @@ class CTTestingDialog(QDialog):
         ):
 
             return None
+
+    # =====================================================
+    # CT CONFIGURATION
+    # =====================================================
 
     def get_ct_primary(
         self
@@ -1283,37 +1301,83 @@ class CTTestingDialog(QDialog):
 
         else:
 
+            # Preserve a legacy ratio if primary/secondary
+            # are unavailable.
+            legacy_ratio = str(
+                getattr(
+                    self.component,
+                    "ct_ratio",
+                    ""
+                )
+                or ""
+            ).strip()
+
             self.fields[
                 "ct_ratio"
-            ].clear()
+            ].setText(
+                legacy_ratio
+            )
 
             self.fields[
                 "nominal_current"
             ].clear()
 
     # =====================================================
-    # PHASE MODE
+    # PHASES
     # =====================================================
 
-    def _current_phases(self):
-        """Return the phases allowed by the current CT configuration."""
-        return (
-            ["R", "Y", "B"]
-            if self.three_phase_selector.currentText().strip().lower() == "yes"
-            else ["R"]
+    def _current_phases(
+        self
+    ):
+
+        if (
+            self.three_phase_selector
+            .currentText()
+            .strip()
+            .lower()
+            == "yes"
+        ):
+
+            return [
+                "R",
+                "Y",
+                "B"
+            ]
+
+        return [
+            "R"
+        ]
+
+    # =====================================================
+    # CREATE RATIO ROW
+    # =====================================================
+
+    def _create_ratio_row(
+        self,
+        phase,
+        primary="",
+        secondary=""
+    ):
+
+        row = (
+            self.phase_table
+            .rowCount()
         )
 
-    def _create_ratio_row(self, phase, primary="", secondary=""):
-        """Create one editable CT ratio test row."""
-        row = self.phase_table.rowCount()
+        self.phase_table.insertRow(
+            row
+        )
 
-        self.phase_table.insertRow(row)
+        phase_item = QTableWidgetItem(
+            str(phase)
+        )
 
-        phase_item = QTableWidgetItem(str(phase))
         phase_item.setFlags(
             phase_item.flags()
-            & ~Qt.ItemFlag.ItemIsEditable
+            &
+            ~Qt.ItemFlag.ItemIsEditable
         )
+
         phase_item.setTextAlignment(
             Qt.AlignmentFlag.AlignCenter
         )
@@ -1325,80 +1389,146 @@ class CTTestingDialog(QDialog):
         )
 
         primary_widget = QLineEdit()
-        primary_widget.setMinimumHeight(48)
+
+        primary_widget.setMinimumHeight(
+            48
+        )
+
         primary_widget.setAlignment(
             Qt.AlignmentFlag.AlignCenter
         )
+
         primary_widget.setText(
-            "" if primary is None else str(primary)
+            ""
+            if primary is None
+            else str(primary)
         )
 
         secondary_widget = QLineEdit()
-        secondary_widget.setMinimumHeight(48)
+
+        secondary_widget.setMinimumHeight(
+            48
+        )
+
         secondary_widget.setAlignment(
             Qt.AlignmentFlag.AlignCenter
         )
+
         secondary_widget.setText(
-            "" if secondary is None else str(secondary)
+            ""
+            if secondary is None
+            else str(secondary)
         )
 
         ratio_widget = QLineEdit()
-        ratio_widget.setMinimumHeight(48)
+
+        ratio_widget.setMinimumHeight(
+            48
+        )
+
+        ratio_widget.setReadOnly(
+            True
+        )
+
         ratio_widget.setAlignment(
             Qt.AlignmentFlag.AlignCenter
         )
-        ratio_widget.setReadOnly(True)
 
         error_widget = QLineEdit()
-        error_widget.setMinimumHeight(48)
-        error_widget.setReadOnly(True)
+
+        error_widget.setMinimumHeight(
+            48
+        )
+
+        error_widget.setReadOnly(
+            True
+        )
+
         error_widget.setAlignment(
             Qt.AlignmentFlag.AlignCenter
         )
 
         result_widget = QLineEdit()
-        result_widget.setMinimumHeight(48)
-        result_widget.setReadOnly(True)
+
+        result_widget.setMinimumHeight(
+            48
+        )
+
+        result_widget.setReadOnly(
+            True
+        )
+
         result_widget.setAlignment(
             Qt.AlignmentFlag.AlignCenter
         )
 
         self.phase_table.setCellWidget(
-            row, 1, primary_widget
+            row,
+            1,
+            primary_widget
         )
+
         self.phase_table.setCellWidget(
-            row, 2, secondary_widget
+            row,
+            2,
+            secondary_widget
         )
+
         self.phase_table.setCellWidget(
-            row, 3, ratio_widget
+            row,
+            3,
+            ratio_widget
         )
+
         self.phase_table.setCellWidget(
-            row, 4, error_widget
+            row,
+            4,
+            error_widget
         )
+
         self.phase_table.setCellWidget(
-            row, 5, result_widget
+            row,
+            5,
+            result_widget
         )
 
         row_data = {
-            "phase": str(phase),
-            "primary": primary_widget,
-            "secondary": secondary_widget,
-            "ratio": ratio_widget,
-            "error": error_widget,
-            "result": result_widget,
+
+            "phase":
+                str(phase),
+
+            "primary":
+                primary_widget,
+
+            "secondary":
+                secondary_widget,
+
+            "ratio":
+                ratio_widget,
+
+            "error":
+                error_widget,
+
+            "result":
+                result_widget,
         }
 
         self.phase_rows.setdefault(
-            str(phase), []
-        ).append(row_data)
+            str(phase),
+            []
+        ).append(
+            row_data
+        )
 
         primary_widget.textChanged.connect(
-            lambda _, r=row_data:
+            lambda _,
+            r=row_data:
             self.calculate_phase_ratio_row(r)
         )
 
         secondary_widget.textChanged.connect(
-            lambda _, r=row_data:
+            lambda _,
+            r=row_data:
             self.calculate_phase_ratio_row(r)
         )
 
@@ -1408,170 +1538,258 @@ class CTTestingDialog(QDialog):
 
         return row_data
 
-    def _snapshot_phase_rows(self):
-        """Preserve all currently entered ratio rows before rebuilding."""
+    # =====================================================
+    # SNAPSHOT
+    # =====================================================
+
+    def _snapshot_phase_rows(
+        self
+    ):
+
         snapshot = []
 
-        for phase, rows in self.phase_rows.items():
+        for phase, rows in (
+            self.phase_rows.items()
+        ):
+
             for row_data in rows:
+
                 snapshot.append({
-                    "phase": phase,
-                    "primary_current": row_data["primary"].text().strip(),
-                    "secondary_current": row_data["secondary"].text().strip(),
+
+                    "phase":
+                        phase,
+
+                    "primary_current":
+                        row_data[
+                            "primary"
+                        ].text().strip(),
+
+                    "secondary_current":
+                        row_data[
+                            "secondary"
+                        ].text().strip(),
                 })
 
         return snapshot
+
+    # =====================================================
+    # PHASE MODE
+    # =====================================================
 
     def on_phase_mode_changed(
         self,
         text
     ):
-        """
-        Rebuild the ratio table for 1-phase or 3-phase operation.
 
-        Existing rows are preserved whenever their phase remains valid.
-        At least one row is created for every active phase.
-        """
-        previous_rows = self._snapshot_phase_rows()
+        previous_rows = (
+            self._snapshot_phase_rows()
+        )
 
         is_three_phase = (
-            str(text).strip().lower()
+            str(text)
+            .strip()
+            .lower()
             == "yes"
         )
 
         phases = (
-            ["R", "Y", "B"]
+            [
+                "R",
+                "Y",
+                "B"
+            ]
             if is_three_phase
-            else ["R"]
+            else [
+                "R"
+            ]
         )
 
-        self.phase_table.setRowCount(0)
+        self.phase_table.setRowCount(
+            0
+        )
+
         self.phase_rows = {}
 
-        # Preserve existing rows belonging to valid phases.
         for phase in phases:
+
             matching = [
-                item for item in previous_rows
-                if item["phase"] == phase
+
+                item
+
+                for item in previous_rows
+
+                if item[
+                    "phase"
+                ] == phase
             ]
 
             if matching:
+
                 for item in matching:
+
                     self._create_ratio_row(
                         phase,
-                        item["primary_current"],
-                        item["secondary_current"]
+                        item[
+                            "primary_current"
+                        ],
+                        item[
+                            "secondary_current"
+                        ]
                     )
+
             else:
+
                 self._create_ratio_row(
                     phase
                 )
 
         self.update_ct_information()
+
         self.update_overall_result()
 
-    def add_ratio_test_row(self):
-        """
-        Add another ratio test row.
+    # =====================================================
+    # ADD ROW
+    # =====================================================
 
-        The selected row's phase is used when possible. Otherwise the
-        first configured phase is used.
-        """
+    def add_ratio_test_row(
+        self
+    ):
+
         phases = self._current_phases()
 
         if not phases:
             return
 
         selected_row = (
-            self.phase_table.currentRow()
+            self.phase_table
+            .currentRow()
         )
 
         phase = phases[0]
 
         if selected_row >= 0:
-            item = self.phase_table.item(
-                selected_row,
-                0
+
+            item = (
+                self.phase_table.item(
+                    selected_row,
+                    0
+                )
             )
 
             if item is not None:
-                selected_phase = item.text().strip()
+
+                selected_phase = (
+                    item.text().strip()
+                )
 
                 if selected_phase in phases:
+
                     phase = selected_phase
 
-        row_data = self._create_ratio_row(
-            phase
+        row_data = (
+            self._create_ratio_row(
+                phase
+            )
         )
 
         new_row = (
-            self.phase_table.rowCount() - 1
+            self.phase_table
+            .rowCount()
+            - 1
         )
 
         self.phase_table.selectRow(
             new_row
         )
 
-        row_data["primary"].setFocus()
+        row_data[
+            "primary"
+        ].setFocus()
 
         self.update_overall_result()
 
-    def remove_ratio_test_row(self):
-        """
-        Remove the selected ratio-test row.
+    # =====================================================
+    # REMOVE ROW
+    # =====================================================
 
-        At least one row is retained for every configured phase.
-        """
-        row = self.phase_table.currentRow()
+    def remove_ratio_test_row(
+        self
+    ):
+
+        row = (
+            self.phase_table
+            .currentRow()
+        )
 
         if row < 0:
+
             QMessageBox.information(
                 self,
                 "Remove Test Row",
                 "Select a CT ratio test row first."
             )
+
             return
 
-        phase_item = self.phase_table.item(
-            row,
-            0
+        phase_item = (
+            self.phase_table.item(
+                row,
+                0
+            )
         )
 
         if phase_item is None:
             return
 
-        phase = phase_item.text().strip()
+        phase = (
+            phase_item
+            .text()
+            .strip()
+        )
 
-        phase_rows = self.phase_rows.get(
-            phase,
-            []
+        phase_rows = (
+            self.phase_rows.get(
+                phase,
+                []
+            )
         )
 
         if len(phase_rows) <= 1:
+
             QMessageBox.information(
                 self,
                 "Cannot Remove Row",
                 (
-                    f"At least one ratio test row must remain "
-                    f"for phase {phase}."
+                    f"At least one ratio test row "
+                    f"must remain for phase {phase}."
                 )
             )
+
             return
 
-        # Find the corresponding row-data object.
         row_data = None
 
         for candidate in phase_rows:
-            if (
-                self.phase_table.indexAt(
-                    candidate["primary"].pos()
-                ).row()
-                == row
-            ):
+
+            widget = candidate[
+                "primary"
+            ]
+
+            index = (
+                self.phase_table
+                .indexAt(
+                    widget.pos()
+                )
+            )
+
+            if index.row() == row:
+
                 row_data = candidate
+
                 break
 
         if row_data is not None:
+
             phase_rows.remove(
                 row_data
             )
@@ -1583,21 +1801,24 @@ class CTTestingDialog(QDialog):
         self.update_overall_result()
 
     # =====================================================
-    # PHASE CALCULATION
-
+    # RATIO CALCULATION
     # =====================================================
 
     def calculate_phase_ratio_row(
         self,
         row
     ):
-        """Calculate measured ratio, error and pass/fail for one test row."""
+
         primary = self._get_float(
-            row["primary"].text()
+            row[
+                "primary"
+            ].text()
         )
 
         secondary = self._get_float(
-            row["secondary"].text()
+            row[
+                "secondary"
+            ].text()
         )
 
         if (
@@ -1605,10 +1826,21 @@ class CTTestingDialog(QDialog):
             or secondary is None
             or secondary == 0
         ):
-            row["ratio"].clear()
-            row["error"].clear()
-            row["result"].clear()
+
+            row[
+                "ratio"
+            ].clear()
+
+            row[
+                "error"
+            ].clear()
+
+            row[
+                "result"
+            ].clear()
+
             self.update_overall_result()
+
             return
 
         measured_ratio = (
@@ -1616,20 +1848,35 @@ class CTTestingDialog(QDialog):
             secondary
         )
 
-        row["ratio"].setText(
+        row[
+            "ratio"
+        ].setText(
             f"{measured_ratio:.4f}"
         )
 
-        configured_primary = self.get_ct_primary()
-        configured_secondary = self.get_ct_secondary()
+        configured_primary = (
+            self.get_ct_primary()
+        )
+
+        configured_secondary = (
+            self.get_ct_secondary()
+        )
 
         if (
             configured_primary <= 0
             or configured_secondary <= 0
         ):
-            row["error"].clear()
-            row["result"].clear()
+
+            row[
+                "error"
+            ].clear()
+
+            row[
+                "result"
+            ].clear()
+
             self.update_overall_result()
+
             return
 
         expected_ratio = (
@@ -1647,7 +1894,9 @@ class CTTestingDialog(QDialog):
             expected_ratio
         ) * 100.0
 
-        row["error"].setText(
+        row[
+            "error"
+        ].setText(
             f"{error:.2f}"
         )
 
@@ -1658,9 +1907,12 @@ class CTTestingDialog(QDialog):
         )
 
         if tolerance is None:
+
             tolerance = 5.0
 
-        row["result"].setText(
+        row[
+            "result"
+        ].setText(
             "PASS"
             if abs(error) <= tolerance
             else "FAIL"
@@ -1672,11 +1924,14 @@ class CTTestingDialog(QDialog):
         self,
         phase
     ):
-        """Backward-compatible helper: recalculate every row for a phase."""
-        for row in self.phase_rows.get(
-            phase,
-            []
+
+        for row in (
+            self.phase_rows.get(
+                phase,
+                []
+            )
         ):
+
             self.calculate_phase_ratio_row(
                 row
             )
@@ -1704,8 +1959,7 @@ class CTTestingDialog(QDialog):
         result = (
             "PASS"
             if expected == observed
-            else
-            "FAIL"
+            else "FAIL"
         )
 
         self.fields[
@@ -1739,7 +1993,8 @@ class CTTestingDialog(QDialog):
         rated = self._get_float(
             str(
                 rated_text
-            ).lower()
+            )
+            .lower()
             .replace(
                 "va",
                 ""
@@ -1819,20 +2074,29 @@ class CTTestingDialog(QDialog):
 
             tolerance = 5.0
 
-        for phase, rows in self.phase_rows.items():
+        for phase, rows in (
+            self.phase_rows.items()
+        ):
 
-            for test_number, row in enumerate(rows, start=1):
+            for test_number, row in enumerate(
+                rows,
+                start=1
+            ):
 
                 error = self._get_float(
-                    row["error"].text()
+                    row[
+                        "error"
+                    ].text()
                 )
 
                 if error is None:
                     continue
 
                 if abs(error) > tolerance:
+
                     failures.append(
-                        f"Ratio {phase} Test {test_number}"
+                        f"Ratio {phase} "
+                        f"Test {test_number}"
                     )
 
         # -------------------------------------------------
@@ -1866,52 +2130,66 @@ class CTTestingDialog(QDialog):
         ].setText(
             "FAIL"
             if failures
-            else
-            "PASS"
+            else "PASS"
         )
 
     # =====================================================
-    # GET PHASE DATA
+    # PHASE DATA
     # =====================================================
 
     def get_phase_data(
         self
     ):
-        """
-        Return every CT ratio test row.
 
-        The list format remains compatible with the existing test-service
-        storage while allowing multiple tests per phase.
-        """
         result = []
 
-        for phase, rows in self.phase_rows.items():
+        for phase, rows in (
+            self.phase_rows.items()
+        ):
 
             for test_number, row in enumerate(
                 rows,
                 start=1
             ):
-                result.append(
-                    {
-                        "phase": phase,
-                        "test_no": test_number,
-                        "primary_current":
-                            row["primary"].text().strip(),
-                        "secondary_current":
-                            row["secondary"].text().strip(),
-                        "measured_ratio":
-                            row["ratio"].text().strip(),
-                        "ratio_error":
-                            row["error"].text().strip(),
-                        "result":
-                            row["result"].text().strip(),
-                    }
-                )
+
+                result.append({
+
+                    "phase":
+                        phase,
+
+                    "test_no":
+                        test_number,
+
+                    "primary_current":
+                        row[
+                            "primary"
+                        ].text().strip(),
+
+                    "secondary_current":
+                        row[
+                            "secondary"
+                        ].text().strip(),
+
+                    "measured_ratio":
+                        row[
+                            "ratio"
+                        ].text().strip(),
+
+                    "ratio_error":
+                        row[
+                            "error"
+                        ].text().strip(),
+
+                    "result":
+                        row[
+                            "result"
+                        ].text().strip(),
+                })
 
         return result
 
     # =====================================================
-    # GET FIELD VALUES
+    # FIELD VALUES
     # =====================================================
 
     def get_field_values(
@@ -1963,7 +2241,9 @@ class CTTestingDialog(QDialog):
             self.get_phase_data()
         )
 
-        # Keep single-phase compatibility.
+        # -------------------------------------------------
+        # LEGACY SINGLE PHASE
+        # -------------------------------------------------
 
         if len(
             values[
@@ -2010,7 +2290,7 @@ class CTTestingDialog(QDialog):
         return values
 
     # =====================================================
-    # SAVE / UPDATE
+    # SAVE
     # =====================================================
 
     def save_test(
@@ -2028,7 +2308,6 @@ class CTTestingDialog(QDialog):
             return
 
         self.update_ct_information()
-
         self.update_overall_result()
 
         values = (
@@ -2047,9 +2326,9 @@ class CTTestingDialog(QDialog):
 
         try:
 
-            # ---------------------------------------------
-            # UPDATE EXISTING
-            # ---------------------------------------------
+            # -------------------------------------------------
+            # UPDATE
+            # -------------------------------------------------
 
             if self.test_id:
 
@@ -2073,24 +2352,35 @@ class CTTestingDialog(QDialog):
 
                 return
 
-            # ---------------------------------------------
-            # NEW TEST
-            # ---------------------------------------------
+            # -------------------------------------------------
+            # NEW
+            # -------------------------------------------------
+
+            component_id = getattr(
+                self.component,
+                "component_id",
+                ""
+            )
+
+            if not component_id:
+
+                QMessageBox.warning(
+                    self,
+                    "Component Error",
+                    "Unable to determine CT component ID."
+                )
+
+                return
 
             test_id = (
                 self.test_service
                 .save_component_test(
-                    project_id=(
-                        self.project_id
-                    ),
 
-                    panel_id=(
-                        self.panel_id
-                    ),
+                    project_id=self.project_id,
 
-                    component_id=(
-                        self.component.component_id
-                    ),
+                    panel_id=self.panel_id,
+
+                    component_id=component_id,
 
                     test_type="CT",
 
@@ -2169,8 +2459,10 @@ class CTTestingDialog(QDialog):
                 QComboBox
             ):
 
-                index = widget.findText(
-                    str(value)
+                index = (
+                    widget.findText(
+                        str(value)
+                    )
                 )
 
                 if index >= 0:
@@ -2193,11 +2485,12 @@ class CTTestingDialog(QDialog):
         self.three_phase_selector.setCurrentText(
             "Yes"
             if is_three_phase
-            else
-            "No"
+            else "No"
         )
 
-        # on_phase_mode_changed() rebuilds rows.
+        # -------------------------------------------------
+        # PHASE DATA
+        # -------------------------------------------------
 
         phase_tests = (
             values.get(
@@ -2207,7 +2500,7 @@ class CTTestingDialog(QDialog):
             or []
         )
 
-        # Legacy test.
+        # Legacy format.
 
         if not phase_tests:
 
@@ -2222,6 +2515,7 @@ class CTTestingDialog(QDialog):
             ):
 
                 phase_tests = [
+
                     {
 
                         "phase":
@@ -2241,13 +2535,14 @@ class CTTestingDialog(QDialog):
                     }
                 ]
 
-        # Rebuild ratio rows from saved data so multiple tests per phase
-        # are restored correctly.
         valid_phases = set(
             self._current_phases()
         )
 
-        self.phase_table.setRowCount(0)
+        self.phase_table.setRowCount(
+            0
+        )
+
         self.phase_rows = {}
 
         grouped = {}
@@ -2279,32 +2574,36 @@ class CTTestingDialog(QDialog):
             )
 
             if not saved_rows:
+
                 self._create_ratio_row(
                     phase
                 )
+
                 continue
 
             for phase_data in saved_rows:
 
                 self._create_ratio_row(
+
                     phase,
+
                     phase_data.get(
                         "primary_current",
                         ""
                     ),
+
                     phase_data.get(
                         "secondary_current",
                         ""
                     )
                 )
 
-        self.calculate_polarity()
+        self.update_ct_information()
 
+        self.calculate_polarity()
         self.calculate_burden()
 
-        for phase in (
-            self.phase_rows
-        ):
+        for phase in self.phase_rows:
 
             self.calculate_phase_ratio(
                 phase
@@ -2313,49 +2612,80 @@ class CTTestingDialog(QDialog):
         self.update_overall_result()
 
     # =====================================================
-    # CLEAR
+    # CLEAR TEST DATA
     # =====================================================
 
     def clear_fields(
         self
     ):
 
-        for field_id, widget in (
-            self.fields.items()
-        ):
+        # -------------------------------------------------
+        # IMPORTANT
+        #
+        # Configuration fields are NOT cleared:
+        #
+        # ct_primary
+        # ct_secondary
+        # ct_ratio
+        # core
+        # ct_class
+        # burden
+        # manufacturer
+        # model
+        # serial_number
+        #
+        # "Clear" means clear the test measurements.
+        # -------------------------------------------------
 
-            if field_id in (
-                "ct_primary",
-                "ct_secondary",
-                "core",
-                "ct_class",
-                "burden",
-                "manufacturer",
-                "model",
-                "serial_number",
-                "remarks",
-                "ir_primary_earth",
-                "ir_secondary_earth",
-                "ir_primary_secondary",
-                "ir_test_voltage",
-                "ir_test_duration",
-                "resistance_phase_a",
-                "resistance_phase_b",
-                "resistance_phase_c",
-                "knee_point_voltage",
-                "knee_point_current",
-                "excitation_test_voltage",
-                "excitation_test_current",
-                "burden_test_current",
-                "measured_burden",
+        fields_to_clear = (
+
+            "ir_primary_earth",
+
+            "ir_secondary_earth",
+
+            "ir_primary_secondary",
+
+            "ir_test_voltage",
+
+            "ir_test_duration",
+
+            "resistance_phase_a",
+
+            "resistance_phase_b",
+
+            "resistance_phase_c",
+
+            "knee_point_voltage",
+
+            "knee_point_current",
+
+            "excitation_test_voltage",
+
+            "excitation_test_current",
+
+            "burden_test_current",
+
+            "measured_burden",
+
+            "remarks",
+        )
+
+        for field_id in fields_to_clear:
+
+            widget = self.fields.get(
+                field_id
+            )
+
+            if isinstance(
+                widget,
+                QLineEdit
             ):
 
-                if isinstance(
-                    widget,
-                    QLineEdit
-                ):
+                widget.clear()
 
-                    widget.clear()
+        # -------------------------------------------------
+        # TOLERANCE
+        # -------------------------------------------------
 
         self.fields[
             "tolerance_percent"
@@ -2363,22 +2693,59 @@ class CTTestingDialog(QDialog):
             "5"
         )
 
+        # -------------------------------------------------
+        # POLARITY
+        # -------------------------------------------------
+
+        self.fields[
+            "expected_polarity"
+        ].setCurrentText(
+            "CORRECT"
+        )
+
+        self.fields[
+            "observed_polarity"
+        ].setCurrentText(
+            "CORRECT"
+        )
+
+        # -------------------------------------------------
+        # PHASE MODE
+        # -------------------------------------------------
+
         self.three_phase_selector.setCurrentText(
             "No"
         )
 
-        # Reset ratio testing to one blank row for each active phase.
-        self.phase_table.setRowCount(0)
+        # -------------------------------------------------
+        # RATIO TEST ROW
+        # -------------------------------------------------
+
+        self.phase_table.setRowCount(
+            0
+        )
+
         self.phase_rows = {}
 
-        for phase in self._current_phases():
+        for phase in (
+            self._current_phases()
+        ):
+
             self._create_ratio_row(
                 phase
             )
 
-        self.calculate_polarity()
-        self.calculate_burden()
+        # -------------------------------------------------
+        # RECALCULATE
+        # -------------------------------------------------
+
         self.update_ct_information()
+
+        self.calculate_polarity()
+
+        self.calculate_burden()
+
+        self.update_overall_result()
 
     # =====================================================
     # CLOSE

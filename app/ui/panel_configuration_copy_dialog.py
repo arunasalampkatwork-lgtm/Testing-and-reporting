@@ -9,151 +9,21 @@ from PySide6.QtWidgets import (
     QLabel,
     QTreeWidget,
     QTreeWidgetItem,
-    QPushButton,
     QCheckBox,
-    QGroupBox,
-    QScrollArea,
-    QWidget,
+    QPushButton,
     QMessageBox,
+    QGroupBox,
 )
-
-from app.services.asset_manager import AssetManager
-from app.services.component_manager import ComponentManager
 
 
 class PanelConfigurationCopyDialog(QDialog):
-
-    # =========================================================
-    # PANEL PARAMETERS
-    # =========================================================
-
-    PANEL_PARAMETERS = {
-
-        "equipment_name":
-            "Feed Equipment",
-
-        "equipment_type":
-            "Equipment Type",
-
-        "ct_count":
-            "Number of CTs",
-
-        "relay_count":
-            "Numerical Relays",
-
-        "aux_count":
-            "Auxiliary Relays",
-
-        "meter_count":
-            "Meters",
-    }
-
-    # =========================================================
-    # COMPONENT PARAMETERS
-    # =========================================================
-
-    COMPONENT_PARAMETERS = {
-
-        "manufacturer":
-            "Manufacturer",
-
-        "model":
-            "Model",
-
-        "description":
-            "Description",
-
-        # -------------------------
-        # CT
-        # -------------------------
-
-        "ct_primary":
-            "CT Primary",
-
-        "ct_secondary":
-            "CT Secondary",
-
-        "ct_ratio":
-            "CT Ratio",
-
-        "ct_class":
-            "CT Class",
-
-        "burden":
-            "Burden",
-
-        "core":
-            "Core",
-
-        # -------------------------
-        # RELAY
-        # -------------------------
-
-        "vt_ratio":
-            "VT Ratio",
-
-        "firmware":
-            "Firmware",
-
-        # -------------------------
-        # AUX RELAY
-        # -------------------------
-
-        "coil_voltage":
-            "Coil Voltage",
-
-        "contact_configuration":
-            "Contact Configuration",
-
-        # -------------------------
-        # METER
-        # -------------------------
-
-        "meter_type":
-            "Meter Type",
-
-        "meter_functions":
-            "Meter Functions",
-
-        "accuracy_class":
-            "Accuracy Class",
-
-        # -------------------------
-        # PROTECTION
-        # -------------------------
-
-        "protection_functions":
-            "Protection Functions",
-    }
-
-    # =========================================================
-    # UNIQUE PARAMETERS
-    #
-    # These are intentionally NOT offered for import.
-    # =========================================================
-
-    UNIQUE_PARAMETERS = {
-
-        "panel_name",
-        "asset_tag",
-
-        "component_id",
-        "panel_id",
-        "component_name",
-
-        "serial_number",
-    }
-
-    # =========================================================
-    # INIT
-    # =========================================================
 
     def __init__(
         self,
         projects_dir,
         target_project_folder=None,
         target_panel_id=None,
-        parent=None,
+        parent=None
     ):
 
         super().__init__(parent)
@@ -174,22 +44,16 @@ class PanelConfigurationCopyDialog(QDialog):
 
         self.selected_panel = None
 
-        self.selected_panel_configuration = {}
+        self.source_components = []
 
-        self.selected_component_configuration = []
-
-        self.panel_checkboxes = {}
-
-        self.component_checkboxes = {}
-
-        self.project_managers = {}
+        self.checkboxes = {}
 
         self.setWindowTitle(
-            "Copy Configuration from Existing Panel"
+            "Import Panel Configuration"
         )
 
         self.resize(
-            1100,
+            1000,
             700
         )
 
@@ -203,7 +67,7 @@ class PanelConfigurationCopyDialog(QDialog):
 
     def build_ui(self):
 
-        main_layout = QVBoxLayout(
+        layout = QVBoxLayout(
             self
         )
 
@@ -212,48 +76,51 @@ class PanelConfigurationCopyDialog(QDialog):
         # =====================================================
 
         title = QLabel(
-            "Copy Configuration from Existing Panel"
+            "IMPORT CONFIGURATION FROM EXISTING PANEL"
         )
 
         title.setStyleSheet(
             """
             QLabel {
-                font-size: 20px;
+                font-size: 22px;
                 font-weight: bold;
             }
             """
         )
 
-        main_layout.addWidget(
+        layout.addWidget(
             title
         )
 
         description = QLabel(
-            "Select a panel from any project. "
-            "Its configuration can then be copied "
-            "to the current panel."
+            "Select a panel and choose which configuration "
+            "parameters should be copied."
         )
 
-        description.setWordWrap(
-            True
+        description.setStyleSheet(
+            """
+            QLabel {
+                color: #9ca3af;
+            }
+            """
         )
 
-        main_layout.addWidget(
+        layout.addWidget(
             description
         )
 
         # =====================================================
-        # MAIN AREA
+        # MAIN SPLIT
         # =====================================================
 
-        content_layout = QHBoxLayout()
+        main_layout = QHBoxLayout()
 
         # =====================================================
-        # LEFT: PANEL TREE
+        # PANEL TREE
         # =====================================================
 
         tree_group = QGroupBox(
-            "Select Source Panel"
+            "Available Panels"
         )
 
         tree_layout = QVBoxLayout(
@@ -264,12 +131,14 @@ class PanelConfigurationCopyDialog(QDialog):
 
         self.panel_tree.setHeaderLabels(
             [
-                "Project / Asset"
+                "Asset",
+                "Type"
             ]
         )
 
-        self.panel_tree.setSelectionMode(
-            QTreeWidget.SelectionMode.SingleSelection
+        self.panel_tree.setColumnWidth(
+            0,
+            300
         )
 
         self.panel_tree.itemSelectionChanged.connect(
@@ -280,13 +149,13 @@ class PanelConfigurationCopyDialog(QDialog):
             self.panel_tree
         )
 
-        content_layout.addWidget(
+        main_layout.addWidget(
             tree_group,
             1
         )
 
         # =====================================================
-        # RIGHT: PARAMETERS
+        # PARAMETERS
         # =====================================================
 
         parameter_group = QGroupBox(
@@ -303,182 +172,90 @@ class PanelConfigurationCopyDialog(QDialog):
 
         selection_buttons = QHBoxLayout()
 
-        self.select_all_button = QPushButton(
+        select_all = QPushButton(
             "Select All"
         )
 
-        self.deselect_all_button = QPushButton(
+        deselect_all = QPushButton(
             "Deselect All"
         )
 
-        self.select_all_button.clicked.connect(
-            self.select_all_parameters
+        select_all.clicked.connect(
+            lambda:
+            self.set_all_checked(True)
         )
 
-        self.deselect_all_button.clicked.connect(
-            self.deselect_all_parameters
+        deselect_all.clicked.connect(
+            lambda:
+            self.set_all_checked(False)
         )
 
         selection_buttons.addWidget(
-            self.select_all_button
+            select_all
         )
 
         selection_buttons.addWidget(
-            self.deselect_all_button
+            deselect_all
         )
-
-        selection_buttons.addStretch()
 
         parameter_layout.addLayout(
             selection_buttons
         )
 
         # -----------------------------------------------------
-        # SCROLL AREA
+        # CHECKBOX AREA
         # -----------------------------------------------------
 
-        scroll = QScrollArea()
+        self.parameter_layout = QVBoxLayout()
 
-        scroll.setWidgetResizable(
-            True
+        parameter_layout.addLayout(
+            self.parameter_layout
         )
 
-        scroll_widget = QWidget()
+        parameter_layout.addStretch()
 
-        self.parameter_scroll_layout = (
-            QVBoxLayout(
-                scroll_widget
-            )
-        )
-
-        # =====================================================
-        # PANEL PARAMETERS
-        # =====================================================
-
-        panel_group = QGroupBox(
-            "Panel Configuration"
-        )
-
-        panel_layout = QVBoxLayout(
-            panel_group
-        )
-
-        for key, label in (
-            self.PANEL_PARAMETERS.items()
-        ):
-
-            checkbox = QCheckBox(
-                label
-            )
-
-            checkbox.setChecked(
-                True
-            )
-
-            self.panel_checkboxes[
-                key
-            ] = checkbox
-
-            panel_layout.addWidget(
-                checkbox
-            )
-
-        self.parameter_scroll_layout.addWidget(
-            panel_group
-        )
-
-        # =====================================================
-        # COMPONENT PARAMETERS
-        # =====================================================
-
-        component_group = QGroupBox(
-            "Component Configuration"
-        )
-
-        component_layout = QVBoxLayout(
-            component_group
-        )
-
-        for key, label in (
-            self.COMPONENT_PARAMETERS.items()
-        ):
-
-            checkbox = QCheckBox(
-                label
-            )
-
-            checkbox.setChecked(
-                True
-            )
-
-            self.component_checkboxes[
-                key
-            ] = checkbox
-
-            component_layout.addWidget(
-                checkbox
-            )
-
-        self.parameter_scroll_layout.addWidget(
-            component_group
-        )
-
-        self.parameter_scroll_layout.addStretch()
-
-        scroll.setWidget(
-            scroll_widget
-        )
-
-        parameter_layout.addWidget(
-            scroll
-        )
-
-        content_layout.addWidget(
+        main_layout.addWidget(
             parameter_group,
             1
         )
 
-        main_layout.addLayout(
-            content_layout
+        layout.addLayout(
+            main_layout
         )
 
         # =====================================================
-        # BOTTOM BUTTONS
+        # BUTTONS
         # =====================================================
 
         buttons = QHBoxLayout()
 
-        self.cancel_button = QPushButton(
+        cancel = QPushButton(
             "Cancel"
         )
 
-        self.import_button = QPushButton(
+        import_button = QPushButton(
             "Import Configuration"
         )
 
-        self.import_button.setEnabled(
-            False
-        )
-
-        self.cancel_button.clicked.connect(
+        cancel.clicked.connect(
             self.reject
         )
 
-        self.import_button.clicked.connect(
-            self.accept_import
+        import_button.clicked.connect(
+            self.accept_selection
         )
 
         buttons.addStretch()
 
         buttons.addWidget(
-            self.cancel_button
+            cancel
         )
 
         buttons.addWidget(
-            self.import_button
+            import_button
         )
 
-        main_layout.addLayout(
+        layout.addLayout(
             buttons
         )
 
@@ -494,56 +271,27 @@ class PanelConfigurationCopyDialog(QDialog):
 
             return
 
-        project_folders = sorted(
-            [
-                folder
-                for folder in self.projects_dir.iterdir()
-                if folder.is_dir()
-            ],
-            key=lambda path:
-                path.name.lower()
-        )
+        for project_folder in sorted(
+            self.projects_dir.iterdir()
+        ):
 
-        for project_folder in project_folders:
-
-            assets_file = (
-                project_folder /
-                "assets.json"
-            )
-
-            if not assets_file.exists():
-                continue
-
-            try:
-
-                asset_manager = AssetManager(
-                    project_folder
-                )
-
-                self.project_managers[
-                    project_folder.name
-                ] = asset_manager
-
-            except Exception:
+            if not project_folder.is_dir():
 
                 continue
 
-            project_item = (
-                QTreeWidgetItem()
-            )
-
-            project_item.setText(
-                0,
-                project_folder.name
+            project_item = QTreeWidgetItem(
+                [
+                    project_folder.name,
+                    "Project"
+                ]
             )
 
             project_item.setData(
                 0,
                 Qt.ItemDataRole.UserRole,
                 {
-                    "type": "PROJECT",
-                    "project_folder":
-                        str(project_folder),
+                    "type": "project",
+                    "folder": project_folder
                 }
             )
 
@@ -551,364 +299,1099 @@ class PanelConfigurationCopyDialog(QDialog):
                 project_item
             )
 
-            roots = (
-                asset_manager.get_children(
-                    None
-                )
+            self.load_project_assets(
+                project_item,
+                project_folder
             )
 
-            for root in roots:
-
-                self.add_node_recursive(
-                    project_item,
-                    asset_manager,
-                    root
-                )
+        # -----------------------------------------------------
+        # EVERYTHING COLLAPSED BY DEFAULT
+        # -----------------------------------------------------
 
         self.panel_tree.collapseAll()
 
     # =========================================================
-    # ADD NODE
+    # LOAD PROJECT ASSETS
     # =========================================================
 
-    def add_node_recursive(
+    def load_project_assets(
         self,
-        parent_item,
-        asset_manager,
-        node,
+        project_item,
+        project_folder
     ):
 
-        item = QTreeWidgetItem()
-
-        item.setText(
-            0,
-            str(node.name)
+        assets_file = (
+            project_folder /
+            "assets.json"
         )
 
-        item.setData(
-            0,
-            Qt.ItemDataRole.UserRole,
-            {
-                "type":
-                    str(
-                        getattr(
-                            node,
-                            "node_type",
-                            ""
-                        )
-                    ).upper(),
+        if not assets_file.exists():
 
-                "node_id":
-                    node.node_id,
+            return
 
-                "project_folder":
-                    str(
-                        asset_manager.project_folder
-                    ),
-            }
-        )
+        try:
 
-        parent_item.addChild(
-            item
-        )
+            with open(
+                assets_file,
+                "r",
+                encoding="utf-8"
+            ) as file:
 
-        children = (
-            asset_manager.get_children(
-                node.node_id
+                data = json.load(file)
+
+        except Exception:
+
+            return
+
+        assets = (
+            data
+            if isinstance(data, list)
+            else data.get(
+                "assets",
+                []
             )
         )
 
-        for child in children:
+        items = {}
 
-            self.add_node_recursive(
-                item,
-                asset_manager,
-                child
+        # -----------------------------------------------------
+        # CREATE ITEMS
+        # -----------------------------------------------------
+
+        for asset in assets:
+
+            if not isinstance(
+                asset,
+                dict
+            ):
+
+                continue
+
+            node_id = (
+                asset.get("node_id")
+                or asset.get("id")
             )
+
+            parent_id = (
+                asset.get("parent_id")
+            )
+
+            name = str(
+                asset.get(
+                    "name",
+                    ""
+                )
+            )
+
+            node_type = str(
+                asset.get(
+                    "node_type",
+                    asset.get(
+                        "type",
+                        ""
+                    )
+                )
+            )
+
+            item = QTreeWidgetItem(
+                [
+                    name,
+                    node_type
+                ]
+            )
+
+            item.setData(
+                0,
+                Qt.ItemDataRole.UserRole,
+                asset
+            )
+
+            items[node_id] = item
+
+        # -----------------------------------------------------
+        # BUILD TREE
+        # -----------------------------------------------------
+
+        for asset in assets:
+
+            node_id = (
+                asset.get("node_id")
+                or asset.get("id")
+            )
+
+            parent_id = (
+                asset.get("parent_id")
+            )
+
+            item = items.get(
+                node_id
+            )
+
+            if item is None:
+
+                continue
+
+            if parent_id in items:
+
+                items[
+                    parent_id
+                ].addChild(
+                    item
+                )
+
+            else:
+
+                project_item.addChild(
+                    item
+                )
 
     # =========================================================
-    # PANEL SELECTED
+    # PANEL SELECTION
     # =========================================================
 
     def on_panel_selected(self):
 
-        item = (
-            self.panel_tree.currentItem()
+        items = (
+            self.panel_tree.selectedItems()
         )
 
-        self.selected_panel = None
+        if not items:
 
-        self.import_button.setEnabled(
-            False
-        )
-
-        if item is None:
             return
 
-        data = item.data(
+        asset = items[0].data(
             0,
             Qt.ItemDataRole.UserRole
         )
 
         if not isinstance(
-            data,
+            asset,
             dict
         ):
-            return
-
-        if data.get(
-            "type"
-        ) != "PANEL":
 
             return
 
-        source_project_folder = Path(
-            data[
-                "project_folder"
-            ]
+        node_type = str(
+            asset.get(
+                "node_type",
+                asset.get(
+                    "type",
+                    ""
+                )
+            )
+        ).upper()
+
+        if node_type != "PANEL":
+
+            self.selected_panel = None
+
+            return
+
+        self.selected_panel = asset
+
+        self.load_parameter_checkboxes(
+            asset
         )
 
-        source_manager = (
-            self.project_managers.get(
-                source_project_folder.name
-            )
-        )
+    # =========================================================
+    # PARAMETERS
+    # =========================================================
 
-        if source_manager is None:
-            return
+    def load_parameter_checkboxes(
+        self,
+        panel
+    ):
 
-        source_panel = (
-            source_manager.get_node(
-                data["node_id"]
-            )
-        )
+        self.clear_parameter_checkboxes()
 
-        if source_panel is None:
-            return
+        # =====================================================
+        # PANEL PARAMETERS
+        # =====================================================
 
-        # Prevent copying a panel onto itself.
-
-        if (
-            self.target_project_folder
-            and
-            source_project_folder.resolve()
-            == self.target_project_folder.resolve()
-            and
-            source_panel.node_id
-            == self.target_panel_id
-        ):
-
-            self.import_button.setEnabled(
-                False
-            )
-
-            return
-
-        self.selected_panel = {
-            "project_folder":
-                source_project_folder,
-
-            "asset_manager":
-                source_manager,
-
-            "panel":
-                source_panel,
-        }
-
-        self.import_button.setEnabled(
+        self.add_checkbox(
+            "panel_equipment_name",
+            "Equipment Name",
+            self.get_value(
+                panel,
+                "equipment_name"
+            ),
             True
         )
+
+        self.add_checkbox(
+            "panel_equipment_type",
+            "Equipment Type",
+            self.get_value(
+                panel,
+                "equipment_type"
+            ),
+            True
+        )
+
+        self.add_checkbox(
+            "panel_ct_count",
+            "Number of CTs",
+            self.get_value(
+                panel,
+                "ct_count"
+            ),
+            True
+        )
+
+        self.add_checkbox(
+            "panel_relay_count",
+            "Number of Numerical Relays",
+            self.get_value(
+                panel,
+                "relay_count"
+            ),
+            True
+        )
+
+        self.add_checkbox(
+            "panel_aux_count",
+            "Number of Auxiliary Relays",
+            self.get_value(
+                panel,
+                "aux_count"
+            ),
+            True
+        )
+
+        self.add_checkbox(
+            "panel_meter_count",
+            "Number of Meters",
+            self.get_value(
+                panel,
+                "meter_count"
+            ),
+            True
+        )
+
+        # =====================================================
+        # COMPONENTS
+        # =====================================================
+
+        self.source_components = (
+            self.load_components_for_panel(
+                panel
+            )
+        )
+
+        for index, component in enumerate(
+            self.source_components
+        ):
+
+            self.add_component_checkboxes(
+                index,
+                component
+            )
+
+    # =========================================================
+    # COMPONENT CHECKBOXES
+    # =========================================================
+
+    def add_component_checkboxes(
+        self,
+        index,
+        component
+    ):
+
+        component_type = str(
+            component.get(
+                "component_type",
+                ""
+            )
+        ).upper()
+
+        name = str(
+            component.get(
+                "name",
+                f"Component {index + 1}"
+            )
+        )
+
+        prefix = (
+            f"component_{index}_"
+        )
+
+        # -----------------------------------------------------
+        # COMPONENT HEADER
+        # -----------------------------------------------------
+
+        header = QCheckBox(
+            f"{name} ({component_type}) - ALL"
+        )
+
+        header.setChecked(
+            True
+        )
+
+        header.setStyleSheet(
+            """
+            QCheckBox {
+                font-weight: bold;
+                margin-top: 8px;
+            }
+            """
+        )
+
+        self.parameter_layout.addWidget(
+            header
+        )
+
+        self.checkboxes[
+            prefix + "ALL"
+        ] = header
+
+        # -----------------------------------------------------
+        # COMMON
+        # -----------------------------------------------------
+
+        common_fields = [
+            (
+                "manufacturer",
+                "Manufacturer"
+            ),
+            (
+                "model",
+                "Model"
+            ),
+            (
+                "description",
+                "Description"
+            ),
+        ]
+
+        # -----------------------------------------------------
+        # UNIQUE FIELD
+        # -----------------------------------------------------
+
+        self.add_checkbox(
+            prefix + "serial_number",
+            f"{name}: Serial Number",
+            component.get(
+                "serial_number",
+                ""
+            ),
+            False
+        )
+
+        # -----------------------------------------------------
+        # COMMON FIELDS
+        # -----------------------------------------------------
+
+        for field, label in common_fields:
+
+            self.add_checkbox(
+                prefix + field,
+                f"{name}: {label}",
+                component.get(
+                    field,
+                    ""
+                ),
+                True
+            )
+
+        # =====================================================
+        # CT
+        # =====================================================
+
+        if component_type == "CT":
+
+            ct_fields = [
+
+                (
+                    "ct_primary",
+                    "CT Primary"
+                ),
+
+                (
+                    "ct_secondary",
+                    "CT Secondary"
+                ),
+
+                (
+                    "ct_ratio",
+                    "CT Ratio"
+                ),
+
+                (
+                    "ct_class",
+                    "CT Class"
+                ),
+
+                (
+                    "burden",
+                    "Burden"
+                ),
+
+                (
+                    "core",
+                    "Core"
+                ),
+            ]
+
+            for field, label in ct_fields:
+
+                self.add_checkbox(
+                    prefix + field,
+                    f"{name}: {label}",
+                    component.get(
+                        field,
+                        ""
+                    ),
+                    True
+                )
+
+        # =====================================================
+        # NUMERICAL RELAY
+        # =====================================================
+
+        elif component_type in (
+            "NUMERICAL RELAY",
+            "RELAY",
+            "NUMERICAL_RELAY"
+        ):
+
+            relay_fields = [
+
+                (
+                    "vt_ratio",
+                    "VT Ratio"
+                ),
+
+                (
+                    "firmware",
+                    "Firmware"
+                ),
+
+                (
+                    "protection_functions",
+                    "Protection Functions"
+                ),
+            ]
+
+            for field, label in relay_fields:
+
+                self.add_checkbox(
+                    prefix + field,
+                    f"{name}: {label}",
+                    component.get(
+                        field,
+                        ""
+                    ),
+                    True
+                )
+
+        # =====================================================
+        # AUXILIARY RELAY
+        # =====================================================
+
+        elif component_type in (
+            "AUX",
+            "AUX RELAY",
+            "AUXILIARY RELAY",
+            "AUXILIARY_RELAY"
+        ):
+
+            aux_fields = [
+
+                (
+                    "coil_voltage",
+                    "Coil Voltage"
+                ),
+
+                (
+                    "contact_configuration",
+                    "Contact Configuration"
+                ),
+            ]
+
+            for field, label in aux_fields:
+
+                self.add_checkbox(
+                    prefix + field,
+                    f"{name}: {label}",
+                    component.get(
+                        field,
+                        ""
+                    ),
+                    True
+                )
+
+        # =====================================================
+        # METER
+        # =====================================================
+
+        elif component_type in (
+            "METER",
+            "METERING"
+        ):
+
+            meter_fields = [
+
+                (
+                    "meter_type",
+                    "Meter Type"
+                ),
+
+                (
+                    "meter_functions",
+                    "Meter Functions"
+                ),
+
+                (
+                    "accuracy_class",
+                    "Accuracy Class"
+                ),
+            ]
+
+            for field, label in meter_fields:
+
+                self.add_checkbox(
+                    prefix + field,
+                    f"{name}: {label}",
+                    component.get(
+                        field,
+                        ""
+                    ),
+                    True
+                )
+
+        # -----------------------------------------------------
+        # COMPONENT SELECT-ALL CONNECTION
+        # -----------------------------------------------------
+
+        header.toggled.connect(
+            lambda checked,
+            p=prefix:
+            self.toggle_component(
+                p,
+                checked
+            )
+        )
+
+    # =========================================================
+    # ADD CHECKBOX
+    # =========================================================
+
+    def add_checkbox(
+        self,
+        key,
+        label,
+        value,
+        checked=True
+    ):
+
+        checkbox = QCheckBox(
+            label
+        )
+
+        checkbox.setChecked(
+            checked
+        )
+
+        checkbox.setToolTip(
+            f"Current value: {value}"
+        )
+
+        self.parameter_layout.addWidget(
+            checkbox
+        )
+
+        self.checkboxes[
+            key
+        ] = checkbox
+
+    # =========================================================
+    # TOGGLE COMPONENT
+    # =========================================================
+
+    def toggle_component(
+        self,
+        prefix,
+        checked
+    ):
+
+        for key, checkbox in (
+            self.checkboxes.items()
+        ):
+
+            if (
+                key.startswith(prefix)
+                and key != prefix + "ALL"
+            ):
+
+                checkbox.setChecked(
+                    checked
+                )
 
     # =========================================================
     # SELECT ALL
     # =========================================================
 
-    def select_all_parameters(self):
+    def set_all_checked(
+        self,
+        checked
+    ):
 
         for checkbox in (
-            self.panel_checkboxes.values()
+            self.checkboxes.values()
         ):
 
             checkbox.setChecked(
-                True
+                checked
             )
 
-        for checkbox in (
-            self.component_checkboxes.values()
+    # =========================================================
+    # CLEAR CHECKBOXES
+    # =========================================================
+
+    def clear_parameter_checkboxes(
+        self
+    ):
+
+        self.checkboxes.clear()
+
+        while (
+            self.parameter_layout.count()
         ):
 
-            checkbox.setChecked(
-                True
+            item = (
+                self.parameter_layout.takeAt(
+                    0
+                )
             )
 
+            widget = item.widget()
+
+            if widget:
+
+                widget.deleteLater()
+
     # =========================================================
-    # DESELECT ALL
+    # LOAD COMPONENTS
     # =========================================================
 
-    def deselect_all_parameters(self):
+    def load_components_for_panel(
+        self,
+        panel
+    ):
 
-        for checkbox in (
-            self.panel_checkboxes.values()
+        project_folder = (
+            self.find_project_folder(
+                panel
+            )
+        )
+
+        if project_folder is None:
+
+            return []
+
+        components_file = (
+            project_folder /
+            "components.json"
+        )
+
+        if not components_file.exists():
+
+            return []
+
+        try:
+
+            with open(
+                components_file,
+                "r",
+                encoding="utf-8"
+            ) as file:
+
+                data = json.load(
+                    file
+                )
+
+        except Exception:
+
+            return []
+
+        components = (
+            data
+            if isinstance(
+                data,
+                list
+            )
+            else data.get(
+                "components",
+                []
+            )
+        )
+
+        panel_id = (
+            panel.get("node_id")
+            or panel.get("id")
+        )
+
+        result = []
+
+        for component in components:
+
+            if not isinstance(
+                component,
+                dict
+            ):
+
+                continue
+
+            component_panel_id = (
+                component.get(
+                    "panel_id"
+                )
+            )
+
+            if (
+                str(component_panel_id)
+                == str(panel_id)
+            ):
+
+                result.append(
+                    component
+                )
+
+        return result
+
+    # =========================================================
+    # FIND PROJECT
+    # =========================================================
+
+    def find_project_folder(
+        self,
+        panel
+    ):
+
+        current = (
+            self.projects_dir
+        )
+
+        project_id = (
+            panel.get(
+                "project_id"
+            )
+        )
+
+        if project_id:
+
+            candidate = (
+                self.projects_dir /
+                str(project_id)
+            )
+
+            if candidate.exists():
+
+                return candidate
+
+        # -----------------------------------------------------
+        # Fallback: search projects
+        # -----------------------------------------------------
+
+        for folder in (
+            self.projects_dir.iterdir()
         ):
 
-            checkbox.setChecked(
-                False
+            if not folder.is_dir():
+
+                continue
+
+            assets_file = (
+                folder /
+                "assets.json"
             )
 
-        for checkbox in (
-            self.component_checkboxes.values()
+            if not assets_file.exists():
+
+                continue
+
+            try:
+
+                with open(
+                    assets_file,
+                    "r",
+                    encoding="utf-8"
+                ) as file:
+
+                    data = json.load(
+                        file
+                    )
+
+            except Exception:
+
+                continue
+
+            assets = (
+                data
+                if isinstance(
+                    data,
+                    list
+                )
+                else data.get(
+                    "assets",
+                    []
+                )
+            )
+
+            panel_id = (
+                panel.get("node_id")
+                or panel.get("id")
+            )
+
+            for asset in assets:
+
+                if not isinstance(
+                    asset,
+                    dict
+                ):
+
+                    continue
+
+                asset_id = (
+                    asset.get("node_id")
+                    or asset.get("id")
+                )
+
+                if str(asset_id) == str(
+                    panel_id
+                ):
+
+                    return folder
+
+        return None
+
+    # =========================================================
+    # VALUE
+    # =========================================================
+
+    @staticmethod
+    def get_value(
+        data,
+        key
+    ):
+
+        value = data.get(
+            key,
+            ""
+        )
+
+        if isinstance(
+            value,
+            list
         ):
 
-            checkbox.setChecked(
-                False
+            return ", ".join(
+                str(x)
+                for x in value
             )
 
+        return str(
+            value or ""
+        )
+
     # =========================================================
-    # ACCEPT IMPORT
+    # ACCEPT
     # =========================================================
 
-    def accept_import(self):
+    def accept_selection(self):
 
         if self.selected_panel is None:
 
             QMessageBox.warning(
                 self,
-                "No Source Panel",
-                "Please select a source panel."
+                "No Panel Selected",
+                "Please select a panel from the tree."
             )
 
             return
 
-        # =====================================================
-        # PANEL CONFIGURATION
-        # =====================================================
-
-        source_panel = (
-            self.selected_panel[
-                "panel"
-            ]
+        configuration = (
+            self.build_configuration()
         )
 
-        panel_configuration = {}
-
-        for key, checkbox in (
-            self.panel_checkboxes.items()
-        ):
-
-            if not checkbox.isChecked():
-                continue
-
-            panel_configuration[
-                key
-            ] = getattr(
-                source_panel,
-                key,
-                ""
-            )
-
-        # =====================================================
-        # COMPONENT CONFIGURATION
-        # =====================================================
-
-        component_configuration = []
-
-        source_manager = (
-            self.selected_panel[
-                "asset_manager"
-            ]
-        )
-
-        source_component_manager = (
-            ComponentManager(
-                source_manager.project_folder
-            )
-        )
-
-        source_components = (
-            source_component_manager
-            .get_panel_components(
-                source_panel.node_id
-            )
-        )
-
-        selected_component_keys = [
-
-            key
-
-            for key, checkbox in (
-                self.component_checkboxes.items()
-            )
-
-            if checkbox.isChecked()
-        ]
-
-        for component in source_components:
-
-            data = {
-
-                # -----------------------------------------
-                # STRUCTURAL
-                #
-                # These are copied internally so that
-                # components can be matched by type/order.
-                # They are NOT exposed as selectable unique
-                # attributes.
-                # -----------------------------------------
-
-                "_source_component_type":
-                    getattr(
-                        component,
-                        "component_type",
-                        ""
-                    ),
-
-                "_source_component_name":
-                    getattr(
-                        component,
-                        "name",
-                        ""
-                    ),
-
-            }
-
-            for key in selected_component_keys:
-
-                data[key] = getattr(
-                    component,
-                    key,
-                    ""
-                )
-
-            component_configuration.append(
-                data
-            )
-
-        # =====================================================
-        # RESULT
-        # =====================================================
-
-        self.selected_panel_configuration = (
-            panel_configuration
-        )
-
-        self.selected_component_configuration = (
-            component_configuration
+        self._configuration = (
+            configuration
         )
 
         self.accept()
 
     # =========================================================
-    # RESULT
+    # BUILD CONFIGURATION
+    # =========================================================
+
+    def build_configuration(
+        self
+    ):
+
+        panel = (
+            self.selected_panel
+        )
+
+        panel_config = {}
+
+        # -----------------------------------------------------
+        # PANEL FIELDS
+        # -----------------------------------------------------
+
+        panel_mapping = {
+
+            "panel_equipment_name":
+                "equipment_name",
+
+            "panel_equipment_type":
+                "equipment_type",
+
+            "panel_ct_count":
+                "ct_count",
+
+            "panel_relay_count":
+                "relay_count",
+
+            "panel_aux_count":
+                "aux_count",
+
+            "panel_meter_count":
+                "meter_count",
+        }
+
+        for checkbox_key, field in (
+            panel_mapping.items()
+        ):
+
+            checkbox = (
+                self.checkboxes.get(
+                    checkbox_key
+                )
+            )
+
+            if checkbox and checkbox.isChecked():
+
+                panel_config[
+                    field
+                ] = panel.get(
+                    field,
+                    ""
+                )
+
+        # -----------------------------------------------------
+        # COMPONENTS
+        # -----------------------------------------------------
+
+        components = []
+
+        for index, component in enumerate(
+            self.source_components
+        ):
+
+            prefix = (
+                f"component_{index}_"
+            )
+
+            imported = {}
+
+            # -------------------------------------------------
+            # ALWAYS KEEP COMPONENT TYPE
+            # -------------------------------------------------
+
+            imported[
+                "component_type"
+            ] = component.get(
+                "component_type",
+                ""
+            )
+
+            # -------------------------------------------------
+            # COMPONENT NAME
+            # -------------------------------------------------
+
+            imported[
+                "name"
+            ] = component.get(
+                "name",
+                ""
+            )
+
+            # -------------------------------------------------
+            # COMPONENT FIELDS
+            # -------------------------------------------------
+
+            for field in (
+                "manufacturer",
+                "model",
+                "description",
+                "serial_number",
+                "ct_primary",
+                "ct_secondary",
+                "ct_ratio",
+                "ct_class",
+                "burden",
+                "core",
+                "vt_ratio",
+                "firmware",
+                "coil_voltage",
+                "contact_configuration",
+                "meter_type",
+                "meter_functions",
+                "accuracy_class",
+                "protection_functions",
+            ):
+
+                checkbox = self.checkboxes.get(
+                    prefix + field
+                )
+
+                if (
+                    checkbox
+                    and checkbox.isChecked()
+                ):
+
+                    imported[
+                        field
+                    ] = component.get(
+                        field,
+                        ""
+                    )
+
+            components.append(
+                imported
+            )
+
+        return {
+
+            "source_panel_name":
+                panel.get(
+                    "name",
+                    ""
+                ),
+
+            "source_panel_id":
+                panel.get(
+                    "node_id",
+                    panel.get(
+                        "id"
+                    )
+                ),
+
+            "panel_configuration":
+                panel_config,
+
+            "components":
+                components,
+        }
+
+    # =========================================================
+    # GET CONFIGURATION
     # =========================================================
 
     def get_configuration(self):
 
-        return {
-
-            "panel_configuration":
-                self.selected_panel_configuration,
-
-            "component_configuration":
-                self.selected_component_configuration,
-
-        }
+        return getattr(
+            self,
+            "_configuration",
+            {}
+        )
