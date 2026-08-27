@@ -23,6 +23,24 @@ class CTReportService:
         )
 
     # =====================================================
+    # VALUE CHECK
+    # =====================================================
+
+    @staticmethod
+    def has_value(value):
+
+        if value is None:
+            return False
+
+        if isinstance(value, str):
+
+            return bool(
+                value.strip()
+            )
+
+        return True
+
+    # =====================================================
     # GENERATE
     # =====================================================
 
@@ -58,7 +76,6 @@ class CTReportService:
         )
 
         if not output_path:
-
             return None
 
         output_path = Path(
@@ -81,8 +98,7 @@ class CTReportService:
                 "measurements",
                 {}
             )
-            or
-            {}
+            or {}
         )
 
         # =================================================
@@ -98,224 +114,173 @@ class CTReportService:
         # TEST INFORMATION
         # =================================================
 
-        self.add_heading(
-            document,
-            "TEST INFORMATION"
-        )
+        test_information = [
 
-        self.add_info_table(
-            document,
-            [
+            (
+                "Test ID",
+                record.get(
+                    "test_id",
+                    ""
+                )
+            ),
 
-                (
-                    "Test ID",
-                    record.get(
-                        "test_id",
-                        ""
-                    )
-                ),
+            (
+                "Test Date",
+                record.get(
+                    "test_date",
+                    ""
+                )
+            ),
 
-                (
-                    "Test Date",
-                    record.get(
-                        "test_date",
-                        ""
-                    )
-                ),
+            (
+                "Project ID",
+                record.get(
+                    "project_id",
+                    ""
+                )
+            ),
 
-                (
-                    "Project ID",
-                    record.get(
-                        "project_id",
-                        ""
-                    )
-                ),
+            (
+                "Panel ID",
+                record.get(
+                    "panel_id",
+                    ""
+                )
+            ),
 
-                (
-                    "Panel ID",
-                    record.get(
-                        "panel_id",
-                        ""
-                    )
-                ),
+            (
+                "Component ID",
+                record.get(
+                    "component_id",
+                    ""
+                )
+            ),
 
-                (
-                    "Component ID",
-                    record.get(
-                        "component_id",
-                        ""
-                    )
-                ),
+            (
+                "Test Type",
+                record.get(
+                    "test_type",
+                    "CT"
+                )
+            ),
 
-                (
-                    "Test Type",
-                    record.get(
-                        "test_type",
-                        "CT"
-                    )
-                ),
+        ]
 
+        if measurements.get(
+            "is_three_phase",
+            False
+        ):
+
+            test_information.append(
                 (
                     "3-Phase CT",
                     "Yes"
-                    if measurements.get(
-                        "is_three_phase",
-                        False
-                    )
-                    else
-                    "No"
-                ),
-            ]
+                )
+            )
+
+        self.add_optional_info_section(
+            document,
+            "TEST INFORMATION",
+            test_information
         )
 
         # =================================================
         # CT DETAILS
         # =================================================
 
-        self.add_heading(
+        ct_details = [
+
+            (
+                "CT",
+                measurements.get(
+                    "ct_name",
+                    ""
+                )
+            ),
+
+            (
+                "Manufacturer",
+                measurements.get(
+                    "manufacturer",
+                    ""
+                )
+            ),
+
+            (
+                "Model",
+                measurements.get(
+                    "model",
+                    ""
+                )
+            ),
+
+            (
+                "Serial Number",
+                measurements.get(
+                    "serial_number",
+                    ""
+                )
+            ),
+
+            (
+                "CT Primary",
+                measurements.get(
+                    "ct_primary",
+                    ""
+                )
+            ),
+
+            (
+                "CT Secondary",
+                measurements.get(
+                    "ct_secondary",
+                    ""
+                )
+            ),
+
+            (
+                "CT Ratio",
+                measurements.get(
+                    "ct_ratio",
+                    ""
+                )
+            ),
+
+            (
+                "Core",
+                measurements.get(
+                    "core",
+                    ""
+                )
+            ),
+
+            (
+                "Class",
+                measurements.get(
+                    "ct_class",
+                    ""
+                )
+            ),
+
+            (
+                "Burden",
+                measurements.get(
+                    "burden",
+                    ""
+                )
+            ),
+
+        ]
+
+        self.add_optional_info_section(
             document,
-            "CT DETAILS"
-        )
-
-        self.add_info_table(
-            document,
-            [
-
-                (
-                    "CT",
-                    measurements.get(
-                        "ct_name",
-                        ""
-                    )
-                ),
-
-                (
-                    "Manufacturer",
-                    measurements.get(
-                        "manufacturer",
-                        ""
-                    )
-                ),
-
-                (
-                    "Model",
-                    measurements.get(
-                        "model",
-                        ""
-                    )
-                ),
-
-                (
-                    "Serial Number",
-                    measurements.get(
-                        "serial_number",
-                        ""
-                    )
-                ),
-
-                (
-                    "CT Primary",
-                    measurements.get(
-                        "ct_primary",
-                        ""
-                    )
-                ),
-
-                (
-                    "CT Secondary",
-                    measurements.get(
-                        "ct_secondary",
-                        ""
-                    )
-                ),
-
-                (
-                    "CT Ratio",
-                    measurements.get(
-                        "ct_ratio",
-                        ""
-                    )
-                ),
-
-                (
-                    "Core",
-                    measurements.get(
-                        "core",
-                        ""
-                    )
-                ),
-
-                (
-                    "Class",
-                    measurements.get(
-                        "ct_class",
-                        ""
-                    )
-                ),
-
-                (
-                    "Burden",
-                    measurements.get(
-                        "burden",
-                        ""
-                    )
-                ),
-            ]
+            "CT DETAILS",
+            ct_details
         )
 
         # =================================================
         # RATIO TEST
         # =================================================
-
-        self.add_heading(
-            document,
-            "RATIO TEST"
-        )
-
-        table = document.add_table(
-            rows=1,
-            cols=5
-        )
-
-        table.style = (
-            "Table Grid"
-        )
-
-        table.alignment = (
-            WD_TABLE_ALIGNMENT.CENTER
-        )
-
-        headers = [
-
-            "Phase",
-
-            "Injected Primary (A)",
-
-            "Recorded Secondary (A)",
-
-            "Measured Ratio",
-
-            "Ratio Error (%)",
-        ]
-
-        for index, text in enumerate(
-            headers
-        ):
-
-            cell = (
-                table.rows[0]
-                .cells[index]
-            )
-
-            cell.text = text
-
-            for run in (
-                cell
-                .paragraphs[0]
-                .runs
-            ):
-
-                run.bold = True
 
         phase_tests = (
             measurements.get(
@@ -325,46 +290,88 @@ class CTReportService:
             or []
         )
 
+        # -------------------------------------------------
+        # BACKWARD COMPATIBILITY
+        # -------------------------------------------------
+
         if not phase_tests:
 
-            phase_tests = [
+            old_ratio_values = [
 
-                {
+                measurements.get(
+                    "primary_current",
+                    ""
+                ),
 
-                    "phase": "R",
+                measurements.get(
+                    "secondary_current",
+                    ""
+                ),
 
-                    "primary_current":
-                        measurements.get(
-                            "primary_current",
-                            ""
-                        ),
+                measurements.get(
+                    "measured_ratio",
+                    ""
+                ),
 
-                    "secondary_current":
-                        measurements.get(
-                            "secondary_current",
-                            ""
-                        ),
+                measurements.get(
+                    "ratio_error",
+                    ""
+                ),
 
-                    "measured_ratio":
-                        measurements.get(
-                            "measured_ratio",
-                            ""
-                        ),
-
-                    "ratio_error":
-                        measurements.get(
-                            "ratio_error",
-                            ""
-                        ),
-                }
             ]
+
+            # Only create the legacy row if at least
+            # one actual value exists.
+
+            if any(
+                self.has_value(value)
+                for value in old_ratio_values
+            ):
+
+                phase_tests = [
+
+                    {
+                        "phase": "R",
+
+                        "primary_current":
+                            measurements.get(
+                                "primary_current",
+                                ""
+                            ),
+
+                        "secondary_current":
+                            measurements.get(
+                                "secondary_current",
+                                ""
+                            ),
+
+                        "measured_ratio":
+                            measurements.get(
+                                "measured_ratio",
+                                ""
+                            ),
+
+                        "ratio_error":
+                            measurements.get(
+                                "ratio_error",
+                                ""
+                            ),
+                    }
+                ]
+
+        # -------------------------------------------------
+        # ONLY SHOW RATIO SECTION IF DATA EXISTS
+        # -------------------------------------------------
+
+        valid_phase_tests = []
 
         for phase_data in phase_tests:
 
-            cells = (
-                table.add_row()
-                .cells
-            )
+            if not isinstance(
+                phase_data,
+                dict
+            ):
+                continue
 
             values = [
 
@@ -392,292 +399,399 @@ class CTReportService:
                     "ratio_error",
                     ""
                 ),
+
             ]
 
-            for index, value in enumerate(
-                values
+            if any(
+                self.has_value(value)
+                for value in values
             ):
 
-                cells[index].text = (
-                    ""
-                    if value is None
-                    else str(value)
+                valid_phase_tests.append(
+                    phase_data
                 )
+
+        if valid_phase_tests:
+
+            self.add_heading(
+                document,
+                "RATIO TEST"
+            )
+
+            table = document.add_table(
+                rows=1,
+                cols=5
+            )
+
+            table.style = (
+                "Table Grid"
+            )
+
+            table.alignment = (
+                WD_TABLE_ALIGNMENT.CENTER
+            )
+
+            headers = [
+
+                "Phase",
+
+                "Injected Primary (A)",
+
+                "Recorded Secondary (A)",
+
+                "Measured Ratio",
+
+                "Ratio Error (%)",
+
+            ]
+
+            for index, text in enumerate(
+                headers
+            ):
+
+                cell = (
+                    table.rows[0]
+                    .cells[index]
+                )
+
+                cell.text = text
+
+                for run in (
+                    cell
+                    .paragraphs[0]
+                    .runs
+                ):
+
+                    run.bold = True
+
+            for phase_data in valid_phase_tests:
+
+                cells = (
+                    table
+                    .add_row()
+                    .cells
+                )
+
+                values = [
+
+                    phase_data.get(
+                        "phase",
+                        ""
+                    ),
+
+                    phase_data.get(
+                        "primary_current",
+                        ""
+                    ),
+
+                    phase_data.get(
+                        "secondary_current",
+                        ""
+                    ),
+
+                    phase_data.get(
+                        "measured_ratio",
+                        ""
+                    ),
+
+                    phase_data.get(
+                        "ratio_error",
+                        ""
+                    ),
+
+                ]
+
+                for index, value in enumerate(
+                    values
+                ):
+
+                    cells[index].text = (
+                        ""
+                        if value is None
+                        else str(value)
+                    )
 
         # =================================================
         # POLARITY
         # =================================================
 
-        self.add_heading(
+        polarity = [
+
+            (
+                "Expected Polarity",
+                measurements.get(
+                    "expected_polarity",
+                    ""
+                )
+            ),
+
+            (
+                "Observed Polarity",
+                measurements.get(
+                    "observed_polarity",
+                    ""
+                )
+            ),
+
+            (
+                "Polarity Result",
+                measurements.get(
+                    "polarity_result",
+                    ""
+                )
+            ),
+
+        ]
+
+        self.add_optional_info_section(
             document,
-            "POLARITY"
-        )
-
-        self.add_info_table(
-            document,
-            [
-
-                (
-                    "Expected Polarity",
-                    measurements.get(
-                        "expected_polarity",
-                        ""
-                    )
-                ),
-
-                (
-                    "Observed Polarity",
-                    measurements.get(
-                        "observed_polarity",
-                        ""
-                    )
-                ),
-
-                (
-                    "Polarity Result",
-                    measurements.get(
-                        "polarity_result",
-                        ""
-                    )
-                ),
-            ]
+            "POLARITY",
+            polarity
         )
 
         # =================================================
         # WINDING RESISTANCE
         # =================================================
 
-        self.add_heading(
+        winding = [
+
+            (
+                "Phase R",
+                measurements.get(
+                    "resistance_phase_a",
+                    ""
+                )
+            ),
+
+            (
+                "Phase Y",
+                measurements.get(
+                    "resistance_phase_b",
+                    ""
+                )
+            ),
+
+            (
+                "Phase B",
+                measurements.get(
+                    "resistance_phase_c",
+                    ""
+                )
+            ),
+
+        ]
+
+        self.add_optional_info_section(
             document,
-            "CT WINDING RESISTANCE"
-        )
-
-        self.add_info_table(
-            document,
-            [
-
-                (
-                    "Phase R",
-                    measurements.get(
-                        "resistance_phase_a",
-                        ""
-                    )
-                ),
-
-                (
-                    "Phase Y",
-                    measurements.get(
-                        "resistance_phase_b",
-                        ""
-                    )
-                ),
-
-                (
-                    "Phase B",
-                    measurements.get(
-                        "resistance_phase_c",
-                        ""
-                    )
-                ),
-            ]
+            "CT WINDING RESISTANCE",
+            winding
         )
 
         # =================================================
         # INSULATION
         # =================================================
 
-        self.add_heading(
+        insulation = [
+
+            (
+                "Primary - Earth",
+                measurements.get(
+                    "ir_primary_earth",
+                    ""
+                )
+            ),
+
+            (
+                "Secondary - Earth",
+                measurements.get(
+                    "ir_secondary_earth",
+                    ""
+                )
+            ),
+
+            (
+                "Primary - Secondary",
+                measurements.get(
+                    "ir_primary_secondary",
+                    ""
+                )
+            ),
+
+            (
+                "Test Voltage",
+                measurements.get(
+                    "ir_test_voltage",
+                    ""
+                )
+            ),
+
+            (
+                "Test Duration",
+                measurements.get(
+                    "ir_test_duration",
+                    ""
+                )
+            ),
+
+        ]
+
+        self.add_optional_info_section(
             document,
-            "INSULATION RESISTANCE"
-        )
-
-        self.add_info_table(
-            document,
-            [
-
-                (
-                    "Primary - Earth",
-                    measurements.get(
-                        "ir_primary_earth",
-                        ""
-                    )
-                ),
-
-                (
-                    "Secondary - Earth",
-                    measurements.get(
-                        "ir_secondary_earth",
-                        ""
-                    )
-                ),
-
-                (
-                    "Primary - Secondary",
-                    measurements.get(
-                        "ir_primary_secondary",
-                        ""
-                    )
-                ),
-
-                (
-                    "Test Voltage",
-                    measurements.get(
-                        "ir_test_voltage",
-                        ""
-                    )
-                ),
-
-                (
-                    "Test Duration",
-                    measurements.get(
-                        "ir_test_duration",
-                        ""
-                    )
-                ),
-            ]
+            "INSULATION RESISTANCE",
+            insulation
         )
 
         # =================================================
         # KNEE POINT
         # =================================================
 
-        self.add_heading(
+        knee_point = [
+
+            (
+                "Knee Point Voltage",
+                measurements.get(
+                    "knee_point_voltage",
+                    ""
+                )
+            ),
+
+            (
+                "Knee Point Current",
+                measurements.get(
+                    "knee_point_current",
+                    ""
+                )
+            ),
+
+            (
+                "Excitation Test Voltage",
+                measurements.get(
+                    "excitation_test_voltage",
+                    ""
+                )
+            ),
+
+            (
+                "Excitation Test Current",
+                measurements.get(
+                    "excitation_test_current",
+                    ""
+                )
+            ),
+
+        ]
+
+        self.add_optional_info_section(
             document,
-            "KNEE POINT / EXCITATION"
-        )
-
-        self.add_info_table(
-            document,
-            [
-
-                (
-                    "Knee Point Voltage",
-                    measurements.get(
-                        "knee_point_voltage",
-                        ""
-                    )
-                ),
-
-                (
-                    "Knee Point Current",
-                    measurements.get(
-                        "knee_point_current",
-                        ""
-                    )
-                ),
-
-                (
-                    "Excitation Test Voltage",
-                    measurements.get(
-                        "excitation_test_voltage",
-                        ""
-                    )
-                ),
-
-                (
-                    "Excitation Test Current",
-                    measurements.get(
-                        "excitation_test_current",
-                        ""
-                    )
-                ),
-            ]
+            "KNEE POINT / EXCITATION",
+            knee_point
         )
 
         # =================================================
         # BURDEN
         # =================================================
 
-        self.add_heading(
+        burden = [
+
+            (
+                "Burden Test Current",
+                measurements.get(
+                    "burden_test_current",
+                    ""
+                )
+            ),
+
+            (
+                "Measured Burden",
+                measurements.get(
+                    "measured_burden",
+                    ""
+                )
+            ),
+
+            (
+                "Burden Error",
+                measurements.get(
+                    "burden_error",
+                    ""
+                )
+            ),
+
+        ]
+
+        self.add_optional_info_section(
             document,
-            "BURDEN"
-        )
-
-        self.add_info_table(
-            document,
-            [
-
-                (
-                    "Burden Test Current",
-                    measurements.get(
-                        "burden_test_current",
-                        ""
-                    )
-                ),
-
-                (
-                    "Measured Burden",
-                    measurements.get(
-                        "measured_burden",
-                        ""
-                    )
-                ),
-
-                (
-                    "Burden Error",
-                    measurements.get(
-                        "burden_error",
-                        ""
-                    )
-                ),
-            ]
+            "BURDEN",
+            burden
         )
 
         # =================================================
         # RESULT
         # =================================================
 
-        self.add_heading(
-            document,
-            "TEST RESULT"
+        result = record.get(
+            "result",
+            ""
         )
 
-        result_paragraph = (
-            document.add_paragraph()
-        )
+        if self.has_value(result):
 
-        run = (
-            result_paragraph
-            .add_run(
-                str(
-                    record.get(
-                        "result",
-                        ""
-                    )
+            self.add_heading(
+                document,
+                "TEST RESULT"
+            )
+
+            result_paragraph = (
+                document.add_paragraph()
+            )
+
+            run = (
+                result_paragraph
+                .add_run(
+                    str(result)
                 )
             )
-        )
 
-        run.bold = True
+            run.bold = True
 
-        run.font.size = Pt(
-            13
-        )
+            run.font.size = Pt(
+                13
+            )
 
         # =================================================
         # REMARKS
         # =================================================
 
-        self.add_heading(
-            document,
-            "REMARKS"
-        )
+        remarks = (
 
-        document.add_paragraph(
-            str(
-                record.get(
-                    "remarks",
-                    ""
-                )
-                or
-                measurements.get(
-                    "remarks",
-                    ""
-                )
-                or
+            record.get(
+                "remarks",
                 ""
             )
+
+            or
+
+            measurements.get(
+                "remarks",
+                ""
+            )
+
+            or ""
+
         )
+
+        if self.has_value(
+            remarks
+        ):
+
+            self.add_heading(
+                document,
+                "REMARKS"
+            )
+
+            document.add_paragraph(
+                str(remarks)
+            )
 
         # =================================================
         # SIGNATURE
@@ -726,6 +840,48 @@ class CTReportService:
         )
 
         return output_path
+
+    # =====================================================
+    # OPTIONAL INFO SECTION
+    # =====================================================
+
+    def add_optional_info_section(
+        self,
+        document,
+        heading,
+        rows
+    ):
+
+        valid_rows = []
+
+        for label, value in rows:
+
+            if self.has_value(
+                value
+            ):
+
+                valid_rows.append(
+                    (
+                        label,
+                        value
+                    )
+                )
+
+        # Nothing was entered.
+        # Don't even create the heading.
+
+        if not valid_rows:
+            return
+
+        self.add_heading(
+            document,
+            heading
+        )
+
+        self.add_info_table(
+            document,
+            valid_rows
+        )
 
     # =====================================================
     # DOCUMENT HELPERS
@@ -820,6 +976,44 @@ class CTReportService:
         rows
     ):
 
+        # ---------------------------------------------
+        # FINAL SAFETY FILTER
+        # ---------------------------------------------
+
+        rows = [
+
+            (
+                label,
+                value
+            )
+
+            for label, value in rows
+
+            if (
+
+                value is not None
+
+                and
+
+                (
+                    not isinstance(
+                        value,
+                        str
+                    )
+
+                    or
+
+                    bool(
+                        value.strip()
+                    )
+                )
+            )
+
+        ]
+
+        if not rows:
+            return
+
         table = document.add_table(
             rows=1,
             cols=2
@@ -863,7 +1057,5 @@ class CTReportService:
             )
 
             cells[1].text = (
-                ""
-                if value is None
-                else str(value)
+                str(value)
             )

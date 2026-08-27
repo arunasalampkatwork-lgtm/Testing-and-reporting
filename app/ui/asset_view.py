@@ -24,7 +24,7 @@ from PySide6.QtWidgets import (
     QDialogButtonBox,
     QDateEdit,
 )
-
+from app.ui.panel_config_dialog import PanelConfigDialog
 from app.services.asset_manager import AssetManager
 from app.services.component_manager import ComponentManager
 
@@ -2017,6 +2017,8 @@ class AssetView(QWidget):
 
         dialog = PanelConfigDialog(
             node=panel,
+            projects_dir=self.project_folder.parent,
+            target_project_folder=self.project_folder,
             parent=self,
         )
 
@@ -2043,6 +2045,19 @@ class AssetView(QWidget):
                 aux_count=int(configuration.get("aux_count", 0) or 0),
                 meter_count=int(configuration.get("meter_count", 0) or 0),
             )
+            copied_components = (
+                configuration.get(
+                    "_copied_component_configuration",
+                    []
+                )
+            )
+
+            if copied_components:
+
+                self.apply_copied_component_configuration(
+                    panel.node_id,
+                    copied_components,
+                )
 
             self.display_selected_components()
 
@@ -3247,3 +3262,575 @@ class AssetView(QWidget):
             ==
             report_date
         )
+
+    # =====================================================
+    # APPLY COPIED COMPONENT CONFIGURATION
+    # =====================================================
+
+    def apply_copied_component_configuration(
+        self,
+        target_panel_id,
+        source_components,
+    ):
+
+        target_components = (
+            self.component_manager
+            .get_panel_components(
+                target_panel_id
+            )
+        )
+
+        # -------------------------------------------------
+        # Group target components by type
+        # -------------------------------------------------
+
+        target_by_type = {}
+
+        for component in target_components:
+
+            component_type = str(
+                getattr(
+                    component,
+                    "component_type",
+                    ""
+                )
+            ).strip().upper()
+
+            target_by_type.setdefault(
+                component_type,
+                []
+            ).append(
+                component
+            )
+
+        # -------------------------------------------------
+        # Group source components by type
+        # -------------------------------------------------
+
+        source_by_type = {}
+
+        for source in source_components:
+
+            component_type = str(
+                source.get(
+                    "_source_component_type",
+                    ""
+                )
+            ).strip().upper()
+
+            source_by_type.setdefault(
+                component_type,
+                []
+            ).append(
+                source
+            )
+
+        # -------------------------------------------------
+        # Match component #1 → component #1
+        # CT-01 → CT-01
+        # CT-02 → CT-02
+        # REL-01 → REL-01
+        # -------------------------------------------------
+
+        for component_type, sources in (
+            source_by_type.items()
+        ):
+
+            targets = (
+                target_by_type.get(
+                    component_type,
+                    []
+                )
+            )
+
+            for index, source in enumerate(
+                sources
+            ):
+
+                if index >= len(targets):
+                    break
+
+                target = targets[index]
+
+                configuration = {}
+
+                for key in (
+                    "manufacturer",
+                    "model",
+                    "description",
+
+                    "ct_primary",
+                    "ct_secondary",
+                    "ct_ratio",
+                    "ct_class",
+                    "burden",
+                    "core",
+
+                    "vt_ratio",
+                    "firmware",
+
+                    "coil_voltage",
+                    "contact_configuration",
+
+                    "meter_type",
+                    "meter_functions",
+                    "accuracy_class",
+
+                    "protection_functions",
+                ):
+
+                    if key in source:
+
+                        configuration[
+                            key
+                        ] = source[key]
+
+                self.component_manager.update_component_configuration(
+                    target.component_id,
+                    configuration,
+                )
+
+    # =========================================================
+    # IMPORT COMPONENT CONFIGURATION
+    # =========================================================
+
+    def apply_imported_component_configuration(
+        self,
+        created_components,
+        imported_components
+    ):
+        """
+        Apply configuration imported from another panel.
+
+        Components are matched by:
+
+            component type
+            +
+            position within that component type
+
+        Example:
+
+            Source:
+                CT-01
+                CT-02
+                CT-03
+
+            Target:
+                CT-01
+                CT-02
+                CT-03
+
+        CT-01 -> CT-01
+        CT-02 -> CT-02
+        CT-03 -> CT-03
+
+        Component IDs, panel IDs and names are NOT changed.
+
+        Only fields explicitly selected during import are copied.
+        """
+
+        if not created_components:
+            return
+
+        if not imported_components:
+            return
+
+        # =====================================================
+        # NORMALISE SOURCE COMPONENTS
+        # =====================================================
+
+        source_groups = {}
+
+        for source in imported_components:
+
+            if not isinstance(
+                source,
+                dict
+            ):
+                continue
+
+            component_type = (
+                self._normalise_component_type(
+                    source.get(
+                        "component_type",
+                        ""
+                    )
+                )
+            )
+
+            if not component_type:
+                continue
+
+            source_groups.setdefault(
+                component_type,
+                []
+            ).append(
+                source
+            )
+
+        # =====================================================
+        # NORMALISE TARGET COMPONENTS
+        # =====================================================
+
+        target_groups = {}
+
+        for target in created_components:
+
+            component_type = (
+                self._normalise_component_type(
+                    self._get_component_value(
+                        target,
+                        "component_type",
+                        ""
+                    )
+                )
+            )
+
+            if not component_type:
+                continue
+
+            target_groups.setdefault(
+                component_type,
+                []
+            ).append(
+                target
+            )
+
+        # =====================================================
+        # FIELDS THAT CAN BE IMPORTED
+        # =====================================================
+
+        importable_fields = [
+
+            # -------------------------------------------------
+            # COMMON
+            # -------------------------------------------------
+
+            "manufacturer",
+            "model",
+            "description",
+
+            # -------------------------------------------------
+            # CT
+            # -------------------------------------------------
+
+            "ct_primary",
+            "ct_secondary",
+            "ct_ratio",
+            "ct_class",
+            "burden",
+            "core",
+
+            # -------------------------------------------------
+            # RELAY
+            # -------------------------------------------------
+
+            "vt_ratio",
+            "firmware",
+            "protection_functions",
+
+            # -------------------------------------------------
+            # AUX
+            # -------------------------------------------------
+
+            "coil_voltage",
+            "contact_configuration",
+
+            # -------------------------------------------------
+            # METER
+            # -------------------------------------------------
+
+            "meter_type",
+            "meter_functions",
+            "accuracy_class",
+
+            # -------------------------------------------------
+            # UNIQUE FIELD
+            #
+            # Serial number is intentionally NOT included.
+            #
+            # A new physical component should normally have
+            # its own serial number.
+            # -------------------------------------------------
+
+        ]
+
+        # =====================================================
+        # MATCH COMPONENTS
+        # =====================================================
+
+        for component_type, sources in (
+            source_groups.items()
+        ):
+
+            targets = target_groups.get(
+                component_type,
+                []
+            )
+
+            if not targets:
+                continue
+
+            for index, source in enumerate(
+                sources
+            ):
+
+                if index >= len(
+                    targets
+                ):
+                    break
+
+                target = targets[
+                    index
+                ]
+
+                # -------------------------------------------------
+                # COPY SELECTED VALUES
+                # -------------------------------------------------
+
+                for field in (
+                    importable_fields
+                ):
+
+                    if field not in source:
+                        continue
+
+                    value = source[
+                        field
+                    ]
+
+                    self._set_component_value(
+                        target,
+                        field,
+                        value
+                    )
+
+        # =====================================================
+        # SAVE/REFRESH IF AVAILABLE
+        # =====================================================
+
+        self._refresh_component_configuration_after_import(
+            created_components
+        )
+
+
+    # =========================================================
+    # NORMALISE COMPONENT TYPE
+    # =========================================================
+
+    @staticmethod
+    def _normalise_component_type(
+        value
+    ):
+
+        value = str(
+            value or ""
+        ).strip().upper()
+
+        aliases = {
+
+            "CT":
+                "CT",
+
+            "CURRENT TRANSFORMER":
+                "CT",
+
+            "NUMERICAL RELAY":
+                "NUMERICAL RELAY",
+
+            "NUMERICAL_RELAY":
+                "NUMERICAL RELAY",
+
+            "RELAY":
+                "NUMERICAL RELAY",
+
+            "AUX":
+                "AUXILIARY RELAY",
+
+            "AUX RELAY":
+                "AUXILIARY RELAY",
+
+            "AUXILIARY RELAY":
+                "AUXILIARY RELAY",
+
+            "AUXILIARY_RELAY":
+                "AUXILIARY RELAY",
+
+            "METER":
+                "METER",
+
+            "METERING":
+                "METER",
+        }
+
+        return aliases.get(
+            value,
+            value
+        )
+
+
+    # =========================================================
+    # GET COMPONENT VALUE
+    # =========================================================
+
+    @staticmethod
+    def _get_component_value(
+        component,
+        field,
+        default=""
+    ):
+
+        if isinstance(
+            component,
+            dict
+        ):
+
+            return component.get(
+                field,
+                default
+            )
+
+        return getattr(
+            component,
+            field,
+            default
+        )
+
+
+    # =========================================================
+    # SET COMPONENT VALUE
+    # =========================================================
+
+    @staticmethod
+    def _set_component_value(
+        component,
+        field,
+        value
+    ):
+
+        if isinstance(
+            component,
+            dict
+        ):
+
+            component[
+                field
+            ] = value
+
+            return
+
+        try:
+
+            setattr(
+                component,
+                field,
+                value
+            )
+
+        except Exception:
+
+            return
+
+
+    # =========================================================
+    # REFRESH AFTER IMPORT
+    # =========================================================
+
+    def _refresh_component_configuration_after_import(
+        self,
+        components
+    ):
+        """
+        Refresh the currently displayed component list/form
+        after imported values have been applied.
+
+        This is intentionally defensive because different
+        versions of AssetView may expose different refresh
+        methods.
+        """
+
+        # -----------------------------------------------------
+        # DATABASE / COMPONENT MANAGER SAVE
+        # -----------------------------------------------------
+
+        for component in (
+            components or []
+        ):
+
+            try:
+
+                if hasattr(
+                    self,
+                    "component_manager"
+                ):
+
+                    manager = (
+                        self.component_manager
+                    )
+
+                    if hasattr(
+                        manager,
+                        "update_component"
+                    ):
+
+                        manager.update_component(
+                            component
+                        )
+
+            except Exception:
+
+                pass
+
+        # -----------------------------------------------------
+        # REFRESH UI
+        # -----------------------------------------------------
+
+        refresh_methods = [
+
+            "load_components",
+
+            "refresh_components",
+
+            "populate_components",
+
+            "refresh_component_list",
+
+            "update_component_list",
+
+        ]
+
+        for method_name in (
+            refresh_methods
+        ):
+
+            method = getattr(
+                self,
+                method_name,
+                None
+            )
+
+            if callable(
+                method
+            ):
+
+                try:
+
+                    method()
+
+                except TypeError:
+
+                    try:
+
+                        method(
+                            components
+                        )
+
+                    except Exception:
+
+                        pass
+
+                except Exception:
+
+                    pass
+
+                break
