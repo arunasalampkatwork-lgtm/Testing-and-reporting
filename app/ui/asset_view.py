@@ -2045,6 +2045,18 @@ class AssetView(QWidget):
                 aux_count=int(configuration.get("aux_count", 0) or 0),
                 meter_count=int(configuration.get("meter_count", 0) or 0),
             )
+            imported_components = configuration.get(
+                "_imported_components",
+                []
+            )
+        
+            copied_components = (
+                self.apply_imported_component_configuration(
+                    panel.node_id,
+                    imported_components
+                )
+            )
+
             copied_components = (
                 configuration.get(
                     "_copied_component_configuration",
@@ -3834,3 +3846,115 @@ class AssetView(QWidget):
                     pass
 
                 break
+
+    def apply_imported_component_configuration(
+        self,
+        target_panel_id,
+        imported_components,
+    ):
+        if not imported_components:
+            return 0
+
+        target_components = (
+            self.component_manager
+            .get_panel_components(target_panel_id)
+            or []
+        )
+
+        def normalise(value):
+            return str(value or "").strip().upper()
+
+        def component_number(name):
+            try:
+                return int(str(name).split("-")[-1])
+            except (ValueError, TypeError):
+                return 0
+
+        target_by_key = {}
+
+        for component in target_components:
+            key = (
+                normalise(
+                    getattr(component, "component_type", "")
+                ),
+                component_number(
+                    getattr(component, "name", "")
+                ),
+            )
+            target_by_key[key] = component
+
+        copied = 0
+
+        fields = (
+            "manufacturer",
+            "model",
+            "description",
+            "ct_primary",
+            "ct_secondary",
+            "ct_ratio",
+            "ct_class",
+            "burden",
+            "core",
+            "vt_ratio",
+            "firmware",
+            "coil_voltage",
+            "contact_configuration",
+            "meter_type",
+            "meter_functions",
+            "accuracy_class",
+            "protection_functions",
+        )
+
+        for source in imported_components:
+
+            source_type = normalise(
+                source.get(
+                    "_source_component_type",
+                    source.get("component_type", "")
+                )
+            )
+
+            source_name = str(
+                source.get(
+                    "_source_component_name",
+                    source.get("name", "")
+                )
+                or ""
+            )
+
+            key = (
+                source_type,
+                component_number(source_name),
+            )
+
+            target = target_by_key.get(key)
+
+            if target is None:
+                continue
+
+            configuration = {}
+
+            for field in fields:
+                if field not in source:
+                    continue
+
+                value = source[field]
+
+                if isinstance(value, list):
+                    value = list(value)
+                elif isinstance(value, dict):
+                    value = dict(value)
+
+                configuration[field] = value
+
+            if not configuration:
+                continue
+
+            self.component_manager.update_component_configuration(
+                target.component_id,
+                configuration
+            )
+
+            copied += 1
+
+        return copied
