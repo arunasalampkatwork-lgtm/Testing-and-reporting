@@ -9,8 +9,8 @@ from PySide6.QtWidgets import (
     QLabel,
     QMessageBox,
     QGroupBox,
+    QAbstractSpinBox,
 )
-from PySide6.QtCore import Qt
 
 from app.ui.panel_configuration_copy_dialog import (
     PanelConfigurationCopyDialog
@@ -26,14 +26,11 @@ class PanelConfigDialog(QDialog):
         target_project_folder=None,
         parent=None
     ):
-
         super().__init__(parent)
 
         self.node = node
 
-        self.projects_dir = (
-            projects_dir
-        )
+        self.projects_dir = projects_dir
 
         self.target_project_folder = (
             target_project_folder
@@ -56,11 +53,90 @@ class PanelConfigDialog(QDialog):
             620
         )
 
-        # =====================================================
-        # MAIN LAYOUT
-        # =====================================================
+        self.setMinimumSize(
+            560,
+            500
+        )
 
-        layout = QVBoxLayout(self)
+        self._apply_style()
+
+        self._build_ui()
+
+    # =========================================================
+    # STYLE
+    # =========================================================
+
+    def _apply_style(self):
+
+        self.setStyleSheet(
+            """
+            QGroupBox {
+                font-weight: bold;
+                border: 1px solid #3a3f46;
+                border-radius: 8px;
+                margin-top: 10px;
+                padding-top: 14px;
+            }
+
+            QGroupBox::title {
+                subcontrol-origin: margin;
+                left: 12px;
+                padding: 0 6px;
+            }
+
+            QLineEdit,
+            QSpinBox {
+                min-height: 38px;
+                border: 1px solid #4b5563;
+                border-radius: 6px;
+                padding-left: 8px;
+                padding-right: 8px;
+            }
+
+            QLineEdit:focus,
+            QSpinBox:focus {
+                border: 1px solid #60a5fa;
+            }
+
+            QSpinBox::up-button,
+            QSpinBox::down-button {
+                width: 30px;
+                min-width: 30px;
+                border: none;
+            }
+
+            QSpinBox::up-button {
+                subcontrol-origin: border;
+                subcontrol-position: top right;
+            }
+
+            QSpinBox::down-button {
+                subcontrol-origin: border;
+                subcontrol-position: bottom right;
+            }
+
+            QPushButton {
+                min-height: 40px;
+                padding-left: 14px;
+                padding-right: 14px;
+                border-radius: 6px;
+            }
+
+            QPushButton:hover {
+                border: 1px solid #60a5fa;
+            }
+            """
+        )
+
+    # =========================================================
+    # BUILD UI
+    # =========================================================
+
+    def _build_ui(self):
+
+        layout = QVBoxLayout(
+            self
+        )
 
         layout.setContentsMargins(
             24,
@@ -84,7 +160,7 @@ class PanelConfigDialog(QDialog):
         title.setStyleSheet(
             """
             QLabel {
-                font-size: 26px;
+                font-size: 24px;
                 font-weight: bold;
             }
             """
@@ -96,7 +172,7 @@ class PanelConfigDialog(QDialog):
 
         description = QLabel(
             "Configure the equipment connected to this panel "
-            "and the number of test components to be created."
+            "and the number of test components."
         )
 
         description.setWordWrap(
@@ -117,7 +193,7 @@ class PanelConfigDialog(QDialog):
         )
 
         # =====================================================
-        # PANEL GROUP
+        # PANEL
         # =====================================================
 
         panel_group = QGroupBox(
@@ -129,14 +205,14 @@ class PanelConfigDialog(QDialog):
         )
 
         panel_form.setContentsMargins(
+            18,
             20,
-            20,
-            20,
-            20
+            18,
+            18
         )
 
         panel_form.setSpacing(
-            12
+            10
         )
 
         self.panel_name = QLineEdit()
@@ -144,15 +220,13 @@ class PanelConfigDialog(QDialog):
         self.panel_name.setText(
             str(
                 getattr(
-                    node,
+                    self.node,
                     "name",
                     ""
                 ) or ""
             )
         )
 
-        # Panel name is the identity of the current panel.
-        # It should not be modified from this dialog.
         self.panel_name.setReadOnly(
             True
         )
@@ -167,7 +241,7 @@ class PanelConfigDialog(QDialog):
         )
 
         # =====================================================
-        # FEED EQUIPMENT
+        # EQUIPMENT
         # =====================================================
 
         equipment_group = QGroupBox(
@@ -179,34 +253,30 @@ class PanelConfigDialog(QDialog):
         )
 
         equipment_form.setContentsMargins(
+            18,
             20,
-            20,
-            20,
-            20
+            18,
+            18
         )
 
         equipment_form.setSpacing(
-            12
+            10
         )
-
-        # -----------------------------------------------------
-        # EQUIPMENT NAME
-        # -----------------------------------------------------
 
         self.equipment_name = QLineEdit()
-
-        self.equipment_name.setPlaceholderText(
-            "Example: 110kV Transformer / Motor / Feeder"
-        )
 
         self.equipment_name.setText(
             str(
                 getattr(
-                    node,
+                    self.node,
                     "equipment_name",
                     ""
                 ) or ""
             )
+        )
+
+        self.equipment_name.setPlaceholderText(
+            "Example: Motor M-101"
         )
 
         equipment_form.addRow(
@@ -214,24 +284,20 @@ class PanelConfigDialog(QDialog):
             self.equipment_name
         )
 
-        # -----------------------------------------------------
-        # EQUIPMENT TYPE
-        # -----------------------------------------------------
-
         self.equipment_type = QLineEdit()
-
-        self.equipment_type.setPlaceholderText(
-            "Example: Transformer / Motor / Feeder"
-        )
 
         self.equipment_type.setText(
             str(
                 getattr(
-                    node,
+                    self.node,
                     "equipment_type",
                     ""
                 ) or ""
             )
+        )
+
+        self.equipment_type.setPlaceholderText(
+            "Example: Motor / Transformer / Feeder"
         )
 
         equipment_form.addRow(
@@ -244,7 +310,7 @@ class PanelConfigDialog(QDialog):
         )
 
         # =====================================================
-        # TEST COMPONENTS
+        # COMPONENT COUNTS
         # =====================================================
 
         component_group = QGroupBox(
@@ -256,33 +322,22 @@ class PanelConfigDialog(QDialog):
         )
 
         component_form.setContentsMargins(
+            18,
             20,
-            20,
-            20,
-            20
+            18,
+            18
         )
 
         component_form.setSpacing(
-            12
+            10
         )
 
         # -----------------------------------------------------
-        # CT COUNT
+        # CT
         # -----------------------------------------------------
 
-        self.ct_count = QSpinBox()
-
-        self.ct_count.setRange(
-            0,
-            100
-        )
-
-        self.ct_count.setValue(
-            self._get_int_value(
-                node,
-                "ct_count",
-                0
-            )
+        self.ct_count = self._create_spinbox(
+            "ct_count"
         )
 
         component_form.addRow(
@@ -291,22 +346,11 @@ class PanelConfigDialog(QDialog):
         )
 
         # -----------------------------------------------------
-        # NUMERICAL RELAY COUNT
+        # RELAYS
         # -----------------------------------------------------
 
-        self.relay_count = QSpinBox()
-
-        self.relay_count.setRange(
-            0,
-            100
-        )
-
-        self.relay_count.setValue(
-            self._get_int_value(
-                node,
-                "relay_count",
-                0
-            )
+        self.relay_count = self._create_spinbox(
+            "relay_count"
         )
 
         component_form.addRow(
@@ -315,22 +359,11 @@ class PanelConfigDialog(QDialog):
         )
 
         # -----------------------------------------------------
-        # AUXILIARY RELAY COUNT
+        # AUX RELAYS
         # -----------------------------------------------------
 
-        self.aux_count = QSpinBox()
-
-        self.aux_count.setRange(
-            0,
-            100
-        )
-
-        self.aux_count.setValue(
-            self._get_int_value(
-                node,
-                "aux_count",
-                0
-            )
+        self.aux_count = self._create_spinbox(
+            "aux_count"
         )
 
         component_form.addRow(
@@ -339,22 +372,11 @@ class PanelConfigDialog(QDialog):
         )
 
         # -----------------------------------------------------
-        # METER COUNT
+        # METERS
         # -----------------------------------------------------
 
-        self.meter_count = QSpinBox()
-
-        self.meter_count.setRange(
-            0,
-            100
-        )
-
-        self.meter_count.setValue(
-            self._get_int_value(
-                node,
-                "meter_count",
-                0
-            )
+        self.meter_count = self._create_spinbox(
+            "meter_count"
         )
 
         component_form.addRow(
@@ -371,9 +393,9 @@ class PanelConfigDialog(QDialog):
         # =====================================================
 
         info = QLabel(
-            "Changing the component counts creates or removes "
-            "the corresponding test components. Existing "
-            "component configurations are preserved where possible."
+            "Use 'Import from Existing Panel' to copy the "
+            "configuration and selected component parameters "
+            "from another panel."
         )
 
         info.setWordWrap(
@@ -393,19 +415,13 @@ class PanelConfigDialog(QDialog):
             info
         )
 
+        layout.addStretch()
+
         # =====================================================
         # BUTTONS
         # =====================================================
 
         buttons = QHBoxLayout()
-
-        buttons.setSpacing(
-            10
-        )
-
-        # -----------------------------------------------------
-        # IMPORT CONFIGURATION
-        # -----------------------------------------------------
 
         self.copy_button = QPushButton(
             "Import from Existing Panel"
@@ -415,18 +431,9 @@ class PanelConfigDialog(QDialog):
             42
         )
 
-        self.copy_button.setToolTip(
-            "Copy configuration and selected component "
-            "parameters from another panel."
-        )
-
         self.copy_button.clicked.connect(
             self.copy_from_existing_panel
         )
-
-        # -----------------------------------------------------
-        # CANCEL
-        # -----------------------------------------------------
 
         self.cancel_button = QPushButton(
             "Cancel"
@@ -440,10 +447,6 @@ class PanelConfigDialog(QDialog):
             self.reject
         )
 
-        # -----------------------------------------------------
-        # SAVE
-        # -----------------------------------------------------
-
         self.save_button = QPushButton(
             "Save Configuration"
         )
@@ -455,10 +458,6 @@ class PanelConfigDialog(QDialog):
         self.save_button.clicked.connect(
             self.accept
         )
-
-        # -----------------------------------------------------
-        # LAYOUT
-        # -----------------------------------------------------
 
         buttons.addWidget(
             self.copy_button
@@ -479,7 +478,53 @@ class PanelConfigDialog(QDialog):
         )
 
     # =========================================================
-    # INTEGER VALUE
+    # CREATE SPINBOX
+    # =========================================================
+
+    def _create_spinbox(
+        self,
+        attribute
+    ):
+
+        spinbox = QSpinBox()
+
+        spinbox.setRange(
+            0,
+            100
+        )
+
+        spinbox.setButtonSymbols(
+            QAbstractSpinBox.ButtonSymbols.UpDownArrows
+        )
+
+        spinbox.setMinimumHeight(
+            40
+        )
+
+        spinbox.setEnabled(
+            True
+        )
+
+        spinbox.setReadOnly(
+            False
+        )
+
+        spinbox.setKeyboardTracking(
+            True
+        )
+
+        spinbox.setValue(
+            self._get_int_value(
+                self.node,
+                attribute,
+                0
+            )
+        )
+
+        return spinbox
+
+    # =========================================================
+    # INTEGER
     # =========================================================
 
     @staticmethod
@@ -496,7 +541,6 @@ class PanelConfigDialog(QDialog):
         )
 
         try:
-
             return int(
                 value or default
             )
@@ -505,18 +549,13 @@ class PanelConfigDialog(QDialog):
             TypeError,
             ValueError
         ):
-
             return default
 
     # =========================================================
-    # IMPORT FROM EXISTING PANEL
+    # IMPORT
     # =========================================================
 
     def copy_from_existing_panel(self):
-
-        # -----------------------------------------------------
-        # PROJECT DIRECTORY CHECK
-        # -----------------------------------------------------
 
         if self.projects_dir is None:
 
@@ -528,41 +567,24 @@ class PanelConfigDialog(QDialog):
 
             return
 
-        # -----------------------------------------------------
-        # OPEN PANEL SELECTION DIALOG
-        # -----------------------------------------------------
-
         dialog = PanelConfigurationCopyDialog(
-
             projects_dir=self.projects_dir,
-
             target_project_folder=(
                 self.target_project_folder
             ),
-
             target_panel_id=getattr(
                 self.node,
                 "node_id",
                 None
             ),
-
             parent=self
         )
-
-        # -----------------------------------------------------
-        # USER CANCELLED
-        # -----------------------------------------------------
 
         if (
             dialog.exec()
             != QDialog.DialogCode.Accepted
         ):
-
             return
-
-        # -----------------------------------------------------
-        # GET CONFIGURATION
-        # -----------------------------------------------------
 
         configuration = (
             dialog.get_configuration()
@@ -587,10 +609,6 @@ class PanelConfigDialog(QDialog):
             )
         )
 
-        # -----------------------------------------------------
-        # EQUIPMENT NAME
-        # -----------------------------------------------------
-
         if (
             "equipment_name"
             in panel_config
@@ -603,10 +621,6 @@ class PanelConfigDialog(QDialog):
                     ] or ""
                 )
             )
-
-        # -----------------------------------------------------
-        # EQUIPMENT TYPE
-        # -----------------------------------------------------
 
         if (
             "equipment_type"
@@ -621,10 +635,6 @@ class PanelConfigDialog(QDialog):
                 )
             )
 
-        # -----------------------------------------------------
-        # CT COUNT
-        # -----------------------------------------------------
-
         if (
             "ct_count"
             in panel_config
@@ -637,10 +647,6 @@ class PanelConfigDialog(QDialog):
                     ]
                 )
             )
-
-        # -----------------------------------------------------
-        # RELAY COUNT
-        # -----------------------------------------------------
 
         if (
             "relay_count"
@@ -655,10 +661,6 @@ class PanelConfigDialog(QDialog):
                 )
             )
 
-        # -----------------------------------------------------
-        # AUXILIARY RELAY COUNT
-        # -----------------------------------------------------
-
         if (
             "aux_count"
             in panel_config
@@ -671,10 +673,6 @@ class PanelConfigDialog(QDialog):
                     ]
                 )
             )
-
-        # -----------------------------------------------------
-        # METER COUNT
-        # -----------------------------------------------------
 
         if (
             "meter_count"
@@ -690,13 +688,20 @@ class PanelConfigDialog(QDialog):
             )
 
         # =====================================================
-        # UPDATE WINDOW TITLE / STATUS
+        # IMPORT STATUS
         # =====================================================
 
-        source_name = (
+        source_name = str(
             configuration.get(
                 "source_panel_name",
                 ""
+            ) or ""
+        )
+
+        component_count = len(
+            configuration.get(
+                "components",
+                []
             )
         )
 
@@ -706,16 +711,10 @@ class PanelConfigDialog(QDialog):
                 f"Imported from {source_name}"
             )
 
-        else:
-
-            self.copy_button.setText(
-                "Configuration Imported"
+            self.copy_button.setToolTip(
+                f"{component_count} component "
+                f"configurations imported."
             )
-
-        # Keep the button usable for another import.
-        self.copy_button.setToolTip(
-            "Import configuration from another panel."
-        )
 
     # =========================================================
     # SAFE INTEGER
@@ -728,7 +727,6 @@ class PanelConfigDialog(QDialog):
     ):
 
         try:
-
             return int(
                 value or default
             )
@@ -737,7 +735,6 @@ class PanelConfigDialog(QDialog):
             TypeError,
             ValueError
         ):
-
             return default
 
     # =========================================================
@@ -747,7 +744,6 @@ class PanelConfigDialog(QDialog):
     def get_configuration(self):
 
         return {
-
             "panel_name":
                 self.panel_name.text().strip(),
 

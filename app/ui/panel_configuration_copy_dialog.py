@@ -1,5 +1,5 @@
-from pathlib import Path
 import json
+from pathlib import Path
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
@@ -13,6 +13,10 @@ from PySide6.QtWidgets import (
     QPushButton,
     QMessageBox,
     QGroupBox,
+    QScrollArea,
+    QWidget,
+    QSizePolicy,
+    QAbstractScrollArea,
 )
 
 
@@ -25,7 +29,6 @@ class PanelConfigurationCopyDialog(QDialog):
         target_panel_id=None,
         parent=None
     ):
-
         super().__init__(parent)
 
         self.projects_dir = Path(
@@ -38,9 +41,7 @@ class PanelConfigurationCopyDialog(QDialog):
             else None
         )
 
-        self.target_panel_id = (
-            target_panel_id
-        )
+        self.target_panel_id = target_panel_id
 
         self.selected_panel = None
 
@@ -48,27 +49,126 @@ class PanelConfigurationCopyDialog(QDialog):
 
         self.checkboxes = {}
 
+        self._configuration = {}
+
+        # =====================================================
+        # WINDOW
+        # =====================================================
+
         self.setWindowTitle(
             "Import Panel Configuration"
         )
 
+        self.setModal(True)
+
+        # Keep the dialog within a normal laptop screen.
         self.resize(
-            1000,
-            700
+            1100,
+            720
         )
 
-        self.build_ui()
+        self.setMinimumSize(
+            850,
+            550
+        )
+
+        self._apply_style()
+
+        self._build_ui()
 
         self.load_projects()
 
     # =========================================================
-    # UI
+    # STYLE
     # =========================================================
 
-    def build_ui(self):
+    def _apply_style(self):
+
+        self.setStyleSheet(
+            """
+            QGroupBox {
+                font-weight: bold;
+                border: 1px solid #3a3f46;
+                border-radius: 8px;
+                margin-top: 10px;
+                padding-top: 14px;
+            }
+
+            QGroupBox::title {
+                subcontrol-origin: margin;
+                left: 12px;
+                padding: 0 6px;
+            }
+
+            QTreeWidget {
+                border: 1px solid #3f444c;
+                border-radius: 6px;
+            }
+
+            QTreeWidget::item {
+                padding: 5px;
+            }
+
+            QTreeWidget::item:selected {
+                background: #3f444c;
+            }
+
+            QCheckBox {
+                min-height: 26px;
+                padding: 2px;
+            }
+
+            QPushButton {
+                min-height: 40px;
+                padding-left: 14px;
+                padding-right: 14px;
+                border-radius: 6px;
+            }
+
+            QPushButton:hover {
+                border: 1px solid #60a5fa;
+            }
+
+            QScrollArea {
+                border: 1px solid #3f444c;
+                border-radius: 6px;
+            }
+
+            QScrollBar:vertical {
+                width: 14px;
+                margin: 1px;
+            }
+
+            QScrollBar::handle:vertical {
+                min-height: 30px;
+                border-radius: 5px;
+            }
+
+            QScrollBar:horizontal {
+                height: 12px;
+            }
+            """
+        )
+
+    # =========================================================
+    # BUILD UI
+    # =========================================================
+
+    def _build_ui(self):
 
         layout = QVBoxLayout(
             self
+        )
+
+        layout.setContentsMargins(
+            18,
+            16,
+            18,
+            16
+        )
+
+        layout.setSpacing(
+            10
         )
 
         # =====================================================
@@ -97,10 +197,15 @@ class PanelConfigurationCopyDialog(QDialog):
             "parameters should be copied."
         )
 
+        description.setWordWrap(
+            True
+        )
+
         description.setStyleSheet(
             """
             QLabel {
                 color: #9ca3af;
+                font-size: 13px;
             }
             """
         )
@@ -110,21 +215,37 @@ class PanelConfigurationCopyDialog(QDialog):
         )
 
         # =====================================================
-        # MAIN SPLIT
+        # MAIN CONTENT
         # =====================================================
 
         main_layout = QHBoxLayout()
 
+        main_layout.setSpacing(
+            10
+        )
+
         # =====================================================
-        # PANEL TREE
+        # LEFT: PANEL TREE
         # =====================================================
 
         tree_group = QGroupBox(
             "Available Panels"
         )
 
+        tree_group.setSizePolicy(
+            QSizePolicy.Policy.Expanding,
+            QSizePolicy.Policy.Expanding
+        )
+
         tree_layout = QVBoxLayout(
             tree_group
+        )
+
+        tree_layout.setContentsMargins(
+            10,
+            15,
+            10,
+            10
         )
 
         self.panel_tree = QTreeWidget()
@@ -138,7 +259,24 @@ class PanelConfigurationCopyDialog(QDialog):
 
         self.panel_tree.setColumnWidth(
             0,
-            300
+            280
+        )
+
+        self.panel_tree.setUniformRowHeights(
+            True
+        )
+
+        self.panel_tree.setSizePolicy(
+            QSizePolicy.Policy.Expanding,
+            QSizePolicy.Policy.Expanding
+        )
+
+        self.panel_tree.setVerticalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAsNeeded
+        )
+
+        self.panel_tree.setHorizontalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAsNeeded
         )
 
         self.panel_tree.itemSelectionChanged.connect(
@@ -155,20 +293,36 @@ class PanelConfigurationCopyDialog(QDialog):
         )
 
         # =====================================================
-        # PARAMETERS
+        # RIGHT: PARAMETERS
         # =====================================================
 
         parameter_group = QGroupBox(
             "Parameters to Import"
         )
 
+        parameter_group.setSizePolicy(
+            QSizePolicy.Policy.Expanding,
+            QSizePolicy.Policy.Expanding
+        )
+
         parameter_layout = QVBoxLayout(
             parameter_group
         )
 
-        # -----------------------------------------------------
-        # SELECT ALL / DESELECT ALL
-        # -----------------------------------------------------
+        parameter_layout.setContentsMargins(
+            10,
+            15,
+            10,
+            10
+        )
+
+        parameter_layout.setSpacing(
+            8
+        )
+
+        # =====================================================
+        # SELECT / DESELECT
+        # =====================================================
 
         selection_buttons = QHBoxLayout()
 
@@ -178,6 +332,14 @@ class PanelConfigurationCopyDialog(QDialog):
 
         deselect_all = QPushButton(
             "Deselect All"
+        )
+
+        select_all.setMinimumHeight(
+            38
+        )
+
+        deselect_all.setMinimumHeight(
+            38
         )
 
         select_all.clicked.connect(
@@ -202,34 +364,117 @@ class PanelConfigurationCopyDialog(QDialog):
             selection_buttons
         )
 
-        # -----------------------------------------------------
-        # CHECKBOX AREA
-        # -----------------------------------------------------
+        # =====================================================
+        # IMPORTANT:
+        #
+        # The scroll area gets the remaining height.
+        # The contents are allowed to become taller than it.
+        # =====================================================
 
-        self.parameter_layout = QVBoxLayout()
+        self.parameter_scroll = QScrollArea()
 
-        parameter_layout.addLayout(
-            self.parameter_layout
+        self.parameter_scroll.setWidgetResizable(
+            True
         )
 
-        parameter_layout.addStretch()
+        self.parameter_scroll.setSizeAdjustPolicy(
+            QAbstractScrollArea.SizeAdjustPolicy.AdjustIgnored
+        )
+
+        self.parameter_scroll.setSizePolicy(
+            QSizePolicy.Policy.Expanding,
+            QSizePolicy.Policy.Expanding
+        )
+
+        self.parameter_scroll.setMinimumHeight(
+            200
+        )
+
+        self.parameter_scroll.setVerticalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAsNeeded
+        )
+
+        self.parameter_scroll.setHorizontalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAlwaysOff
+        )
+
+        self.parameter_scroll.setFrameShape(
+            QScrollArea.Shape.NoFrame
+        )
+
+        # =====================================================
+        # SCROLL CONTENT
+        # =====================================================
+
+        self.parameter_container = QWidget()
+
+        self.parameter_container.setSizePolicy(
+            QSizePolicy.Policy.Preferred,
+            QSizePolicy.Policy.Preferred
+        )
+
+        self.parameter_container.setMinimumWidth(
+            0
+        )
+
+        self.parameter_container.setMinimumHeight(
+            0
+        )
+
+        self.parameter_layout = QVBoxLayout(
+            self.parameter_container
+        )
+
+        self.parameter_layout.setContentsMargins(
+            10,
+            10,
+            10,
+            10
+        )
+
+        self.parameter_layout.setSpacing(
+            4
+        )
+
+        # IMPORTANT:
+        # No stretch here.
+        #
+        # The widget must be allowed to become taller
+        # than the viewport so QScrollArea can scroll it.
+        # =====================================================
+
+        self.parameter_scroll.setWidget(
+            self.parameter_container
+        )
+
+        parameter_layout.addWidget(
+            self.parameter_scroll,
+            1
+        )
 
         main_layout.addWidget(
             parameter_group,
             1
         )
 
+        # =====================================================
+        # MAIN LAYOUT
+        # =====================================================
+
         layout.addLayout(
-            main_layout
+            main_layout,
+            1
         )
 
         # =====================================================
-        # BUTTONS
+        # BOTTOM BUTTONS
         # =====================================================
 
         buttons = QHBoxLayout()
 
-        cancel = QPushButton(
+        buttons.addStretch()
+
+        cancel_button = QPushButton(
             "Cancel"
         )
 
@@ -237,7 +482,15 @@ class PanelConfigurationCopyDialog(QDialog):
             "Import Configuration"
         )
 
-        cancel.clicked.connect(
+        cancel_button.setMinimumHeight(
+            42
+        )
+
+        import_button.setMinimumHeight(
+            42
+        )
+
+        cancel_button.clicked.connect(
             self.reject
         )
 
@@ -245,10 +498,8 @@ class PanelConfigurationCopyDialog(QDialog):
             self.accept_selection
         )
 
-        buttons.addStretch()
-
         buttons.addWidget(
-            cancel
+            cancel_button
         )
 
         buttons.addWidget(
@@ -271,13 +522,23 @@ class PanelConfigurationCopyDialog(QDialog):
 
             return
 
-        for project_folder in sorted(
-            self.projects_dir.iterdir()
-        ):
+        try:
 
-            if not project_folder.is_dir():
+            project_folders = sorted(
+                [
+                    p
+                    for p in self.projects_dir.iterdir()
+                    if p.is_dir()
+                ],
+                key=lambda p:
+                    p.name.lower()
+            )
 
-                continue
+        except Exception:
+
+            return
+
+        for project_folder in project_folders:
 
             project_item = QTreeWidgetItem(
                 [
@@ -291,7 +552,9 @@ class PanelConfigurationCopyDialog(QDialog):
                 Qt.ItemDataRole.UserRole,
                 {
                     "type": "project",
-                    "folder": project_folder
+                    "folder": str(
+                        project_folder
+                    )
                 }
             )
 
@@ -304,9 +567,10 @@ class PanelConfigurationCopyDialog(QDialog):
                 project_folder
             )
 
-        # -----------------------------------------------------
-        # EVERYTHING COLLAPSED BY DEFAULT
-        # -----------------------------------------------------
+        # =====================================================
+        # IMPORTANT:
+        # START COLLAPSED
+        # =====================================================
 
         self.panel_tree.collapseAll()
 
@@ -337,26 +601,47 @@ class PanelConfigurationCopyDialog(QDialog):
                 encoding="utf-8"
             ) as file:
 
-                data = json.load(file)
+                data = json.load(
+                    file
+                )
 
         except Exception:
 
             return
 
-        assets = (
-            data
-            if isinstance(data, list)
-            else data.get(
+        if isinstance(
+            data,
+            list
+        ):
+
+            assets = data
+
+        elif isinstance(
+            data,
+            dict
+        ):
+
+            assets = data.get(
                 "assets",
                 []
             )
-        )
+
+        else:
+
+            assets = []
+
+        if not isinstance(
+            assets,
+            list
+        ):
+
+            return
 
         items = {}
 
-        # -----------------------------------------------------
-        # CREATE ITEMS
-        # -----------------------------------------------------
+        # =====================================================
+        # CREATE ALL ITEMS
+        # =====================================================
 
         for asset in assets:
 
@@ -368,19 +653,26 @@ class PanelConfigurationCopyDialog(QDialog):
                 continue
 
             node_id = (
-                asset.get("node_id")
-                or asset.get("id")
+                asset.get(
+                    "node_id"
+                )
+                or
+                asset.get(
+                    "id"
+                )
             )
 
-            parent_id = (
-                asset.get("parent_id")
-            )
+            if not node_id:
+
+                continue
 
             name = str(
                 asset.get(
                     "name",
                     ""
                 )
+                or
+                ""
             )
 
             node_type = str(
@@ -391,6 +683,8 @@ class PanelConfigurationCopyDialog(QDialog):
                         ""
                     )
                 )
+                or
+                ""
             )
 
             item = QTreeWidgetItem(
@@ -406,36 +700,60 @@ class PanelConfigurationCopyDialog(QDialog):
                 asset
             )
 
-            items[node_id] = item
+            items[
+                str(node_id)
+            ] = item
 
-        # -----------------------------------------------------
+        # =====================================================
         # BUILD TREE
-        # -----------------------------------------------------
+        # =====================================================
 
         for asset in assets:
 
-            node_id = (
-                asset.get("node_id")
-                or asset.get("id")
-            )
+            if not isinstance(
+                asset,
+                dict
+            ):
 
-            parent_id = (
-                asset.get("parent_id")
+                continue
+
+            node_id = (
+                asset.get(
+                    "node_id"
+                )
+                or
+                asset.get(
+                    "id"
+                )
             )
 
             item = items.get(
-                node_id
+                str(node_id)
             )
 
             if item is None:
 
                 continue
 
-            if parent_id in items:
+            parent_id = (
+                asset.get(
+                    "parent_id"
+                )
+            )
 
-                items[
-                    parent_id
-                ].addChild(
+            if parent_id is not None:
+
+                parent_item = items.get(
+                    str(parent_id)
+                )
+
+            else:
+
+                parent_item = None
+
+            if parent_item is not None:
+
+                parent_item.addChild(
                     item
                 )
 
@@ -446,20 +764,26 @@ class PanelConfigurationCopyDialog(QDialog):
                 )
 
     # =========================================================
-    # PANEL SELECTION
+    # PANEL SELECTED
     # =========================================================
 
     def on_panel_selected(self):
 
-        items = (
+        selected_items = (
             self.panel_tree.selectedItems()
         )
 
-        if not items:
+        if not selected_items:
+
+            self.selected_panel = None
+
+            self.clear_parameter_checkboxes()
 
             return
 
-        asset = items[0].data(
+        item = selected_items[0]
+
+        asset = item.data(
             0,
             Qt.ItemDataRole.UserRole
         )
@@ -468,6 +792,10 @@ class PanelConfigurationCopyDialog(QDialog):
             asset,
             dict
         ):
+
+            self.selected_panel = None
+
+            self.clear_parameter_checkboxes()
 
             return
 
@@ -479,11 +807,53 @@ class PanelConfigurationCopyDialog(QDialog):
                     ""
                 )
             )
-        ).upper()
+            or
+            ""
+        ).strip().upper()
+
+        # =====================================================
+        # ONLY PANELS
+        # =====================================================
 
         if node_type != "PANEL":
 
             self.selected_panel = None
+
+            self.clear_parameter_checkboxes()
+
+            return
+
+        source_panel_id = (
+            asset.get(
+                "node_id",
+                asset.get(
+                    "id"
+                )
+            )
+        )
+
+        # =====================================================
+        # DON'T ALLOW SAME PANEL
+        # =====================================================
+
+        if (
+            self.target_panel_id is not None
+            and
+            str(source_panel_id)
+            ==
+            str(self.target_panel_id)
+        ):
+
+            self.selected_panel = None
+
+            self.clear_parameter_checkboxes()
+
+            QMessageBox.information(
+                self,
+                "Invalid Source Panel",
+                "The current panel cannot be used "
+                "as its own configuration source."
+            )
 
             return
 
@@ -494,7 +864,7 @@ class PanelConfigurationCopyDialog(QDialog):
         )
 
     # =========================================================
-    # PARAMETERS
+    # LOAD PARAMETERS
     # =========================================================
 
     def load_parameter_checkboxes(
@@ -511,9 +881,9 @@ class PanelConfigurationCopyDialog(QDialog):
         self.add_checkbox(
             "panel_equipment_name",
             "Equipment Name",
-            self.get_value(
-                panel,
-                "equipment_name"
+            panel.get(
+                "equipment_name",
+                ""
             ),
             True
         )
@@ -521,9 +891,9 @@ class PanelConfigurationCopyDialog(QDialog):
         self.add_checkbox(
             "panel_equipment_type",
             "Equipment Type",
-            self.get_value(
-                panel,
-                "equipment_type"
+            panel.get(
+                "equipment_type",
+                ""
             ),
             True
         )
@@ -531,9 +901,9 @@ class PanelConfigurationCopyDialog(QDialog):
         self.add_checkbox(
             "panel_ct_count",
             "Number of CTs",
-            self.get_value(
-                panel,
-                "ct_count"
+            panel.get(
+                "ct_count",
+                0
             ),
             True
         )
@@ -541,9 +911,9 @@ class PanelConfigurationCopyDialog(QDialog):
         self.add_checkbox(
             "panel_relay_count",
             "Number of Numerical Relays",
-            self.get_value(
-                panel,
-                "relay_count"
+            panel.get(
+                "relay_count",
+                0
             ),
             True
         )
@@ -551,9 +921,9 @@ class PanelConfigurationCopyDialog(QDialog):
         self.add_checkbox(
             "panel_aux_count",
             "Number of Auxiliary Relays",
-            self.get_value(
-                panel,
-                "aux_count"
+            panel.get(
+                "aux_count",
+                0
             ),
             True
         )
@@ -561,9 +931,9 @@ class PanelConfigurationCopyDialog(QDialog):
         self.add_checkbox(
             "panel_meter_count",
             "Number of Meters",
-            self.get_value(
-                panel,
-                "meter_count"
+            panel.get(
+                "meter_count",
+                0
             ),
             True
         )
@@ -587,6 +957,21 @@ class PanelConfigurationCopyDialog(QDialog):
                 component
             )
 
+        # =====================================================
+        # RESET SCROLL
+        # =====================================================
+
+        self.parameter_scroll.verticalScrollBar().setValue(
+            0
+        )
+
+        self.parameter_scroll.horizontalScrollBar().setValue(
+            0
+        )
+
+        # Force geometry update.
+        self.parameter_container.adjustSize()
+
     # =========================================================
     # COMPONENT CHECKBOXES
     # =========================================================
@@ -597,27 +982,31 @@ class PanelConfigurationCopyDialog(QDialog):
         component
     ):
 
-        component_type = str(
-            component.get(
-                "component_type",
-                ""
+        component_type = (
+            self.normalise_component_type(
+                component.get(
+                    "component_type",
+                    ""
+                )
             )
-        ).upper()
+        )
 
         name = str(
             component.get(
                 "name",
                 f"Component {index + 1}"
             )
+            or
+            ""
         )
 
         prefix = (
             f"component_{index}_"
         )
 
-        # -----------------------------------------------------
-        # COMPONENT HEADER
-        # -----------------------------------------------------
+        # =====================================================
+        # HEADER
+        # =====================================================
 
         header = QCheckBox(
             f"{name} ({component_type}) - ALL"
@@ -632,6 +1021,7 @@ class PanelConfigurationCopyDialog(QDialog):
             QCheckBox {
                 font-weight: bold;
                 margin-top: 8px;
+                margin-bottom: 3px;
             }
             """
         )
@@ -644,28 +1034,9 @@ class PanelConfigurationCopyDialog(QDialog):
             prefix + "ALL"
         ] = header
 
-        # -----------------------------------------------------
+        # =====================================================
         # COMMON
-        # -----------------------------------------------------
-
-        common_fields = [
-            (
-                "manufacturer",
-                "Manufacturer"
-            ),
-            (
-                "model",
-                "Model"
-            ),
-            (
-                "description",
-                "Description"
-            ),
-        ]
-
-        # -----------------------------------------------------
-        # UNIQUE FIELD
-        # -----------------------------------------------------
+        # =====================================================
 
         self.add_checkbox(
             prefix + "serial_number",
@@ -677,21 +1048,35 @@ class PanelConfigurationCopyDialog(QDialog):
             False
         )
 
-        # -----------------------------------------------------
-        # COMMON FIELDS
-        # -----------------------------------------------------
+        self.add_checkbox(
+            prefix + "manufacturer",
+            f"{name}: Manufacturer",
+            component.get(
+                "manufacturer",
+                ""
+            ),
+            True
+        )
 
-        for field, label in common_fields:
+        self.add_checkbox(
+            prefix + "model",
+            f"{name}: Model",
+            component.get(
+                "model",
+                ""
+            ),
+            True
+        )
 
-            self.add_checkbox(
-                prefix + field,
-                f"{name}: {label}",
-                component.get(
-                    field,
-                    ""
-                ),
-                True
-            )
+        self.add_checkbox(
+            prefix + "description",
+            f"{name}: Description",
+            component.get(
+                "description",
+                ""
+            ),
+            True
+        )
 
         # =====================================================
         # CT
@@ -699,7 +1084,7 @@ class PanelConfigurationCopyDialog(QDialog):
 
         if component_type == "CT":
 
-            ct_fields = [
+            fields = [
 
                 (
                     "ct_primary",
@@ -732,7 +1117,7 @@ class PanelConfigurationCopyDialog(QDialog):
                 ),
             ]
 
-            for field, label in ct_fields:
+            for field, label in fields:
 
                 self.add_checkbox(
                     prefix + field,
@@ -748,13 +1133,9 @@ class PanelConfigurationCopyDialog(QDialog):
         # NUMERICAL RELAY
         # =====================================================
 
-        elif component_type in (
-            "NUMERICAL RELAY",
-            "RELAY",
-            "NUMERICAL_RELAY"
-        ):
+        elif component_type == "NUMERICAL RELAY":
 
-            relay_fields = [
+            fields = [
 
                 (
                     "vt_ratio",
@@ -772,7 +1153,7 @@ class PanelConfigurationCopyDialog(QDialog):
                 ),
             ]
 
-            for field, label in relay_fields:
+            for field, label in fields:
 
                 self.add_checkbox(
                     prefix + field,
@@ -788,14 +1169,9 @@ class PanelConfigurationCopyDialog(QDialog):
         # AUXILIARY RELAY
         # =====================================================
 
-        elif component_type in (
-            "AUX",
-            "AUX RELAY",
-            "AUXILIARY RELAY",
-            "AUXILIARY_RELAY"
-        ):
+        elif component_type == "AUXILIARY RELAY":
 
-            aux_fields = [
+            fields = [
 
                 (
                     "coil_voltage",
@@ -808,7 +1184,7 @@ class PanelConfigurationCopyDialog(QDialog):
                 ),
             ]
 
-            for field, label in aux_fields:
+            for field, label in fields:
 
                 self.add_checkbox(
                     prefix + field,
@@ -824,12 +1200,9 @@ class PanelConfigurationCopyDialog(QDialog):
         # METER
         # =====================================================
 
-        elif component_type in (
-            "METER",
-            "METERING"
-        ):
+        elif component_type == "METER":
 
-            meter_fields = [
+            fields = [
 
                 (
                     "meter_type",
@@ -847,7 +1220,7 @@ class PanelConfigurationCopyDialog(QDialog):
                 ),
             ]
 
-            for field, label in meter_fields:
+            for field, label in fields:
 
                 self.add_checkbox(
                     prefix + field,
@@ -859,9 +1232,9 @@ class PanelConfigurationCopyDialog(QDialog):
                     True
                 )
 
-        # -----------------------------------------------------
-        # COMPONENT SELECT-ALL CONNECTION
-        # -----------------------------------------------------
+        # =====================================================
+        # HEADER CONTROLS COMPONENT
+        # =====================================================
 
         header.toggled.connect(
             lambda checked,
@@ -892,8 +1265,14 @@ class PanelConfigurationCopyDialog(QDialog):
             checked
         )
 
+        checkbox.setSizePolicy(
+            QSizePolicy.Policy.Expanding,
+            QSizePolicy.Policy.Fixed
+        )
+
         checkbox.setToolTip(
-            f"Current value: {value}"
+            f"Current value: "
+            f"{self.format_value(value)}"
         )
 
         self.parameter_layout.addWidget(
@@ -915,16 +1294,27 @@ class PanelConfigurationCopyDialog(QDialog):
     ):
 
         for key, checkbox in (
-            self.checkboxes.items()
+            list(
+                self.checkboxes.items()
+            )
         ):
 
             if (
                 key.startswith(prefix)
-                and key != prefix + "ALL"
+                and
+                key != prefix + "ALL"
             ):
+
+                checkbox.blockSignals(
+                    True
+                )
 
                 checkbox.setChecked(
                     checked
+                )
+
+                checkbox.blockSignals(
+                    False
                 )
 
     # =========================================================
@@ -940,12 +1330,20 @@ class PanelConfigurationCopyDialog(QDialog):
             self.checkboxes.values()
         ):
 
+            checkbox.blockSignals(
+                True
+            )
+
             checkbox.setChecked(
                 checked
             )
 
+            checkbox.blockSignals(
+                False
+            )
+
     # =========================================================
-    # CLEAR CHECKBOXES
+    # CLEAR PARAMETERS
     # =========================================================
 
     def clear_parameter_checkboxes(
@@ -966,9 +1364,11 @@ class PanelConfigurationCopyDialog(QDialog):
 
             widget = item.widget()
 
-            if widget:
+            if widget is not None:
 
                 widget.deleteLater()
+
+        self.parameter_container.adjustSize()
 
     # =========================================================
     # LOAD COMPONENTS
@@ -1014,21 +1414,41 @@ class PanelConfigurationCopyDialog(QDialog):
 
             return []
 
-        components = (
-            data
-            if isinstance(
-                data,
-                list
-            )
-            else data.get(
+        if isinstance(
+            data,
+            list
+        ):
+
+            components = data
+
+        elif isinstance(
+            data,
+            dict
+        ):
+
+            components = data.get(
                 "components",
                 []
             )
-        )
+
+        else:
+
+            components = []
+
+        if not isinstance(
+            components,
+            list
+        ):
+
+            return []
 
         panel_id = (
-            panel.get("node_id")
-            or panel.get("id")
+            panel.get(
+                "node_id",
+                panel.get(
+                    "id"
+                )
+            )
         )
 
         result = []
@@ -1050,7 +1470,8 @@ class PanelConfigurationCopyDialog(QDialog):
 
             if (
                 str(component_panel_id)
-                == str(panel_id)
+                ==
+                str(panel_id)
             ):
 
                 result.append(
@@ -1060,17 +1481,13 @@ class PanelConfigurationCopyDialog(QDialog):
         return result
 
     # =========================================================
-    # FIND PROJECT
+    # FIND PROJECT FOLDER
     # =========================================================
 
     def find_project_folder(
         self,
         panel
     ):
-
-        current = (
-            self.projects_dir
-        )
 
         project_id = (
             panel.get(
@@ -1089,13 +1506,26 @@ class PanelConfigurationCopyDialog(QDialog):
 
                 return candidate
 
-        # -----------------------------------------------------
-        # Fallback: search projects
-        # -----------------------------------------------------
+        panel_id = (
+            panel.get(
+                "node_id",
+                panel.get(
+                    "id"
+                )
+            )
+        )
 
-        for folder in (
-            self.projects_dir.iterdir()
-        ):
+        try:
+
+            folders = (
+                self.projects_dir.iterdir()
+            )
+
+        except Exception:
+
+            return None
+
+        for folder in folders:
 
             if not folder.is_dir():
 
@@ -1126,22 +1556,26 @@ class PanelConfigurationCopyDialog(QDialog):
 
                 continue
 
-            assets = (
-                data
-                if isinstance(
-                    data,
-                    list
-                )
-                else data.get(
+            if isinstance(
+                data,
+                list
+            ):
+
+                assets = data
+
+            elif isinstance(
+                data,
+                dict
+            ):
+
+                assets = data.get(
                     "assets",
                     []
                 )
-            )
 
-            panel_id = (
-                panel.get("node_id")
-                or panel.get("id")
-            )
+            else:
+
+                assets = []
 
             for asset in assets:
 
@@ -1153,46 +1587,23 @@ class PanelConfigurationCopyDialog(QDialog):
                     continue
 
                 asset_id = (
-                    asset.get("node_id")
-                    or asset.get("id")
+                    asset.get(
+                        "node_id",
+                        asset.get(
+                            "id"
+                        )
+                    )
                 )
 
-                if str(asset_id) == str(
-                    panel_id
+                if (
+                    str(asset_id)
+                    ==
+                    str(panel_id)
                 ):
 
                     return folder
 
         return None
-
-    # =========================================================
-    # VALUE
-    # =========================================================
-
-    @staticmethod
-    def get_value(
-        data,
-        key
-    ):
-
-        value = data.get(
-            key,
-            ""
-        )
-
-        if isinstance(
-            value,
-            list
-        ):
-
-            return ", ".join(
-                str(x)
-                for x in value
-            )
-
-        return str(
-            value or ""
-        )
 
     # =========================================================
     # ACCEPT
@@ -1214,6 +1625,10 @@ class PanelConfigurationCopyDialog(QDialog):
             self.build_configuration()
         )
 
+        if not configuration:
+
+            return
+
         self._configuration = (
             configuration
         )
@@ -1232,11 +1647,7 @@ class PanelConfigurationCopyDialog(QDialog):
             self.selected_panel
         )
 
-        panel_config = {}
-
-        # -----------------------------------------------------
-        # PANEL FIELDS
-        # -----------------------------------------------------
+        panel_configuration = {}
 
         panel_mapping = {
 
@@ -1259,6 +1670,10 @@ class PanelConfigurationCopyDialog(QDialog):
                 "meter_count",
         }
 
+        # =====================================================
+        # PANEL PARAMETERS
+        # =====================================================
+
         for checkbox_key, field in (
             panel_mapping.items()
         ):
@@ -1269,22 +1684,26 @@ class PanelConfigurationCopyDialog(QDialog):
                 )
             )
 
-            if checkbox and checkbox.isChecked():
+            if (
+                checkbox is not None
+                and
+                checkbox.isChecked()
+            ):
 
-                panel_config[
+                panel_configuration[
                     field
                 ] = panel.get(
                     field,
                     ""
                 )
 
-        # -----------------------------------------------------
-        # COMPONENTS
-        # -----------------------------------------------------
+        # =====================================================
+        # COMPONENT PARAMETERS
+        # =====================================================
 
-        components = []
+        imported_components = []
 
-        for index, component in enumerate(
+        for index, source in enumerate(
             self.source_components
         ):
 
@@ -1292,72 +1711,75 @@ class PanelConfigurationCopyDialog(QDialog):
                 f"component_{index}_"
             )
 
-            imported = {}
+            imported = {
 
-            # -------------------------------------------------
-            # ALWAYS KEEP COMPONENT TYPE
-            # -------------------------------------------------
+                "component_type":
+                    source.get(
+                        "component_type",
+                        ""
+                    ),
 
-            imported[
-                "component_type"
-            ] = component.get(
-                "component_type",
-                ""
-            )
+                "name":
+                    source.get(
+                        "name",
+                        ""
+                    ),
+            }
 
-            # -------------------------------------------------
-            # COMPONENT NAME
-            # -------------------------------------------------
+            fields = [
 
-            imported[
-                "name"
-            ] = component.get(
-                "name",
-                ""
-            )
-
-            # -------------------------------------------------
-            # COMPONENT FIELDS
-            # -------------------------------------------------
-
-            for field in (
                 "manufacturer",
                 "model",
                 "description",
+
+                # Unique, unchecked by default.
                 "serial_number",
+
+                # CT
                 "ct_primary",
                 "ct_secondary",
                 "ct_ratio",
                 "ct_class",
                 "burden",
                 "core",
+
+                # Relay
                 "vt_ratio",
                 "firmware",
+                "protection_functions",
+
+                # Aux relay
                 "coil_voltage",
                 "contact_configuration",
+
+                # Meter
                 "meter_type",
                 "meter_functions",
                 "accuracy_class",
-                "protection_functions",
-            ):
+            ]
 
-                checkbox = self.checkboxes.get(
-                    prefix + field
+            for field in fields:
+
+                checkbox = (
+                    self.checkboxes.get(
+                        prefix + field
+                    )
                 )
 
                 if (
-                    checkbox
-                    and checkbox.isChecked()
+                    checkbox is not None
+                    and
+                    checkbox.isChecked()
                 ):
 
                     imported[
                         field
-                    ] = component.get(
+                    ] = source.get(
                         field,
                         ""
                     )
 
-            components.append(
+            imported_components.append(
                 imported
             )
 
@@ -1378,10 +1800,10 @@ class PanelConfigurationCopyDialog(QDialog):
                 ),
 
             "panel_configuration":
-                panel_config,
+                panel_configuration,
 
             "components":
-                components,
+                imported_components,
         }
 
     # =========================================================
@@ -1390,8 +1812,95 @@ class PanelConfigurationCopyDialog(QDialog):
 
     def get_configuration(self):
 
-        return getattr(
-            self,
-            "_configuration",
-            {}
+        return self._configuration
+
+    # =========================================================
+    # NORMALISE COMPONENT TYPE
+    # =========================================================
+
+    @staticmethod
+    def normalise_component_type(
+        value
+    ):
+
+        value = str(
+            value or ""
+        ).strip().upper()
+
+        aliases = {
+
+            "CT":
+                "CT",
+
+            "CURRENT TRANSFORMER":
+                "CT",
+
+            "NUMERICAL RELAY":
+                "NUMERICAL RELAY",
+
+            "NUMERICAL_RELAY":
+                "NUMERICAL RELAY",
+
+            "RELAY":
+                "NUMERICAL RELAY",
+
+            "AUX":
+                "AUXILIARY RELAY",
+
+            "AUX RELAY":
+                "AUXILIARY RELAY",
+
+            "AUXILIARY RELAY":
+                "AUXILIARY RELAY",
+
+            "AUXILIARY_RELAY":
+                "AUXILIARY RELAY",
+
+            "METER":
+                "METER",
+
+            "METERING":
+                "METER",
+        }
+
+        return aliases.get(
+            value,
+            value
+        )
+
+    # =========================================================
+    # FORMAT VALUE
+    # =========================================================
+
+    @staticmethod
+    def format_value(
+        value
+    ):
+
+        if value is None:
+
+            return ""
+
+        if isinstance(
+            value,
+            list
+        ):
+
+            return ", ".join(
+                str(item)
+                for item in value
+            )
+
+        if isinstance(
+            value,
+            dict
+        ):
+
+            return json.dumps(
+                value,
+                ensure_ascii=False
+            )
+
+        return str(
+            value
         )
