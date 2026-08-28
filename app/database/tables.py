@@ -57,25 +57,61 @@ def create_tables(database):
         )
     """)
 
-    # Existing installations may already have the original thermal table.
-    # Add the equation-builder columns without destroying existing templates.
     columns = {
-        row[1] for row in database.fetch_all("PRAGMA table_info(thermal_templates)")
+        row[1]
+        for row in database.fetch_all(
+            "PRAGMA table_info(thermal_templates)"
+        )
     }
+
     migrations = [
-        ("equation", "ALTER TABLE thermal_templates ADD COLUMN equation TEXT DEFAULT ''"),
-        ("independent_variable", "ALTER TABLE thermal_templates ADD COLUMN independent_variable TEXT DEFAULT 'I'"),
-        ("dependent_variable", "ALTER TABLE thermal_templates ADD COLUMN dependent_variable TEXT DEFAULT 'T'"),
-        ("variables_json", "ALTER TABLE thermal_templates ADD COLUMN variables_json TEXT DEFAULT '[]'"),
-        ("parameters_json", "ALTER TABLE thermal_templates ADD COLUMN parameters_json TEXT DEFAULT '{}'"),
-        ("x_min", "ALTER TABLE thermal_templates ADD COLUMN x_min REAL DEFAULT 1"),
-        ("x_max", "ALTER TABLE thermal_templates ADD COLUMN x_max REAL DEFAULT 20"),
+        (
+            "equation",
+            "ALTER TABLE thermal_templates "
+            "ADD COLUMN equation TEXT DEFAULT ''"
+        ),
+        (
+            "independent_variable",
+            "ALTER TABLE thermal_templates "
+            "ADD COLUMN independent_variable TEXT DEFAULT 'I'"
+        ),
+        (
+            "dependent_variable",
+            "ALTER TABLE thermal_templates "
+            "ADD COLUMN dependent_variable TEXT DEFAULT 'T'"
+        ),
+        (
+            "variables_json",
+            "ALTER TABLE thermal_templates "
+            "ADD COLUMN variables_json TEXT DEFAULT '[]'"
+        ),
+        (
+            "parameters_json",
+            "ALTER TABLE thermal_templates "
+            "ADD COLUMN parameters_json TEXT DEFAULT '{}'"
+        ),
+        (
+            "x_min",
+            "ALTER TABLE thermal_templates "
+            "ADD COLUMN x_min REAL DEFAULT 1"
+        ),
+        (
+            "x_max",
+            "ALTER TABLE thermal_templates "
+            "ADD COLUMN x_max REAL DEFAULT 20"
+        ),
     ]
+
     for name, sql in migrations:
         if name not in columns:
             database.execute(sql)
 
     database.execute("""
-        CREATE INDEX IF NOT EXISTS idx_thermal_templates_relay
-        ON thermal_templates(protection_function, manufacturer, model)
+        CREATE INDEX IF NOT EXISTS
+        idx_thermal_templates_relay
+        ON thermal_templates(
+            protection_function,
+            manufacturer,
+            model
+        )
     """)
