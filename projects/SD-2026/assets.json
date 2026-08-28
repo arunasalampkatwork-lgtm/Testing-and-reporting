@@ -22,7 +22,7 @@
         "relay_count": 1,
         "aux_count": 2,
         "meter_count": 2,
-        "asset_id": "ASSET-A8F8D13E77",
+        "asset_id": "ASSET-A8FA15406E",
         "linked_asset_id": null
     },
     {
@@ -36,7 +36,7 @@
         "relay_count": 1,
         "aux_count": 3,
         "meter_count": 0,
-        "asset_id": "ASSET-65779DD66E",
+        "asset_id": "ASSET-8DE489D1C6",
         "linked_asset_id": null
     },
     {
@@ -50,7 +50,7 @@
         "relay_count": 1,
         "aux_count": 2,
         "meter_count": 0,
-        "asset_id": "ASSET-B9753C4A40",
+        "asset_id": "ASSET-64A5E61799",
         "linked_asset_id": null
     },
     {
@@ -110,7 +110,7 @@
         "relay_count": 1,
         "aux_count": 2,
         "meter_count": 0,
-        "asset_id": "ASSET-80E4E1A7EA",
+        "asset_id": "ASSET-889D96B335",
         "linked_asset_id": null
     },
     {
@@ -124,7 +124,7 @@
         "relay_count": 0,
         "aux_count": 0,
         "meter_count": 0,
-        "asset_id": "ASSET-495DC3B451",
+        "asset_id": "ASSET-BADE00B8E0",
         "linked_asset_id": null
     },
     {
@@ -138,7 +138,7 @@
         "relay_count": 0,
         "aux_count": 0,
         "meter_count": 0,
-        "asset_id": "ASSET-0D8C9696F4",
+        "asset_id": "ASSET-CDB3BED4DE",
         "linked_asset_id": null
     },
     {
@@ -164,7 +164,7 @@
         "relay_count": 1,
         "aux_count": 2,
         "meter_count": 1,
-        "asset_id": "ASSET-3FA86F5D47",
+        "asset_id": "ASSET-55F3B17EFD",
         "linked_asset_id": null
     },
     {
@@ -178,7 +178,7 @@
         "relay_count": 0,
         "aux_count": 0,
         "meter_count": 0,
-        "asset_id": "ASSET-A2B3DD2E77",
+        "asset_id": "ASSET-7E9707E166",
         "linked_asset_id": null
     },
     {
@@ -192,7 +192,7 @@
         "relay_count": 1,
         "aux_count": 1,
         "meter_count": 2,
-        "asset_id": "ASSET-331928B0B2",
+        "asset_id": "ASSET-F39B1770E0",
         "linked_asset_id": null
     },
     {
@@ -206,7 +206,7 @@
         "relay_count": 1,
         "aux_count": 2,
         "meter_count": 2,
-        "asset_id": "ASSET-05AEDA2D26",
+        "asset_id": "ASSET-766E223626",
         "linked_asset_id": null
     },
     {
@@ -220,8 +220,8 @@
         "relay_count": 1,
         "aux_count": 2,
         "meter_count": 0,
-        "asset_id": "ASSET-349CA904CB",
-        "linked_asset_id": "ASSET-349CA904CB"
+        "asset_id": "ASSET-95DA5FE821",
+        "linked_asset_id": "ASSET-95DA5FE821"
     },
     {
         "node_id": "AST-9439DBA8",
@@ -234,7 +234,7 @@
         "relay_count": 1,
         "aux_count": 2,
         "meter_count": 2,
-        "asset_id": "ASSET-FF7D20B062",
+        "asset_id": "ASSET-9432CB39FF",
         "linked_asset_id": null
     },
     {
@@ -260,7 +260,7 @@
         "relay_count": 1,
         "aux_count": 2,
         "meter_count": 2,
-        "asset_id": "ASSET-C03D0E6CA5",
+        "asset_id": "ASSET-0DFF008FC5",
         "linked_asset_id": null
     },
     {
@@ -274,7 +274,7 @@
         "relay_count": 1,
         "aux_count": 2,
         "meter_count": 0,
-        "asset_id": "ASSET-00232E7F44",
+        "asset_id": "ASSET-AA1789878B",
         "linked_asset_id": null
     },
     {
@@ -300,7 +300,7 @@
         "relay_count": 1,
         "aux_count": 2,
         "meter_count": 3,
-        "asset_id": "ASSET-CD79D4F987",
+        "asset_id": "ASSET-ECBFD59B9A",
         "linked_asset_id": null
     },
     {
@@ -314,7 +314,7 @@
         "relay_count": 0,
         "aux_count": 0,
         "meter_count": 0,
-        "asset_id": "ASSET-8FC6B13665",
+        "asset_id": "ASSET-07411BC544",
         "linked_asset_id": null
     },
     {
@@ -328,7 +328,7 @@
         "relay_count": 1,
         "aux_count": 2,
         "meter_count": 2,
-        "asset_id": "ASSET-1D2BDDF713",
+        "asset_id": "ASSET-7EF6D0A3C2",
         "linked_asset_id": null
     }
 ]

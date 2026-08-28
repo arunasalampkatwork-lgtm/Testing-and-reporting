@@ -1,5 +1,6 @@
 import sqlite3
 from pathlib import Path
+from datetime import datetime
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
@@ -35,37 +36,48 @@ class AssetExplorerView(QWidget):
     """
     GLOBAL ASSET MANAGEMENT
 
-    This replaces the old separation between:
+    Physical asset identity:
+        asset_id
 
-        Asset Database
-        Asset Explorer
-        Asset Register
+    Project occurrence identity:
+        node_id
 
-    It is completely independent of the currently opened
-    project.
+    Project-local hierarchy:
+        parent_id
 
-    Hierarchy:
+    Global hierarchy:
+        asset.metadata["parent_asset_id"]
 
-        Substation
-            └── Switchboard
-                    └── Panel
-                            └── Components
+    This distinction is important when an asset is linked into
+    another project.
 
-    Selecting an asset shows its configuration.
+    Example:
 
-    Selecting a panel also shows:
-        - components
-        - test history
+        Project 1
 
-    Selecting a component shows:
-        - component configuration
-        - test history
+        REF-3 SS-1
+        ├── HV-201A
+        └── HV-201B
+
+
+        Project 2
+
+        REF-3 SS-1
+        └── HV-201C
+
+
+    Global Asset Management:
+
+        REF-3 SS-1
+        ├── HV-201A
+        ├── HV-201B
+        └── HV-201C
     """
 
     def __init__(
         self,
         global_asset_service,
-        parent=None,
+        parent=None
     ):
 
         super().__init__(parent)
@@ -75,8 +87,6 @@ class AssetExplorerView(QWidget):
         )
 
         self._all_records = []
-
-        self._tree_nodes = {}
 
         self._build_ui()
 
@@ -88,9 +98,7 @@ class AssetExplorerView(QWidget):
 
     def _build_ui(self):
 
-        root = QVBoxLayout(
-            self
-        )
+        root = QVBoxLayout(self)
 
         root.setContentsMargins(
             16,
@@ -99,13 +107,11 @@ class AssetExplorerView(QWidget):
             16
         )
 
-        root.setSpacing(
-            10
-        )
+        root.setSpacing(10)
 
-        # =====================================================
+        # -----------------------------------------------------
         # HEADER
-        # =====================================================
+        # -----------------------------------------------------
 
         header_layout = QHBoxLayout()
 
@@ -122,9 +128,7 @@ class AssetExplorerView(QWidget):
             """
         )
 
-        header_layout.addWidget(
-            header
-        )
+        header_layout.addWidget(header)
 
         header_layout.addStretch()
 
@@ -145,7 +149,7 @@ class AssetExplorerView(QWidget):
         )
 
         subtitle = QLabel(
-            "Global asset configuration, hierarchy and test history"
+            "Global physical asset configuration, hierarchy and test history"
         )
 
         subtitle.setStyleSheet(
@@ -161,9 +165,9 @@ class AssetExplorerView(QWidget):
             subtitle
         )
 
-        # =====================================================
+        # -----------------------------------------------------
         # FILTER BAR
-        # =====================================================
+        # -----------------------------------------------------
 
         filter_frame = QFrame()
 
@@ -253,9 +257,9 @@ class AssetExplorerView(QWidget):
             filter_frame
         )
 
-        # =====================================================
+        # -----------------------------------------------------
         # SPLITTER
-        # =====================================================
+        # -----------------------------------------------------
 
         splitter = QSplitter(
             Qt.Orientation.Horizontal
@@ -265,9 +269,9 @@ class AssetExplorerView(QWidget):
             False
         )
 
-        # =====================================================
-        # LEFT TREE
-        # =====================================================
+        # -----------------------------------------------------
+        # TREE
+        # -----------------------------------------------------
 
         tree_frame = QFrame()
 
@@ -315,6 +319,11 @@ class AssetExplorerView(QWidget):
             True
         )
 
+        self.tree.setColumnWidth(
+            0,
+            360
+        )
+
         self.tree.itemSelectionChanged.connect(
             self._selection_changed
         )
@@ -327,9 +336,9 @@ class AssetExplorerView(QWidget):
             tree_frame
         )
 
-        # =====================================================
-        # RIGHT
-        # =====================================================
+        # -----------------------------------------------------
+        # DETAILS
+        # -----------------------------------------------------
 
         details_frame = QFrame()
 
@@ -426,9 +435,9 @@ class AssetExplorerView(QWidget):
             1
         )
 
-        # =====================================================
+        # -----------------------------------------------------
         # STYLE
-        # =====================================================
+        # -----------------------------------------------------
 
         self.setStyleSheet(
             """
@@ -521,25 +530,30 @@ class AssetExplorerView(QWidget):
             )
 
     # =========================================================
-    # LOAD GLOBAL RECORDS
+    # LOAD RECORDS
     # =========================================================
 
     def _load_records(self):
 
         self._all_records = []
 
-        # -----------------------------------------------------
-        # PHYSICAL ASSETS
-        # -----------------------------------------------------
+        # =====================================================
+        # NODES
+        #
+        # IMPORTANT:
+        #
+        # Every project-local node is retained separately.
+        #
+        # node_id   -> identifies the node in the project tree
+        # parent_id -> defines the tree hierarchy
+        # asset_id  -> identifies the physical/global asset
+        #
+        # DO NOT deduplicate nodes using asset_id.
+        # =====================================================
 
-        for entry in (
-            self.global_asset_service
-            .get_all_nodes()
-        ):
+        for entry in self.global_asset_service.get_all_nodes():
 
-            node = entry.get(
-                "node"
-            )
+            node = entry.get("node")
 
             if node is None:
                 continue
@@ -560,67 +574,87 @@ class AssetExplorerView(QWidget):
                 continue
 
             record = {
+                "record_type": "NODE",
 
-                "record_type":
-                    "NODE",
+                # -------------------------------------------------
+                # Project information
+                # -------------------------------------------------
 
-                "project":
-                    entry.get(
-                        "project",
-                        ""
-                    ),
+                "project": entry.get(
+                    "project",
+                    ""
+                ),
 
-                "folder":
-                    entry.get(
-                        "folder"
-                    ),
+                "folder": entry.get(
+                    "folder"
+                ),
 
-                "asset_manager":
-                    entry.get(
-                        "asset_manager"
-                    ),
+                # -------------------------------------------------
+                # Managers
+                # -------------------------------------------------
 
-                "component_manager":
-                    entry.get(
-                        "component_manager"
-                    ),
+                "asset_manager": entry.get(
+                    "asset_manager"
+                ),
 
-                "node":
+                "component_manager": entry.get(
+                    "component_manager"
+                ),
+
+                # -------------------------------------------------
+                # Actual node
+                # -------------------------------------------------
+
+                "node": node,
+
+                # -------------------------------------------------
+                # Tree identity
+                # -------------------------------------------------
+
+                "node_id": getattr(
                     node,
+                    "node_id",
+                    None
+                ),
 
-                "component":
-                    None,
+                "parent_id": getattr(
+                    node,
+                    "parent_id",
+                    None
+                ),
 
-                "type":
-                    node_type,
+                # -------------------------------------------------
+                # Physical/global identity
+                # -------------------------------------------------
 
-                "asset_id":
-                    getattr(
-                        node,
-                        "asset_id",
-                        ""
-                    ),
+                "asset_id": getattr(
+                    node,
+                    "asset_id",
+                    None
+                ),
 
-                "name":
-                    getattr(
-                        node,
-                        "name",
-                        ""
-                    ),
+                # -------------------------------------------------
+                # Display
+                # -------------------------------------------------
+
+                "name": getattr(
+                    node,
+                    "name",
+                    ""
+                ),
+
+                "type": node_type,
             }
 
             self._all_records.append(
                 record
             )
 
-        # -----------------------------------------------------
+        # =====================================================
         # COMPONENTS
-        # -----------------------------------------------------
+        # =====================================================
 
-        for entry in (
-            self.global_asset_service
-            .get_all_components()
-        ):
+        for entry in self.global_asset_service.get_all_components():
 
             component = entry.get(
                 "component"
@@ -644,73 +678,126 @@ class AssetExplorerView(QWidget):
             )
 
             record = {
+                "record_type": "COMPONENT",
 
-                "record_type":
-                    "COMPONENT",
+                "project": entry.get(
+                    "project",
+                    ""
+                ),
 
-                "project":
-                    entry.get(
-                        "project",
-                        ""
-                    ),
+                "folder": entry.get(
+                    "folder"
+                ),
 
-                "folder":
-                    entry.get(
-                        "folder"
-                    ),
+                "asset_manager": entry.get(
+                    "asset_manager"
+                ),
 
-                "asset_manager":
-                    entry.get(
-                        "asset_manager"
-                    ),
+                "component_manager": entry.get(
+                    "component_manager"
+                ),
 
-                "component_manager":
-                    entry.get(
-                        "component_manager"
-                    ),
+                "node": panel,
 
-                "node":
+                "component": component,
+
+                "type": component_type,
+
+                # The panel's physical asset.
+                "asset_id": getattr(
                     panel,
+                    "asset_id",
+                    None
+                ),
 
-                "component":
+                # The panel's project-local node.
+                "panel_node_id": getattr(
+                    panel,
+                    "node_id",
+                    None
+                ),
+
+                "component_id": getattr(
                     component,
+                    "component_id",
+                    None
+                ),
 
-                "type":
-                    component_type,
-
-                "asset_id":
-                    getattr(
-                        panel,
-                        "asset_id",
-                        ""
-                    ),
-
-                "component_id":
-                    getattr(
-                        component,
-                        "component_id",
-                        ""
-                    ),
-
-                "name":
-                    getattr(
-                        component,
-                        "name",
-                        ""
-                    ),
+                "name": getattr(
+                    component,
+                    "name",
+                    ""
+                ),
             }
 
             self._all_records.append(
                 record
             )
+    # =========================================================
+    # MERGE CONFIGURATION
+    # =========================================================
+
+    @staticmethod
+    def _merge_node_configuration(
+        target,
+        source
+    ):
+
+        fields = (
+
+            "name",
+            "asset_tag",
+            "equipment_name",
+            "equipment_type",
+            "manufacturer",
+            "model",
+            "serial_number",
+            "ct_count",
+            "relay_count",
+            "aux_count",
+            "meter_count",
+
+        )
+
+        for field in fields:
+
+            current = getattr(
+                target,
+                field,
+                None
+            )
+
+            incoming = getattr(
+                source,
+                field,
+                None
+            )
+
+            if (
+                not current
+                and incoming
+            ):
+
+                try:
+
+                    setattr(
+                        target,
+                        field,
+                        incoming
+                    )
+
+                except Exception:
+
+                    pass
 
     # =========================================================
-    # FILTER
+    # FILTER / BUILD TREE
     # =========================================================
 
     def apply_filters(self):
 
         self.tree.clear()
+        self._tree_nodes = {}
 
         search = (
             self.search_edit.text()
@@ -722,20 +809,42 @@ class AssetExplorerView(QWidget):
             self.type_filter.currentText()
         )
 
-        # -----------------------------------------------------
-        # Group records by project.
-        # -----------------------------------------------------
+        # =====================================================
+        # GET ALL NODE RECORDS
+        # =====================================================
 
-        projects = {}
+        all_nodes = [
+            record
+            for record in self._all_records
+            if record.get("record_type") == "NODE"
+        ]
 
-        for record in self._all_records:
+        all_components = [
+            record
+            for record in self._all_records
+            if record.get("record_type") == "COMPONENT"
+        ]
 
-            if not self._record_matches(
-                record,
-                search,
-                selected_type
-            ):
-                continue
+        # =====================================================
+        # STEP 1
+        #
+        # Build a lookup of every project-local node.
+        #
+        # IMPORTANT:
+        #
+        # parent_id is used here.
+        #
+        # A parent_id only has meaning inside the project
+        # in which that node exists.
+        #
+        # Therefore the lookup key is:
+        #
+        #       (project, node_id)
+        # =====================================================
+
+        local_nodes = {}
+
+        for record in all_nodes:
 
             project = str(
                 record.get(
@@ -744,127 +853,662 @@ class AssetExplorerView(QWidget):
                 )
             )
 
-            projects.setdefault(
-                project,
-                []
-            ).append(
+            node_id = record.get(
+                "node_id"
+            )
+
+            if not node_id:
+                continue
+
+            local_nodes[
+                (project, node_id)
+            ] = record
+
+        # =====================================================
+        # STEP 2
+        #
+        # Resolve every project-local node into a GLOBAL
+        # PHYSICAL NODE KEY.
+        #
+        # This is the important bit.
+        #
+        # parent_id builds the original hierarchy.
+        #
+        # asset_id merges copies of the same physical asset.
+        #
+        # Example:
+        #
+        # Project A:
+        #
+        # REF-3 SS-1
+        # node_id = AAA
+        #
+        # Project B:
+        #
+        # REF-3 SS-1
+        # node_id = BBB
+        #
+        # They can have different node_ids but represent the
+        # same physical asset.
+        # =====================================================
+
+        global_nodes = {}
+
+        # Maps:
+        #
+        # (project, node_id)
+        #
+        #       ->
+        #
+        # global_key
+        #
+        local_to_global = {}
+
+        # -----------------------------------------------------
+        # First pass: create the global node records.
+        # -----------------------------------------------------
+
+        for record in all_nodes:
+
+            global_key = self._get_global_node_key(
                 record
             )
 
-        # -----------------------------------------------------
-        # Build hierarchy from actual nodes.
-        # -----------------------------------------------------
+            local_key = (
+                str(
+                    record.get(
+                        "project",
+                        ""
+                    )
+                ),
+                record.get(
+                    "node_id"
+                )
+            )
 
-        node_records = [
-            record
-            for record in self._all_records
-            if record["record_type"] == "NODE"
-        ]
-
-        component_records = [
-            record
-            for record in self._all_records
-            if record["record_type"] == "COMPONENT"
-        ]
-
-        for project_name in sorted(
-            projects.keys(),
-            key=str.lower
-        ):
-
-            # Project is deliberately NOT shown as part of
-            # the physical asset hierarchy.
-            #
-            # We use it only to prevent mixing identical
-            # assets belonging to different projects.
-
-            project_node_records = [
-                record
-                for record in node_records
-                if record["project"] == project_name
-            ]
-
-            project_component_records = [
-                record
-                for record in component_records
-                if record["project"] == project_name
-            ]
+            local_to_global[
+                local_key
+            ] = global_key
 
             # -------------------------------------------------
-            # ROOTS
+            # Create the global node only once.
             # -------------------------------------------------
 
-            roots = []
+            if global_key not in global_nodes:
 
-            for record in project_node_records:
+                global_nodes[
+                    global_key
+                ] = {
+                    "record_type": "NODE",
 
-                node = record["node"]
+                    "node": record.get(
+                        "node"
+                    ),
 
-                parent_id = getattr(
-                    node,
-                    "parent_id",
-                    None
+                    "name": record.get(
+                        "name",
+                        ""
+                    ),
+
+                    "type": record.get(
+                        "type",
+                        ""
+                    ),
+
+                    "asset_id": record.get(
+                        "asset_id"
+                    ),
+
+                    "node_id": record.get(
+                        "node_id"
+                    ),
+
+                    "parent_id": None,
+
+                    "project": record.get(
+                        "project",
+                        ""
+                    ),
+
+                    "records": [
+                        record
+                    ],
+                }
+
+            else:
+
+                # -------------------------------------------------
+                # Same physical asset encountered in another
+                # project.
+                #
+                # Keep all source records attached to it.
+                # -------------------------------------------------
+
+                global_nodes[
+                    global_key
+                ][
+                    "records"
+                ].append(
+                    record
                 )
 
-                if parent_id is None:
+        # =====================================================
+        # STEP 3
+        #
+        # Determine the GLOBAL parent of every global node.
+        #
+        # We STILL use the original parent_id.
+        #
+        # But instead of attaching:
+        #
+        #     child -> raw parent_id
+        #
+        # we resolve:
+        #
+        #     project + parent_id
+        #
+        # into the parent's GLOBAL KEY.
+        # =====================================================
 
-                    roots.append(
-                        record
+        for global_key, global_record in global_nodes.items():
+
+            parent_global_keys = []
+
+            for source_record in global_record[
+                "records"
+            ]:
+
+                project = str(
+                    source_record.get(
+                        "project",
+                        ""
+                    )
+                )
+
+                parent_id = source_record.get(
+                    "parent_id"
+                )
+
+                # -------------------------------------------------
+                # Root node.
+                # -------------------------------------------------
+
+                if (
+                    parent_id is None
+                    or parent_id == ""
+                ):
+
+                    continue
+
+                parent_local_key = (
+                    project,
+                    parent_id
+                )
+
+                parent_global_key = local_to_global.get(
+                    parent_local_key
+                )
+
+                if parent_global_key is not None:
+
+                    parent_global_keys.append(
+                        parent_global_key
                     )
 
-            for record in sorted(
-                roots,
-                key=lambda r:
-                    str(
-                        r["name"]
-                    ).lower()
-            ):
+            # -----------------------------------------------------
+            # If all source records are roots, this is a root.
+            #
+            # Otherwise use the resolved global parent.
+            # -----------------------------------------------------
 
-                self._add_node(
-                    None,
-                    record,
-                    project_node_records,
-                    project_component_records,
-                    search,
-                    selected_type
+            if parent_global_keys:
+
+                # Remove duplicates while retaining order.
+                parent_global_keys = list(
+                    dict.fromkeys(
+                        parent_global_keys
+                    )
                 )
 
-        # -----------------------------------------------------
-        # Start collapsed.
-        # -----------------------------------------------------
+                # In a valid tree there should normally be only
+                # one physical parent.
+                global_record[
+                    "parent_global_key"
+                ] = parent_global_keys[0]
+
+            else:
+
+                global_record[
+                    "parent_global_key"
+                ] = None
+
+        # =====================================================
+        # STEP 4
+        #
+        # Build global parent -> children relationship.
+        # =====================================================
+
+        children_by_parent = {}
+
+        roots = []
+
+        for global_key, record in global_nodes.items():
+
+            parent_key = record.get(
+                "parent_global_key"
+            )
+
+            if parent_key is None:
+
+                roots.append(
+                    global_key
+                )
+
+            else:
+
+                children_by_parent.setdefault(
+                    parent_key,
+                    []
+                ).append(
+                    global_key
+                )
+
+        # =====================================================
+        # SORT
+        # =====================================================
+
+        def sort_key(global_key):
+
+            return str(
+                global_nodes[
+                    global_key
+                ].get(
+                    "name",
+                    ""
+                )
+            ).lower()
+
+        roots.sort(
+            key=sort_key
+        )
+
+        for parent_key in children_by_parent:
+
+            children_by_parent[
+                parent_key
+            ].sort(
+                key=sort_key
+            )
+
+        # =====================================================
+        # STEP 5
+        #
+        # Determine visibility.
+        #
+        # We don't throw hierarchy away just because a child
+        # doesn't match the filter.
+        # =====================================================
+
+        def branch_matches(
+            global_key,
+            visited=None
+        ):
+
+            if visited is None:
+                visited = set()
+
+            if global_key in visited:
+                return False
+
+            visited.add(
+                global_key
+            )
+
+            record = global_nodes[
+                global_key
+            ]
+
+            # -------------------------------------------------
+            # Node itself
+            # -------------------------------------------------
+
+            if self._record_matches(
+                record,
+                search,
+                selected_type
+            ):
+
+                return True
+
+            # -------------------------------------------------
+            # Children
+            # -------------------------------------------------
+
+            for child_key in children_by_parent.get(
+                global_key,
+                []
+            ):
+
+                if branch_matches(
+                    child_key,
+                    visited
+                ):
+
+                    return True
+
+            return False
+
+        # =====================================================
+        # STEP 6
+        #
+        # Create the visible tree.
+        # =====================================================
+
+        for global_key in roots:
+
+            if not branch_matches(
+                global_key
+            ):
+                continue
+
+            self._add_global_node(
+                parent_item=None,
+                global_key=global_key,
+                global_nodes=global_nodes,
+                children_by_parent=children_by_parent,
+                all_components=all_components,
+                search=search,
+                selected_type=selected_type,
+                path=set()
+            )
+
+        # =====================================================
+        # START COLLAPSED
+        # =====================================================
 
         self.collapse_all()
 
-    # =========================================================
-    # ADD NODE
-    # =========================================================
+    def _get_global_node_key(
+        self,
+        record
+    ):
+        """
+        Returns the identity used to MERGE project copies
+        of the same physical asset.
+
+        Priority:
+
+            1. asset_id
+            2. asset tag
+            3. name + type
+
+        IMPORTANT:
+
+            node_id is deliberately NOT used.
+
+        node_id identifies a project-local tree node.
+
+        asset_id identifies the physical/global asset.
+        """
+
+        asset_id = record.get(
+            "asset_id"
+        )
+
+        if asset_id:
+
+            return (
+                "ASSET",
+                str(
+                    asset_id
+                ).strip().upper()
+            )
+
+        # -----------------------------------------------------
+        # Try asset tag.
+        # -----------------------------------------------------
+
+        node = record.get(
+            "node"
+        )
+
+        asset_tag = ""
+
+        if node is not None:
+
+            asset_tag = getattr(
+                node,
+                "asset_tag",
+                ""
+            )
+
+        if asset_tag:
+
+            return (
+                "TAG",
+                str(
+                    asset_tag
+                ).strip().upper()
+            )
+
+        # -----------------------------------------------------
+        # Final fallback.
+        #
+        # Name + type.
+        #
+        # This is weaker than asset_id and should only be used
+        # when no physical identity exists.
+        # -----------------------------------------------------
+
+        name = str(
+            record.get(
+                "name",
+                ""
+            )
+        ).strip().upper()
+
+        node_type = str(
+            record.get(
+                "type",
+                ""
+            )
+        ).strip().upper()
+
+        return (
+            "NAME",
+            node_type,
+            name
+        )
 
     def _add_node(
         self,
         parent_item,
         record,
-        node_records,
-        component_records,
+        node_by_id,
+        project_components,
         search,
-        selected_type
+        selected_type,
+        path
     ):
 
-        node = record["node"]
+        node = record.get(
+            "node"
+        )
 
-        node_type = record["type"]
+        if node is None:
+            return
+
+        node_id = record.get(
+            "node_id"
+        )
+
+        if not node_id:
+            return
+
+        # =====================================================
+        # CYCLE PROTECTION
+        #
+        # A corrupt assets.json should not make the UI recurse
+        # into the abyss.
+        # =====================================================
+
+        if node_id in path:
+            return
+
+        path = set(
+            path
+        )
+
+        path.add(
+            node_id
+        )
+
+        # =====================================================
+        # FIND CHILDREN USING parent_id
+        #
+        # THIS IS THE ONLY RELATIONSHIP USED TO BUILD THE TREE.
+        #
+        # asset_id is NOT used here.
+        # =====================================================
+
+        children = []
+
+        for candidate in node_by_id.values():
+
+            if candidate is record:
+                continue
+
+            if candidate.get(
+                "parent_id"
+            ) == node_id:
+
+                children.append(
+                    candidate
+                )
+
+        children.sort(
+            key=lambda record:
+                str(
+                    record.get(
+                        "name",
+                        ""
+                    )
+                ).lower()
+        )
+
+        # =====================================================
+        # CHECK WHETHER THIS NODE MATCHES THE FILTER
+        # =====================================================
+
+        direct_match = self._record_matches(
+            record,
+            search,
+            selected_type
+        )
+
+        # =====================================================
+        # CHECK WHETHER ANY DESCENDANT MATCHES
+        #
+        # This allows a search for P-02 to still display:
+        #
+        # REF-3 SS-1
+        #     HV-201A
+        #         P-02
+        #
+        # instead of ripping the hierarchy apart like a
+        # badly maintained switchyard.
+        # =====================================================
+
+        descendant_match = False
+
+        for child in children:
+
+            if self._branch_contains_match(
+                child,
+                node_by_id,
+                search,
+                selected_type,
+                set()
+            ):
+
+                descendant_match = True
+
+                break
+
+        # =====================================================
+        # COMPONENT MATCH
+        # =====================================================
+
+        component_match = False
+
+        node_type = self._normalise_type(
+            getattr(
+                node,
+                "node_type",
+                ""
+            )
+        )
+
+        if node_type == "PANEL":
+
+            panel_node_id = node_id
+
+            for component_record in project_components:
+
+                if component_record.get(
+                    "panel_node_id"
+                ) != panel_node_id:
+
+                    continue
+
+                if self._record_matches(
+                    component_record,
+                    search,
+                    selected_type
+                ):
+
+                    component_match = True
+
+                    break
+
+        # =====================================================
+        # SHOULD THIS NODE BE DISPLAYED?
+        # =====================================================
+
+        if (
+            not direct_match
+            and
+            not descendant_match
+            and
+            not component_match
+        ):
+
+            return
+
+        # =====================================================
+        # CREATE TREE ITEM
+        # =====================================================
 
         item = QTreeWidgetItem()
 
         item.setText(
             0,
             str(
-                record["name"]
+                record.get(
+                    "name",
+                    ""
+                )
             )
         )
 
         item.setText(
             1,
-            node_type
+            str(
+                record.get(
+                    "type",
+                    ""
+                )
+            )
         )
 
         item.setText(
@@ -874,11 +1518,19 @@ class AssetExplorerView(QWidget):
             )
         )
 
+        # -----------------------------------------------------
+        # Store complete record.
+        # -----------------------------------------------------
+
         item.setData(
             0,
             Qt.ItemDataRole.UserRole,
             record
         )
+
+        # =====================================================
+        # ADD TO PARENT
+        # =====================================================
 
         if parent_item is None:
 
@@ -892,109 +1544,130 @@ class AssetExplorerView(QWidget):
                 item
             )
 
-        # -----------------------------------------------------
-        # CHILD NODES
-        # -----------------------------------------------------
+        # =====================================================
+        # ADD CHILDREN
+        # =====================================================
 
-        children = []
-
-        for child_record in node_records:
-
-            child_node = (
-                child_record["node"]
-            )
-
-            if getattr(
-                child_node,
-                "parent_id",
-                None
-            ) == getattr(
-                node,
-                "node_id",
-                None
-            ):
-
-                if self._record_matches(
-                    child_record,
-                    search,
-                    selected_type
-                ):
-
-                    children.append(
-                        child_record
-                    )
-
-        for child in sorted(
-            children,
-            key=lambda r:
-                str(
-                    r["name"]
-                ).lower()
-        ):
+        for child in children:
 
             self._add_node(
-                item,
-                child,
-                node_records,
-                component_records,
-                search,
-                selected_type
+                parent_item=item,
+                record=child,
+                node_by_id=node_by_id,
+                project_components=project_components,
+                search=search,
+                selected_type=selected_type,
+                path=path
             )
 
-        # -----------------------------------------------------
-        # COMPONENTS
-        # -----------------------------------------------------
+        # =====================================================
+        # ADD COMPONENTS UNDER PANEL
+        # =====================================================
 
         if node_type == "PANEL":
 
-            panel_id = getattr(
-                node,
-                "node_id",
-                None
-            )
-
-            panel_components = []
-
-            for component_record in (
-                component_records
-            ):
-
-                component_panel = (
-                    component_record["node"]
-                )
-
-                if getattr(
-                    component_panel,
-                    "node_id",
-                    None
-                ) != panel_id:
-                    continue
-
-                if self._record_matches(
-                    component_record,
-                    search,
-                    selected_type
-                ):
-
-                    panel_components.append(
-                        component_record
-                    )
-
             for component_record in sorted(
-                panel_components,
-                key=lambda r:
+                project_components,
+                key=lambda record:
                     str(
-                        r["name"]
+                        record.get(
+                            "name",
+                            ""
+                        )
                     ).lower()
             ):
+
+                if component_record.get(
+                    "panel_node_id"
+                ) != node_id:
+
+                    continue
+
+                # -------------------------------------------------
+                # When searching, only show matching components.
+                # -------------------------------------------------
+
+                if (
+                    search
+                    and
+                    not self._record_matches(
+                        component_record,
+                        search,
+                        selected_type
+                    )
+                ):
+
+                    continue
 
                 self._add_component(
                     item,
                     component_record
                 )
 
+    def _branch_contains_match(
+        self,
+        record,
+        node_by_id,
+        search,
+        selected_type,
+        visited
+    ):
+
+        node_id = record.get(
+            "node_id"
+        )
+
+        if not node_id:
+            return False
+
+        if node_id in visited:
+            return False
+
+        visited = set(
+            visited
+        )
+
+        visited.add(
+            node_id
+        )
+
+        # -----------------------------------------------------
+        # Does this node itself match?
+        # -----------------------------------------------------
+
+        if self._record_matches(
+            record,
+            search,
+            selected_type
+        ):
+
+            return True
+
+        # -----------------------------------------------------
+        # Check children.
+        # -----------------------------------------------------
+
+        for child in node_by_id.values():
+
+            if child.get(
+                "parent_id"
+            ) != node_id:
+
+                continue
+
+            if self._branch_contains_match(
+                child,
+                node_by_id,
+                search,
+                selected_type,
+                visited
+            ):
+
+                return True
+
+        return False
     # =========================================================
-    # ADD COMPONENT
+    # COMPONENT
     # =========================================================
 
     def _add_component(
@@ -1004,7 +1677,9 @@ class AssetExplorerView(QWidget):
     ):
 
         component = (
-            record["component"]
+            record[
+                "component"
+            ]
         )
 
         item = QTreeWidgetItem()
@@ -1023,7 +1698,10 @@ class AssetExplorerView(QWidget):
         item.setText(
             1,
             str(
-                record["type"]
+                record.get(
+                    "type",
+                    ""
+                )
             )
         )
 
@@ -1043,7 +1721,108 @@ class AssetExplorerView(QWidget):
         )
 
     # =========================================================
-    # RECORD MATCHING
+    # MASTER PARENT LOOKUP
+    # =========================================================
+
+    def _get_master_parent_asset_id(
+        self,
+        record
+    ):
+
+        """
+        Get:
+
+            asset.metadata["parent_asset_id"]
+
+        from the global asset library.
+
+        This allows:
+
+            HV-201C
+                asset_id = ASSET-C...
+
+                metadata:
+                    parent_asset_id = ASSET-A17...
+
+        to be placed below:
+
+            REF-3 SS-1
+                asset_id = ASSET-A17...
+        """
+
+        asset_id = str(
+            record.get(
+                "asset_id",
+                ""
+            )
+            or ""
+        ).strip()
+
+        if not asset_id:
+
+            return ""
+
+        manager = (
+            record.get(
+                "asset_manager"
+            )
+        )
+
+        if manager is None:
+
+            return ""
+
+        try:
+
+            library = getattr(
+                manager,
+                "asset_library",
+                None
+            )
+
+            if library is None:
+
+                return ""
+
+            try:
+
+                library.load()
+
+            except Exception:
+
+                pass
+
+            asset = (
+                library.get_asset(
+                    asset_id
+                )
+            )
+
+            if not asset:
+
+                return ""
+
+            metadata = (
+                asset.get(
+                    "metadata"
+                )
+                or {}
+            )
+
+            return str(
+                metadata.get(
+                    "parent_asset_id",
+                    ""
+                )
+                or ""
+            ).strip()
+
+        except Exception:
+
+            return ""
+
+    # =========================================================
+    # FILTER MATCH
     # =========================================================
 
     def _record_matches(
@@ -1057,31 +1836,44 @@ class AssetExplorerView(QWidget):
             "record_type"
         )
 
-        # -----------------------------------------------------
-        # Type filter
-        # -----------------------------------------------------
+        asset_type = self._normalise_type(
+            record.get(
+                "type",
+                ""
+            )
+        )
+
+        # =====================================================
+        # TYPE FILTER
+        # =====================================================
 
         if selected_type == "Substations":
 
-            if record.get(
-                "type"
-            ) != "SUBSTATION":
+            if (
+                record_type != "NODE"
+                or
+                asset_type != "SUBSTATION"
+            ):
 
                 return False
 
         elif selected_type == "Switchboards":
 
-            if record.get(
-                "type"
-            ) != "SWITCHBOARD":
+            if (
+                record_type != "NODE"
+                or
+                asset_type != "SWITCHBOARD"
+            ):
 
                 return False
 
         elif selected_type == "Panels":
 
-            if record.get(
-                "type"
-            ) != "PANEL":
+            if (
+                record_type != "NODE"
+                or
+                asset_type != "PANEL"
+            ):
 
                 return False
 
@@ -1091,13 +1883,17 @@ class AssetExplorerView(QWidget):
 
                 return False
 
-        # -----------------------------------------------------
-        # Search
-        # -----------------------------------------------------
+        # =====================================================
+        # NO SEARCH TEXT
+        # =====================================================
 
         if not search:
 
             return True
+
+        # =====================================================
+        # BUILD SEARCHABLE TEXT
+        # =====================================================
 
         values = []
 
@@ -1109,18 +1905,29 @@ class AssetExplorerView(QWidget):
             "component"
         )
 
+        # -----------------------------------------------------
+        # NODE
+        # -----------------------------------------------------
+
         if node is not None:
 
-            for field in (
+            fields = (
+
                 "name",
+                "node_id",
                 "asset_id",
                 "asset_tag",
+
                 "manufacturer",
                 "model",
                 "serial_number",
+
                 "equipment_name",
                 "equipment_type",
-            ):
+
+            )
+
+            for field in fields:
 
                 values.append(
                     str(
@@ -1133,27 +1940,45 @@ class AssetExplorerView(QWidget):
                     )
                 )
 
+        # -----------------------------------------------------
+        # COMPONENT
+        # -----------------------------------------------------
+
         if component is not None:
 
-            for field in (
+            fields = (
+
                 "name",
                 "component_id",
                 "component_type",
+
                 "manufacturer",
                 "model",
                 "serial_number",
+
                 "description",
+
+                "ct_primary",
+                "ct_secondary",
                 "ct_ratio",
                 "ct_class",
                 "burden",
                 "core",
+
                 "vt_ratio",
                 "firmware",
+
                 "coil_voltage",
                 "contact_configuration",
+
                 "meter_type",
                 "accuracy_class",
-            ):
+
+                "protection_functions",
+
+            )
+
+            for field in fields:
 
                 values.append(
                     str(
@@ -1166,6 +1991,10 @@ class AssetExplorerView(QWidget):
                     )
                 )
 
+        # -----------------------------------------------------
+        # PROJECT
+        # -----------------------------------------------------
+
         values.append(
             str(
                 record.get(
@@ -1175,18 +2004,23 @@ class AssetExplorerView(QWidget):
             )
         )
 
-        return search in (
-            " ".join(values)
-            .lower()
-        )
+        searchable = " ".join(
+            values
+        ).lower()
 
+        return (
+            search
+            in searchable
+        )
     # =========================================================
     # SELECTION
     # =========================================================
 
     def _selection_changed(self):
 
-        item = self.tree.currentItem()
+        item = (
+            self.tree.currentItem()
+        )
 
         if item is None:
 
@@ -1223,10 +2057,17 @@ class AssetExplorerView(QWidget):
 
         self._clear_detail_widgets()
 
-        if record["record_type"] == "COMPONENT":
+        if (
+            record.get(
+                "record_type"
+            )
+            == "COMPONENT"
+        ):
 
             component = (
-                record["component"]
+                record[
+                    "component"
+                ]
             )
 
             self.details_title.setText(
@@ -1241,8 +2082,9 @@ class AssetExplorerView(QWidget):
 
             self.details_subtitle.setText(
                 (
-                    f"{record['type']}  |  "
-                    f"{record['project']}"
+                    f"{record.get('type', '')} | "
+                    f"Projects: "
+                    f"{self._occurrence_projects(record)}"
                 )
             )
 
@@ -1256,7 +2098,11 @@ class AssetExplorerView(QWidget):
 
             return
 
-        node = record["node"]
+        node = (
+            record[
+                "node"
+            ]
+        )
 
         self.details_title.setText(
             str(
@@ -1270,8 +2116,11 @@ class AssetExplorerView(QWidget):
 
         self.details_subtitle.setText(
             (
-                f"{record['type']}  |  "
-                f"{record['project']}"
+                f"{record.get('type', '')} | "
+                f"Asset ID: "
+                f"{getattr(node, 'asset_id', '') or 'Not assigned'} | "
+                f"Projects: "
+                f"{self._occurrence_projects(record)}"
             )
         )
 
@@ -1280,13 +2129,13 @@ class AssetExplorerView(QWidget):
         )
 
         if (
-            str(
+            self._normalise_type(
                 getattr(
                     node,
                     "node_type",
                     ""
                 )
-            ).upper()
+            )
             == "PANEL"
         ):
 
@@ -1307,17 +2156,17 @@ class AssetExplorerView(QWidget):
         record
     ):
 
-        node = record["node"]
+        node = (
+            record[
+                "node"
+            ]
+        )
+
+        self._add_section(
+            "Physical Asset"
+        )
 
         fields = [
-
-            (
-                "Project",
-                record.get(
-                    "project",
-                    ""
-                )
-            ),
 
             (
                 "Asset ID",
@@ -1332,6 +2181,24 @@ class AssetExplorerView(QWidget):
                 "Asset Tag",
                 self._get_asset_tag(
                     record
+                )
+            ),
+
+            (
+                "Name",
+                getattr(
+                    node,
+                    "name",
+                    ""
+                )
+            ),
+
+            (
+                "Asset Type",
+                getattr(
+                    node,
+                    "node_type",
+                    ""
                 )
             ),
 
@@ -1382,13 +2249,16 @@ class AssetExplorerView(QWidget):
 
         ]
 
-        if str(
-            getattr(
-                node,
-                "node_type",
-                ""
+        if (
+            self._normalise_type(
+                getattr(
+                    node,
+                    "node_type",
+                    ""
+                )
             )
-        ).upper() == "PANEL":
+            == "PANEL"
+        ):
 
             fields.extend(
 
@@ -1431,17 +2301,34 @@ class AssetExplorerView(QWidget):
                     ),
 
                 ]
-            )
 
-        self._add_section(
-            "Asset Configuration"
-        )
+            )
 
         for label, value in fields:
 
             self._add_field(
                 label,
                 value
+            )
+
+        self._add_section(
+            "Project Occurrences"
+        )
+
+        for occurrence in (
+            record.get(
+                "occurrences",
+                []
+            )
+        ):
+
+            self._add_field(
+                "Project",
+                (
+                    f"{occurrence.get('project', '')} | "
+                    f"Node: "
+                    f"{occurrence.get('node_id', '-')}"
+                )
             )
 
     # =========================================================
@@ -1454,18 +2341,16 @@ class AssetExplorerView(QWidget):
     ):
 
         component = (
-            record["component"]
+            record[
+                "component"
+            ]
+        )
+
+        self._add_section(
+            "Component Configuration"
         )
 
         fields = [
-
-            (
-                "Project",
-                record.get(
-                    "project",
-                    ""
-                )
-            ),
 
             (
                 "Component ID",
@@ -1653,10 +2538,6 @@ class AssetExplorerView(QWidget):
 
         ]
 
-        self._add_section(
-            "Component Configuration"
-        )
-
         for label, value in fields:
 
             self._add_field(
@@ -1673,44 +2554,113 @@ class AssetExplorerView(QWidget):
         panel_record
     ):
 
-        panel = panel_record["node"]
+        panel = (
+            panel_record[
+                "node"
+            ]
+        )
 
-        panel_id = getattr(
+        panel_asset_id = str(
+            getattr(
+                panel,
+                "asset_id",
+                ""
+            )
+            or ""
+        ).strip()
+
+        panel_node_ids = set(
+            panel_record.get(
+                "node_ids",
+                []
+            )
+        )
+
+        current_panel_id = getattr(
             panel,
             "node_id",
             None
         )
 
+        if current_panel_id:
+
+            panel_node_ids.add(
+                current_panel_id
+            )
+
         components = []
 
         for record in self._all_records:
 
-            if record["record_type"] != "COMPONENT":
+            if (
+                record.get(
+                    "record_type"
+                )
+                != "COMPONENT"
+            ):
+
                 continue
 
             component_panel = (
-                record["node"]
+                record.get(
+                    "node"
+                )
             )
 
-            if getattr(
+            if component_panel is None:
+
+                continue
+
+            component_panel_asset_id = str(
+                getattr(
+                    component_panel,
+                    "asset_id",
+                    ""
+                )
+                or ""
+            ).strip()
+
+            component_panel_node_id = getattr(
                 component_panel,
                 "node_id",
                 None
-            ) == panel_id:
+            )
+
+            if (
+
+                (
+                    panel_asset_id
+                    and
+                    component_panel_asset_id
+                    and
+                    panel_asset_id
+                    ==
+                    component_panel_asset_id
+                )
+
+                or
+
+                (
+                    component_panel_node_id
+                    in
+                    panel_node_ids
+                )
+
+            ):
 
                 components.append(
                     record
                 )
 
         self._add_section(
-            "Components"
+            "Configured Components"
         )
 
         if not components:
 
             self._add_field(
                 "Components",
-                "No components configured"
+                "No configured components found."
             )
 
             return
@@ -1732,7 +2682,9 @@ class AssetExplorerView(QWidget):
         )
 
         table.setRowCount(
-            len(components)
+            len(
+                components
+            )
         )
 
         for row, record in enumerate(
@@ -1740,7 +2692,9 @@ class AssetExplorerView(QWidget):
         ):
 
             component = (
-                record["component"]
+                record[
+                    "component"
+                ]
             )
 
             values = [
@@ -1786,7 +2740,8 @@ class AssetExplorerView(QWidget):
                     column,
                     QTableWidgetItem(
                         str(
-                            value or ""
+                            value
+                            or ""
                         )
                     )
                 )
@@ -1824,6 +2779,12 @@ class AssetExplorerView(QWidget):
             "Test History"
         )
 
+        rows = (
+            self._get_test_history(
+                record
+            )
+        )
+
         table = QTableWidget()
 
         table.setColumnCount(
@@ -1843,14 +2804,10 @@ class AssetExplorerView(QWidget):
             ]
         )
 
-        rows = (
-            self._get_test_history(
-                record
-            )
-        )
-
         table.setRowCount(
-            len(rows)
+            len(
+                rows
+            )
         )
 
         for row_index, row_data in enumerate(
@@ -1866,7 +2823,8 @@ class AssetExplorerView(QWidget):
                     column_index,
                     QTableWidgetItem(
                         str(
-                            value or ""
+                            value
+                            or ""
                         )
                     )
                 )
@@ -1898,25 +2856,28 @@ class AssetExplorerView(QWidget):
                 "No test history found"
             )
 
-    # =========================================================
-    # TEST HISTORY DATA
-    # =========================================================
-
     def _get_test_history(
         self,
         record
     ):
 
-        node = record.get(
-            "node"
+        results = []
+
+        node = (
+            record.get(
+                "node"
+            )
         )
 
-        component = record.get(
-            "component"
+        component = (
+            record.get(
+                "component"
+            )
         )
 
         if node is None:
-            return []
+
+            return results
 
         panel_id = getattr(
             node,
@@ -1934,162 +2895,266 @@ class AssetExplorerView(QWidget):
                 None
             )
 
-        results = []
-
-        project_folder = Path(
-            record["folder"]
-        )
-
-        database_file = (
-            project_folder /
-            "testing.db"
-        )
-
-        if not database_file.exists():
-
-            return []
-
-        component_names = (
-            self._load_component_names(
-                project_folder
+        occurrences = (
+            record.get(
+                "occurrences",
+                []
             )
         )
 
-        try:
+        if not occurrences:
 
-            connection = sqlite3.connect(
-                database_file
+            occurrences = [
+
+                {
+
+                    "project":
+                        record.get(
+                            "project",
+                            ""
+                        ),
+
+                    "folder":
+                        record.get(
+                            "folder"
+                        ),
+
+                    "node":
+                        node,
+
+                    "node_id":
+                        panel_id,
+
+                }
+
+            ]
+
+        seen = set()
+
+        for occurrence in occurrences:
+
+            folder = occurrence.get(
+                "folder"
             )
 
-            cursor = connection.cursor()
+            if not folder:
 
-            # -------------------------------------------------
-            # Protection tests
-            # -------------------------------------------------
+                continue
 
-            if component_id is None:
+            folder = Path(
+                folder
+            )
 
-                try:
+            database_candidates = [
 
-                    cursor.execute(
-                        """
-                        SELECT
-                            test_id,
-                            test_date,
-                            protection_code,
-                            relay_id,
-                            result,
-                            remarks
-                        FROM protection_tests
-                        WHERE panel_id = ?
-                        ORDER BY test_date DESC
-                        """,
-                        (
-                            panel_id,
-                        )
+                folder / "testing.db",
+
+                folder / "tests.db",
+
+            ]
+
+            database_file = next(
+                (
+                    path
+
+                    for path in database_candidates
+
+                    if path.exists()
+                ),
+                None
+            )
+
+            if database_file is None:
+
+                continue
+
+            project = (
+                occurrence.get(
+                    "project",
+                    ""
+                )
+            )
+
+            try:
+
+                connection = sqlite3.connect(
+                    str(
+                        database_file
                     )
+                )
 
-                    for row in cursor.fetchall():
+                cursor = connection.cursor()
 
-                        results.append(
-                            [
+                component_names = (
+                    self._load_component_names(
+                        folder
+                    )
+                )
+
+                if component_id is not None:
+
+                    try:
+
+                        cursor.execute(
+                            """
+                            SELECT
+                                test_id,
+                                test_date,
+                                component_id,
+                                test_type,
+                                result,
+                                remarks
+                            FROM component_tests
+                            WHERE component_id = ?
+                            ORDER BY test_date DESC
+                            """,
+                            (
+                                component_id,
+                            )
+                        )
+
+                        for row in cursor.fetchall():
+
+                            result_row = [
+
                                 row[1],
-                                record["project"],
+
+                                project,
+
                                 getattr(
                                     node,
                                     "name",
                                     ""
                                 ),
-                                "PROTECTION TEST",
-                                (
-                                    f"{row[2] or ''} | "
-                                    f"{component_names.get(row[3], row[3] or '')}"
+
+                                "COMPONENT TEST",
+
+                                component_names.get(
+                                    row[2],
+                                    row[2]
+                                    or ""
                                 ),
+
                                 row[4],
+
                                 row[5],
+
                                 row[0],
+
                             ]
-                        )
 
-                except sqlite3.Error:
-                    pass
+                            key = tuple(
+                                str(
+                                    value
+                                    or ""
+                                )
+                                for value
+                                in result_row
+                            )
 
-            # -------------------------------------------------
-            # Component tests
-            # -------------------------------------------------
+                            if key not in seen:
 
-            try:
+                                seen.add(
+                                    key
+                                )
 
-                if component_id is not None:
+                                results.append(
+                                    result_row
+                                )
 
-                    cursor.execute(
-                        """
-                        SELECT
-                            test_id,
-                            test_date,
-                            component_id,
-                            test_type,
-                            result,
-                            remarks
-                        FROM component_tests
-                        WHERE component_id = ?
-                        ORDER BY test_date DESC
-                        """,
-                        (
-                            component_id,
-                        )
-                    )
+                    except sqlite3.Error:
+
+                        pass
 
                 else:
 
-                    cursor.execute(
-                        """
-                        SELECT
-                            test_id,
-                            test_date,
-                            component_id,
-                            test_type,
-                            result,
-                            remarks
-                        FROM component_tests
-                        WHERE panel_id = ?
-                        ORDER BY test_date DESC
-                        """,
-                        (
-                            panel_id,
+                    try:
+
+                        cursor.execute(
+                            """
+                            SELECT
+                                test_id,
+                                test_date,
+                                component_id,
+                                test_type,
+                                result,
+                                remarks
+                            FROM component_tests
+                            WHERE panel_id = ?
+                            ORDER BY test_date DESC
+                            """,
+                            (
+                                panel_id,
+                            )
                         )
-                    )
 
-                for row in cursor.fetchall():
+                        for row in cursor.fetchall():
 
-                    results.append(
-                        [
-                            row[1],
-                            record["project"],
-                            getattr(
-                                node,
-                                "name",
-                                ""
-                            ),
-                            "COMPONENT TEST",
-                            component_names.get(
-                                row[2],
-                                row[2] or ""
-                            ),
-                            row[4],
-                            row[5],
-                            row[0],
-                        ]
-                    )
+                            result_row = [
+
+                                row[1],
+
+                                project,
+
+                                getattr(
+                                    node,
+                                    "name",
+                                    ""
+                                ),
+
+                                "COMPONENT TEST",
+
+                                component_names.get(
+                                    row[2],
+                                    row[2]
+                                    or ""
+                                ),
+
+                                row[4],
+
+                                row[5],
+
+                                row[0],
+
+                            ]
+
+                            key = tuple(
+                                str(
+                                    value
+                                    or ""
+                                )
+                                for value
+                                in result_row
+                            )
+
+                            if key not in seen:
+
+                                seen.add(
+                                    key
+                                )
+
+                                results.append(
+                                    result_row
+                                )
+
+                    except sqlite3.Error:
+
+                        pass
+
+                connection.close()
 
             except sqlite3.Error:
-                pass
 
-            connection.close()
+                continue
 
-        except sqlite3.Error:
-
-            return []
+        results.sort(
+            key=lambda row:
+                str(
+                    row[0]
+                    or ""
+                ),
+            reverse=True
+        )
 
         return results
 
@@ -2105,7 +3170,10 @@ class AssetExplorerView(QWidget):
         names = {}
 
         components_file = (
-            Path(project_folder) /
+            Path(
+                project_folder
+            )
+            /
             "components.json"
         )
 
@@ -2134,6 +3202,13 @@ class AssetExplorerView(QWidget):
 
                 for item in data:
 
+                    if not isinstance(
+                        item,
+                        dict
+                    ):
+
+                        continue
+
                     component_id = (
                         item.get(
                             "component_id"
@@ -2150,12 +3225,13 @@ class AssetExplorerView(QWidget):
                         )
 
         except Exception:
+
             pass
 
         return names
 
     # =========================================================
-    # DETAILS HELPERS
+    # DETAILS
     # =========================================================
 
     def _clear_details(self):
@@ -2213,7 +3289,9 @@ class AssetExplorerView(QWidget):
         row = QHBoxLayout()
 
         name = QLabel(
-            str(label)
+            str(
+                label
+            )
         )
 
         name.setMinimumWidth(
@@ -2264,23 +3342,116 @@ class AssetExplorerView(QWidget):
         self.tree.collapseAll()
 
     # =========================================================
-    # ASSET TAG
+    # PHYSICAL KEY
     # =========================================================
 
     @staticmethod
-    def _get_asset_tag(
+    def _physical_key(
         record
     ):
 
-        node = record.get(
-            "node"
+        asset_id = str(
+            record.get(
+                "asset_id",
+                ""
+            )
+            or ""
+        ).strip()
+
+        if asset_id:
+
+            return (
+                f"ASSET::{asset_id}"
+            )
+
+        node = (
+            record.get(
+                "node"
+            )
+        )
+
+        node_id = getattr(
+            node,
+            "node_id",
+            None
+        )
+
+        return (
+            f"NODE::{node_id}"
+        )
+
+    # =========================================================
+    # PROJECTS
+    # =========================================================
+
+    @staticmethod
+    def _occurrence_projects(
+        record
+    ):
+
+        projects = []
+
+        for occurrence in (
+            record.get(
+                "occurrences",
+                []
+            )
+        ):
+
+            project = str(
+                occurrence.get(
+                    "project",
+                    ""
+                )
+            ).strip()
+
+            if (
+                project
+                and
+                project not in projects
+            ):
+
+                projects.append(
+                    project
+                )
+
+        if not projects:
+
+            project = str(
+                record.get(
+                    "project",
+                    ""
+                )
+            ).strip()
+
+            if project:
+
+                projects.append(
+                    project
+                )
+
+        return ", ".join(
+            projects
+        )
+
+    # =========================================================
+    # ASSET TAG
+    # =========================================================
+
+    def _get_asset_tag(
+        self,
+        record
+    ):
+
+        node = (
+            record.get(
+                "node"
+            )
         )
 
         if node is None:
 
             return ""
-
-        # Direct node field first.
 
         value = getattr(
             node,
@@ -2294,10 +3465,10 @@ class AssetExplorerView(QWidget):
                 value
             )
 
-        # Asset library.
-
-        manager = record.get(
-            "asset_manager"
+        manager = (
+            record.get(
+                "asset_manager"
+            )
         )
 
         asset_id = getattr(
@@ -2308,7 +3479,8 @@ class AssetExplorerView(QWidget):
 
         if (
             manager is not None
-            and asset_id
+            and
+            asset_id
         ):
 
             try:
@@ -2322,8 +3494,11 @@ class AssetExplorerView(QWidget):
                 if library is not None:
 
                     try:
+
                         library.load()
+
                     except Exception:
+
                         pass
 
                     asset = (
@@ -2362,11 +3537,16 @@ class AssetExplorerView(QWidget):
 
         if isinstance(
             value,
-            (list, tuple)
+            (
+                list,
+                tuple
+            )
         ):
 
             return ", ".join(
-                str(item)
+                str(
+                    item
+                )
                 for item in value
             )
 
@@ -2377,7 +3557,8 @@ class AssetExplorerView(QWidget):
 
             return ", ".join(
                 f"{key}: {value}"
-                for key, value in value.items()
+                for key, value
+                in value.items()
             )
 
         return str(
@@ -2385,7 +3566,7 @@ class AssetExplorerView(QWidget):
         )
 
     # =========================================================
-    # NORMALISE TYPE
+    # NORMALISE
     # =========================================================
 
     @staticmethod
@@ -2394,12 +3575,20 @@ class AssetExplorerView(QWidget):
     ):
 
         value = str(
-            value or ""
+            value
+            or ""
         ).strip().upper()
 
-        return value.replace(
-            " ",
-            "_"
+        return (
+            value
+            .replace(
+                "-",
+                "_"
+            )
+            .replace(
+                " ",
+                "_"
+            )
         )
 
     @staticmethod
@@ -2408,51 +3597,75 @@ class AssetExplorerView(QWidget):
     ):
 
         value = str(
-            value or ""
+            value
+            or ""
         ).strip().upper()
 
-        if value in (
-            "CURRENT TRANSFORMER",
-            "CURRENT_TRANSFORMER",
-        ):
+        aliases = {
 
-            return "CT"
+            "CURRENT TRANSFORMER":
+                "CT",
 
-        if value in (
-            "NUMERICAL RELAY",
-            "NUMERICAL_RELAY",
-            "RELAY",
-        ):
+            "CURRENT_TRANSFORMER":
+                "CT",
 
-            return "NUMERICAL RELAY"
+            "CT":
+                "CT",
 
-        if value in (
-            "AUXILIARY RELAY",
-            "AUXILIARY_RELAY",
-            "AUX RELAY",
-        ):
+            "NUMERICAL RELAY":
+                "NUMERICAL RELAY",
 
-            return "AUXILIARY RELAY"
+            "NUMERICAL_RELAY":
+                "NUMERICAL RELAY",
 
-        if value in (
-            "MULTIFUNCTION METER",
-            "MULTIFUNCTION_METER",
-            "AMMETER",
-            "VOLTMETER",
-        ):
+            "RELAY":
+                "NUMERICAL RELAY",
 
-            return "METER"
+            "AUXILIARY RELAY":
+                "AUXILIARY RELAY",
 
-        return value
+            "AUXILIARY_RELAY":
+                "AUXILIARY RELAY",
+
+            "AUX RELAY":
+                "AUXILIARY RELAY",
+
+            "METER":
+                "METER",
+
+            "AMMETER":
+                "METER",
+
+            "VOLTMETER":
+                "METER",
+
+            "MULTIFUNCTION METER":
+                "METER",
+
+            "MULTIFUNCTION_METER":
+                "METER",
+
+        }
+
+        return aliases.get(
+            value,
+            value.replace(
+                "_",
+                " "
+            )
+        )
 
     # =========================================================
-    # EXPORT ASSET REGISTER
+    # EXPORT
     # =========================================================
 
-    def export_asset_register(self):
+    def export_asset_register(
+        self
+    ):
 
         default_path = (
-            PROJECTS_DIR /
+            PROJECTS_DIR
+            /
             "Asset_Register.xlsx"
         )
 
@@ -2486,21 +3699,29 @@ class AssetExplorerView(QWidget):
                 )
             )
 
+        except PermissionError:
+
+            QMessageBox.critical(
+                self,
+                "Export Failed",
+                (
+                    "The Excel file is currently open or "
+                    "you do not have permission to overwrite it."
+                )
+            )
+
         except Exception as error:
 
             QMessageBox.critical(
                 self,
-                "Asset Register Export Failed",
-                (
-                    "Unable to export the Asset Register.\n\n"
-                    f"{error}"
+                "Export Failed",
+                str(
+                    error
                 )
             )
 
-            raise
-
     # =========================================================
-    # EXCEL EXPORT
+    # EXCEL
     # =========================================================
 
     def _export_excel(
@@ -2514,19 +3735,11 @@ class AssetExplorerView(QWidget):
 
         workbook = Workbook()
 
-        default_sheet = (
+        workbook.remove(
             workbook.active
         )
 
-        workbook.remove(
-            default_sheet
-        )
-
-        # =====================================================
-        # MASTER REGISTER
-        # =====================================================
-
-        master_columns = [
+        columns = [
 
             "Project",
             "Substation",
@@ -2535,6 +3748,7 @@ class AssetExplorerView(QWidget):
             "Panel Asset Tag",
             "Feed Equipment",
             "Equipment Type",
+
             "Component",
             "Component Type",
             "Component ID",
@@ -2562,21 +3776,32 @@ class AssetExplorerView(QWidget):
             "Accuracy Class",
 
             "Protection Functions",
+
         ]
 
         rows = []
 
         for record in self._all_records:
 
-            if record["record_type"] != "COMPONENT":
+            if (
+                record.get(
+                    "record_type"
+                )
+                != "COMPONENT"
+            ):
+
                 continue
 
             component = (
-                record["component"]
+                record[
+                    "component"
+                ]
             )
 
             panel = (
-                record["node"]
+                record[
+                    "node"
+                ]
             )
 
             hierarchy = (
@@ -2589,7 +3814,10 @@ class AssetExplorerView(QWidget):
                 {
 
                     "Project":
-                        record["project"],
+                        record.get(
+                            "project",
+                            ""
+                        ),
 
                     "Substation":
                         hierarchy.get(
@@ -2786,14 +4014,14 @@ class AssetExplorerView(QWidget):
             workbook.create_sheet(
                 "Asset Register"
             ),
-            master_columns,
+            columns,
             rows,
             "AssetRegisterTable"
         )
 
-        # =====================================================
+        # -----------------------------------------------------
         # PANELS
-        # =====================================================
+        # -----------------------------------------------------
 
         panel_columns = [
 
@@ -2809,16 +4037,25 @@ class AssetExplorerView(QWidget):
             "Numerical Relay Count",
             "Auxiliary Relay Count",
             "Meter Count",
+
         ]
 
         panel_rows = []
 
         for record in self._all_records:
 
-            if record["record_type"] != "NODE":
+            if (
+                record.get(
+                    "record_type"
+                )
+                != "NODE"
+            ):
+
                 continue
 
-            node = record["node"]
+            node = record[
+                "node"
+            ]
 
             if (
                 self._normalise_type(
@@ -2843,7 +4080,10 @@ class AssetExplorerView(QWidget):
                 {
 
                     "Project":
-                        record["project"],
+                        record.get(
+                            "project",
+                            ""
+                        ),
 
                     "Substation":
                         hierarchy.get(
@@ -2929,71 +4169,9 @@ class AssetExplorerView(QWidget):
             "PanelsTable"
         )
 
-        # =====================================================
-        # COMPONENT SHEETS
-        # =====================================================
-
-        component_columns = master_columns
-
-        component_sheet_map = {
-
-            "CT":
-                (
-                    "CTs",
-                    "CTTable"
-                ),
-
-            "NUMERICAL RELAY":
-                (
-                    "Numerical Relays",
-                    "NumericalRelayTable"
-                ),
-
-            "AUXILIARY RELAY":
-                (
-                    "Aux Relays",
-                    "AuxRelayTable"
-                ),
-
-            "METER":
-                (
-                    "Meters",
-                    "MeterTable"
-                ),
-        }
-
-        for component_type, (
-            sheet_name,
-            table_name
-        ) in component_sheet_map.items():
-
-            component_rows = [
-
-                row
-
-                for row in rows
-
-                if self._normalise_component_type(
-                    row.get(
-                        "Component Type",
-                        ""
-                    )
-                )
-                == component_type
-            ]
-
-            self._write_sheet(
-                workbook.create_sheet(
-                    sheet_name
-                ),
-                component_columns,
-                component_rows,
-                table_name
-            )
-
-        # =====================================================
+        # -----------------------------------------------------
         # INFO
-        # =====================================================
+        # -----------------------------------------------------
 
         info = workbook.create_sheet(
             "Register Info"
@@ -3012,8 +4190,6 @@ class AssetExplorerView(QWidget):
             "Generated"
         )
 
-        from datetime import datetime
-
         info["B3"] = (
             datetime.now().strftime(
                 "%Y-%m-%d %H:%M:%S"
@@ -3030,12 +4206,37 @@ class AssetExplorerView(QWidget):
         )
 
         info["A5"] = (
-            "Components"
+            "Physical Assets"
         )
 
         info["B5"] = len(
-            self.global_asset_service
-            .get_all_components()
+            [
+                record
+
+                for record in self._all_records
+
+                if record.get(
+                    "record_type"
+                )
+                == "NODE"
+            ]
+        )
+
+        info["A6"] = (
+            "Components"
+        )
+
+        info["B6"] = len(
+            [
+                record
+
+                for record in self._all_records
+
+                if record.get(
+                    "record_type"
+                )
+                == "COMPONENT"
+            ]
         )
 
         info.column_dimensions[
@@ -3051,7 +4252,7 @@ class AssetExplorerView(QWidget):
         )
 
     # =========================================================
-    # EXCEL SHEET WRITER
+    # EXCEL WRITER
     # =========================================================
 
     @staticmethod
@@ -3068,11 +4269,10 @@ class AssetExplorerView(QWidget):
         ):
 
             cell = worksheet.cell(
-                1,
-                column_index
+                row=1,
+                column=column_index,
+                value=column
             )
-
-            cell.value = column
 
             cell.font = Font(
                 bold=True
@@ -3083,7 +4283,7 @@ class AssetExplorerView(QWidget):
                 vertical="center"
             )
 
-        for row_index, row_data in enumerate(
+        for row_index, row in enumerate(
             rows,
             start=2
         ):
@@ -3093,21 +4293,18 @@ class AssetExplorerView(QWidget):
                 start=1
             ):
 
-                value = row_data.get(
-                    column,
-                    ""
+                worksheet.cell(
+                    row=row_index,
+                    column=column_index,
+                    value=row.get(
+                        column,
+                        ""
+                    )
                 )
 
-                if value is None:
-
-                    value = ""
-
-                worksheet.cell(
-                    row_index,
-                    column_index
-                ).value = value
-
-        worksheet.freeze_panes = "A2"
+        worksheet.freeze_panes = (
+            "A2"
+        )
 
         if rows:
 
@@ -3117,15 +4314,13 @@ class AssetExplorerView(QWidget):
                 )
             )
 
-            reference = (
-                f"A1:"
-                f"{last_column}"
-                f"{len(rows) + 1}"
-            )
-
             table = Table(
                 displayName=table_name,
-                ref=reference
+                ref=(
+                    f"A1:"
+                    f"{last_column}"
+                    f"{len(rows) + 1}"
+                )
             )
 
             table.tableStyleInfo = (
@@ -3147,15 +4342,17 @@ class AssetExplorerView(QWidget):
             len(columns) + 1
         ):
 
-            letter = get_column_letter(
-                column_index
+            letter = (
+                get_column_letter(
+                    column_index
+                )
             )
 
             maximum = len(
                 str(
                     worksheet.cell(
-                        1,
-                        column_index
+                        row=1,
+                        column=column_index
                     ).value
                     or ""
                 )
@@ -3170,8 +4367,8 @@ class AssetExplorerView(QWidget):
             ):
 
                 value = worksheet.cell(
-                    row_index,
-                    column_index
+                    row=row_index,
+                    column=column_index
                 ).value
 
                 if value is not None:
@@ -3179,7 +4376,9 @@ class AssetExplorerView(QWidget):
                     maximum = max(
                         maximum,
                         len(
-                            str(value)
+                            str(
+                                value
+                            )
                         )
                     )
 
@@ -3194,56 +4393,50 @@ class AssetExplorerView(QWidget):
             )
 
     # =========================================================
-    # HIERARCHY
+    # HIERARCHY FOR EXPORT
     # =========================================================
 
-    @staticmethod
     def _get_hierarchy(
+        self,
         record
     ):
 
-        manager = record.get(
-            "asset_manager"
-        )
-
-        node = record.get(
-            "node"
-        )
-
         result = {}
 
-        if (
-            manager is None
-            or node is None
-        ):
-
-            return result
-
-        current = node
+        current = record
 
         visited = set()
 
         while current is not None:
 
-            node_id = getattr(
-                current,
-                "node_id",
-                None
+            physical_key = (
+                self._physical_key(
+                    current
+                )
             )
 
-            if node_id in visited:
+            if physical_key in visited:
 
                 break
 
             visited.add(
-                node_id
+                physical_key
             )
 
+            node = (
+                current.get(
+                    "node"
+                )
+            )
+
+            if node is None:
+
+                break
+
             node_type = (
-                AssetExplorerView
-                ._normalise_type(
+                self._normalise_type(
                     getattr(
-                        current,
+                        node,
                         "node_type",
                         ""
                     )
@@ -3253,31 +4446,504 @@ class AssetExplorerView(QWidget):
             result[
                 node_type
             ] = getattr(
-                current,
+                node,
                 "name",
                 ""
             )
 
-            parent_id = getattr(
-                current,
-                "parent_id",
-                None
+            current = (
+                self._find_parent_record(
+                    current
+                )
             )
 
-            if parent_id is None:
+        return result
+
+    def _find_parent_record(
+        self,
+        child_record
+    ):
+
+        node_records = [
+
+            record
+
+            for record in self._all_records
+
+            if record.get(
+                "record_type"
+            )
+            == "NODE"
+
+        ]
+
+        child_project = (
+            child_record.get(
+                "project",
+                ""
+            )
+        )
+
+        # -----------------------------------------------------
+        # First: project-local parent_id.
+        # -----------------------------------------------------
+
+        for occurrence in (
+            child_record.get(
+                "occurrences",
+                []
+            )
+        ):
+
+            parent_id = (
+                occurrence.get(
+                    "parent_id"
+                )
+            )
+
+            if not parent_id:
+
+                continue
+
+            project = (
+                occurrence.get(
+                    "project",
+                    child_project
+                )
+            )
+
+            for candidate in node_records:
+
+                for candidate_occurrence in (
+                    candidate.get(
+                        "occurrences",
+                        []
+                    )
+                ):
+
+                    if (
+
+                        candidate_occurrence.get(
+                            "project"
+                        )
+                        == project
+
+                        and
+
+                        candidate_occurrence.get(
+                            "node_id"
+                        )
+                        == parent_id
+
+                    ):
+
+                        return candidate
+
+        # -----------------------------------------------------
+        # Second: global parent_asset_id.
+        # -----------------------------------------------------
+
+        master_parent_id = (
+            self._get_master_parent_asset_id(
+                child_record
+            )
+        )
+
+        if master_parent_id:
+
+            for candidate in node_records:
+
+                candidate_asset_id = str(
+                    candidate.get(
+                        "asset_id",
+                        ""
+                    )
+                    or ""
+                ).strip()
+
+                if (
+                    candidate_asset_id
+                    == master_parent_id
+                ):
+
+                    return candidate
+
+        return None
+    def _add_global_node(
+        self,
+        parent_item,
+        global_key,
+        global_nodes,
+        children_by_parent,
+        all_components,
+        search,
+        selected_type,
+        path
+    ):
+
+        # =====================================================
+        # CYCLE PROTECTION
+        # =====================================================
+
+        if global_key in path:
+            return
+
+        path = set(
+            path
+        )
+
+        path.add(
+            global_key
+        )
+
+        record = global_nodes[
+            global_key
+        ]
+
+        # =====================================================
+        # MATCH
+        # =====================================================
+
+        direct_match = self._record_matches(
+            record,
+            search,
+            selected_type
+        )
+
+        descendant_match = False
+
+        for child_key in children_by_parent.get(
+            global_key,
+            []
+        ):
+
+            if self._global_branch_matches(
+                child_key,
+                global_nodes,
+                children_by_parent,
+                search,
+                selected_type,
+                set()
+            ):
+
+                descendant_match = True
 
                 break
 
-            try:
+        # =====================================================
+        # COMPONENT MATCH
+        # =====================================================
 
-                current = (
-                    manager.get_node(
-                        parent_id
+        component_match = False
+
+        node = record.get(
+            "node"
+        )
+
+        node_type = self._normalise_type(
+            record.get(
+                "type",
+                ""
+            )
+        )
+
+        if node_type == "PANEL":
+
+            # -------------------------------------------------
+            # A physical panel can have component records from
+            # multiple projects.
+            #
+            # Match them using the project-local node identity
+            # stored in panel_node_id.
+            # -------------------------------------------------
+
+            source_records = record.get(
+                "records",
+                []
+            )
+
+            panel_node_keys = set()
+
+            for source_record in source_records:
+
+                project = str(
+                    source_record.get(
+                        "project",
+                        ""
                     )
                 )
 
-            except Exception:
+                node_id = source_record.get(
+                    "node_id"
+                )
 
-                break
+                if node_id:
 
-        return result
+                    panel_node_keys.add(
+                        (
+                            project,
+                            node_id
+                        )
+                    )
+
+            for component_record in all_components:
+
+                component_project = str(
+                    component_record.get(
+                        "project",
+                        ""
+                    )
+                )
+
+                panel_node_id = component_record.get(
+                    "panel_node_id"
+                )
+
+                if (
+                    component_project,
+                    panel_node_id
+                ) not in panel_node_keys:
+
+                    continue
+
+                if self._record_matches(
+                    component_record,
+                    search,
+                    selected_type
+                ):
+
+                    component_match = True
+
+                    break
+
+        # =====================================================
+        # FILTER
+        # =====================================================
+
+        if (
+            not direct_match
+            and
+            not descendant_match
+            and
+            not component_match
+        ):
+
+            return
+
+        # =====================================================
+        # CREATE ITEM
+        # =====================================================
+
+        item = QTreeWidgetItem()
+
+        item.setText(
+            0,
+            str(
+                record.get(
+                    "name",
+                    ""
+                )
+            )
+        )
+
+        item.setText(
+            1,
+            str(
+                record.get(
+                    "type",
+                    ""
+                )
+            )
+        )
+
+        item.setText(
+            2,
+            self._get_asset_tag(
+                record
+            )
+        )
+
+        # -----------------------------------------------------
+        # Store the GLOBAL record.
+        # -----------------------------------------------------
+
+        item.setData(
+            0,
+            Qt.ItemDataRole.UserRole,
+            record
+        )
+
+        # =====================================================
+        # ADD TO TREE
+        # =====================================================
+
+        if parent_item is None:
+
+            self.tree.addTopLevelItem(
+                item
+            )
+
+        else:
+
+            parent_item.addChild(
+                item
+            )
+
+        # =====================================================
+        # STORE TREE NODE
+        # =====================================================
+
+        self._tree_nodes[
+            global_key
+        ] = item
+
+        # =====================================================
+        # CHILDREN
+        # =====================================================
+
+        for child_key in children_by_parent.get(
+            global_key,
+            []
+        ):
+
+            self._add_global_node(
+                parent_item=item,
+                global_key=child_key,
+                global_nodes=global_nodes,
+                children_by_parent=children_by_parent,
+                all_components=all_components,
+                search=search,
+                selected_type=selected_type,
+                path=path
+            )
+
+        # =====================================================
+        # COMPONENTS
+        # =====================================================
+
+        if node_type == "PANEL":
+
+            source_records = record.get(
+                "records",
+                []
+            )
+
+            panel_node_keys = set()
+
+            for source_record in source_records:
+
+                project = str(
+                    source_record.get(
+                        "project",
+                        ""
+                    )
+                )
+
+                node_id = source_record.get(
+                    "node_id"
+                )
+
+                if node_id:
+
+                    panel_node_keys.add(
+                        (
+                            project,
+                            node_id
+                        )
+                    )
+
+            matching_components = []
+
+            for component_record in all_components:
+
+                key = (
+                    str(
+                        component_record.get(
+                            "project",
+                            ""
+                        )
+                    ),
+                    component_record.get(
+                        "panel_node_id"
+                    )
+                )
+
+                if key in panel_node_keys:
+
+                    if (
+                        not search
+                        or
+                        self._record_matches(
+                            component_record,
+                            search,
+                            selected_type
+                        )
+                    ):
+
+                        matching_components.append(
+                            component_record
+                        )
+
+            matching_components.sort(
+                key=lambda r:
+                    str(
+                        r.get(
+                            "name",
+                            ""
+                        )
+                    ).lower()
+            )
+
+            for component_record in matching_components:
+
+                self._add_component(
+                    item,
+                    component_record
+                )
+
+    def _global_branch_matches(
+        self,
+        global_key,
+        global_nodes,
+        children_by_parent,
+        search,
+        selected_type,
+        visited
+    ):
+
+        if global_key in visited:
+            return False
+
+        visited.add(
+            global_key
+        )
+
+        record = global_nodes[
+            global_key
+        ]
+
+        if self._record_matches(
+            record,
+            search,
+            selected_type
+        ):
+
+            return True
+
+        for child_key in children_by_parent.get(
+            global_key,
+            []
+        ):
+
+            if self._global_branch_matches(
+                child_key,
+                global_nodes,
+                children_by_parent,
+                search,
+                selected_type,
+                visited
+            ):
+
+                return True
+
+        return False

@@ -46,6 +46,10 @@ from app.ui.meter_testing_dialog import (
     MeterTestingDialog
 )
 
+from app.ui.thermal_template_manager_dialog import (
+    ThermalTemplateManagerDialog
+)
+
 
 
 class PanelAssetDialog(QDialog):
@@ -379,6 +383,10 @@ class AssetView(QWidget):
             "Edit Protection Functions"
         )
 
+        self.thermal_templates = QPushButton(
+            "Thermal Templates"
+        )
+
         self.configure_panel = QPushButton(
             "Edit Panel Configuration"
         )
@@ -466,6 +474,7 @@ class AssetView(QWidget):
                 self.configure_panel,
                 self.configure_component,
                 self.configure_protection,
+                self.thermal_templates,
             ],
         )
 
@@ -707,6 +716,10 @@ class AssetView(QWidget):
 
         self.configure_protection.clicked.connect(
             self.configure_selected_protection
+        )
+
+        self.thermal_templates.clicked.connect(
+            self.open_thermal_template_manager
         )
 
         self.configure_panel.clicked.connect(
@@ -1230,6 +1243,10 @@ class AssetView(QWidget):
         )
 
         self.configure_protection.setEnabled(
+            relay_selected
+        )
+
+        self.thermal_templates.setEnabled(
             relay_selected
         )
 
@@ -2045,6 +2062,18 @@ class AssetView(QWidget):
                 aux_count=int(configuration.get("aux_count", 0) or 0),
                 meter_count=int(configuration.get("meter_count", 0) or 0),
             )
+            imported_components = configuration.get(
+                "_imported_components",
+                []
+            )
+        
+            copied_components = (
+                self.apply_imported_component_configuration(
+                    panel.node_id,
+                    imported_components
+                )
+            )
+
             copied_components = (
                 configuration.get(
                     "_copied_component_configuration",
@@ -2235,6 +2264,76 @@ class AssetView(QWidget):
                 "Save Failed",
                 str(error),
             )
+
+    # =================================================
+    # THERMAL TEMPLATE MANAGEMENT
+    # =================================================
+
+    def open_thermal_template_manager(self):
+        component = self.get_selected_component()
+
+        if component is None:
+            QMessageBox.warning(
+                self,
+                "No Component Selected",
+                "Please select a numerical relay first.",
+            )
+            return
+
+        component_type = str(
+            getattr(component, "component_type", "")
+        ).strip().upper()
+
+        if component_type != "NUMERICAL_RELAY":
+            QMessageBox.warning(
+                self,
+                "Invalid Component",
+                "Thermal templates can only be configured "
+                "for a numerical relay.",
+            )
+            return
+
+        database = getattr(
+            self.test_service,
+            "database",
+            None,
+        )
+
+        if database is None:
+            QMessageBox.warning(
+                self,
+                "Database Not Available",
+                "The project database is not available.",
+            )
+            return
+
+        manufacturer = str(
+            getattr(component, "manufacturer", "") or ""
+        ).strip()
+
+        model = str(
+            getattr(component, "model", "") or ""
+        ).strip()
+
+        if not manufacturer or not model:
+            QMessageBox.warning(
+                self,
+                "Relay Configuration Missing",
+                (
+                    "Please configure the relay manufacturer "
+                    "and model before creating thermal templates."
+                ),
+            )
+            return
+
+        dialog = ThermalTemplateManagerDialog(
+            database=database,
+            manufacturer=manufacturer,
+            model=model,
+            parent=self,
+        )
+
+        dialog.exec()
 
     # =================================================
     # SAVE COMPONENT CONFIGURATION
@@ -3834,3 +3933,115 @@ class AssetView(QWidget):
                     pass
 
                 break
+
+    def apply_imported_component_configuration(
+        self,
+        target_panel_id,
+        imported_components,
+    ):
+        if not imported_components:
+            return 0
+
+        target_components = (
+            self.component_manager
+            .get_panel_components(target_panel_id)
+            or []
+        )
+
+        def normalise(value):
+            return str(value or "").strip().upper()
+
+        def component_number(name):
+            try:
+                return int(str(name).split("-")[-1])
+            except (ValueError, TypeError):
+                return 0
+
+        target_by_key = {}
+
+        for component in target_components:
+            key = (
+                normalise(
+                    getattr(component, "component_type", "")
+                ),
+                component_number(
+                    getattr(component, "name", "")
+                ),
+            )
+            target_by_key[key] = component
+
+        copied = 0
+
+        fields = (
+            "manufacturer",
+            "model",
+            "description",
+            "ct_primary",
+            "ct_secondary",
+            "ct_ratio",
+            "ct_class",
+            "burden",
+            "core",
+            "vt_ratio",
+            "firmware",
+            "coil_voltage",
+            "contact_configuration",
+            "meter_type",
+            "meter_functions",
+            "accuracy_class",
+            "protection_functions",
+        )
+
+        for source in imported_components:
+
+            source_type = normalise(
+                source.get(
+                    "_source_component_type",
+                    source.get("component_type", "")
+                )
+            )
+
+            source_name = str(
+                source.get(
+                    "_source_component_name",
+                    source.get("name", "")
+                )
+                or ""
+            )
+
+            key = (
+                source_type,
+                component_number(source_name),
+            )
+
+            target = target_by_key.get(key)
+
+            if target is None:
+                continue
+
+            configuration = {}
+
+            for field in fields:
+                if field not in source:
+                    continue
+
+                value = source[field]
+
+                if isinstance(value, list):
+                    value = list(value)
+                elif isinstance(value, dict):
+                    value = dict(value)
+
+                configuration[field] = value
+
+            if not configuration:
+                continue
+
+            self.component_manager.update_component_configuration(
+                target.component_id,
+                configuration
+            )
+
+            copied += 1
+
+        return copied
