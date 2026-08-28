@@ -17,6 +17,7 @@ from app.ui.asset_view import AssetView
 from app.ui.report_generator_dialog import ReportGeneratorDialog
 from app.ui.asset_explorer_view import AssetExplorerView
 from app.ui.dashboard_view import DashboardView
+from app.ui.icon_helper import icon
 
 from app.config.settings import PROJECTS_DIR
 
@@ -218,8 +219,9 @@ class MainWindow(QMainWindow):
             10
         )
 
-        brand_icon = QLabel(
-            "⚡"
+        brand_icon = QLabel()
+        brand_icon.setPixmap(
+            icon("app").pixmap(32, 32)
         )
 
         brand_icon.setObjectName(
@@ -270,6 +272,7 @@ class MainWindow(QMainWindow):
             self
         )
 
+        self.project_action.setIcon(icon("projects"))
         self.project_action.setToolTip(
             "Open and manage testing projects"
         )
@@ -291,6 +294,7 @@ class MainWindow(QMainWindow):
             self
         )
 
+        self.asset_management_action.setIcon(icon("assets"))
         self.asset_management_action.setToolTip(
             "Browse the global asset register, configurations and test history"
         )
@@ -312,6 +316,7 @@ class MainWindow(QMainWindow):
             self
         )
 
+        self.report_action.setIcon(icon("reports"))
         self.report_action.setToolTip(
             "Generate testing reports"
         )
@@ -333,6 +338,7 @@ class MainWindow(QMainWindow):
             self
         )
 
+        self.dashboard_action.setIcon(icon("dashboard"))
         self.dashboard_action.setToolTip(
             "View testing statistics and operational overview"
         )
