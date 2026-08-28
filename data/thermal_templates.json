@@ -1,0 +1,134 @@
+[
+    {
+        "template_id": "THERMAL-C2D8B49E",
+        "protection_function": "49",
+        "manufacturer": "Siemens",
+        "model": "AB123",
+        "name": "AB123",
+        "curve_type": "POINT_TABLE",
+        "rated_current": 10.0,
+        "pickup_current": 1.0,
+        "thermal_constant": 2.0,
+        "cooling_constant": 6.0,
+        "curves": [
+            {
+                "current_multiple": 1.0,
+                "operating_time": 100.0
+            },
+            {
+                "current_multiple": 2.0,
+                "operating_time": 50.0
+            },
+            {
+                "current_multiple": 4.0,
+                "operating_time": 25.0
+            },
+            {
+                "current_multiple": 8.0,
+                "operating_time": 12.5
+            },
+            {
+                "current_multiple": 16.0,
+                "operating_time": 6.25
+            }
+        ],
+        "heating_curve": [],
+        "cooling_curve": [],
+        "equation": "",
+        "independent_variable": "I",
+        "dependent_variable": "T",
+        "variables": [],
+        "parameters": {},
+        "x_min": 1.0,
+        "x_max": 20.0,
+        "notes": ""
+    },
+    {
+        "template_id": "THERMAL-1355DCE7",
+        "protection_function": "49",
+        "manufacturer": "Siemens",
+        "model": "AB123",
+        "name": "Curve based",
+        "curve_type": "EQUATION",
+        "rated_current": 100.0,
+        "pickup_current": 1.0,
+        "thermal_constant": 0.0,
+        "cooling_constant": 0.0,
+        "curves": [],
+        "heating_curve": [],
+        "cooling_curve": [],
+        "equation": "k/(I-0.24)",
+        "independent_variable": "I",
+        "dependent_variable": "T",
+        "variables": [
+            {
+                "name": "I",
+                "unit": "xIn",
+                "description": "Test current multiple",
+                "default_value": 1.0,
+                "is_input": true
+            },
+            {
+                "name": "k",
+                "unit": "1",
+                "description": "Thermal constant",
+                "default_value": 1.0,
+                "is_input": false
+            }
+        ],
+        "parameters": {
+            "k": 1.0
+        },
+        "x_min": 1.05,
+        "x_max": 20.0,
+        "notes": ""
+    },
+    {
+        "template_id": "THERMAL-53DA93C5",
+        "protection_function": "49",
+        "manufacturer": "Siemens",
+        "model": "AB123",
+        "name": "curve2",
+        "curve_type": "EQUATION",
+        "rated_current": 100.0,
+        "pickup_current": 1.0,
+        "thermal_constant": 0.0,
+        "cooling_constant": 0.0,
+        "curves": [],
+        "heating_curve": [],
+        "cooling_curve": [],
+        "equation": "k/((I-Ip)**0.4)",
+        "independent_variable": "I",
+        "dependent_variable": "T",
+        "variables": [
+            {
+                "name": "I",
+                "unit": "xIn",
+                "description": "Test current multiple",
+                "default_value": 1.0,
+                "is_input": true
+            },
+            {
+                "name": "Ip",
+                "unit": "xIn",
+                "description": "I theta",
+                "default_value": 1.0,
+                "is_input": false
+            },
+            {
+                "name": "k",
+                "unit": "1",
+                "description": "Constant",
+                "default_value": 1.0,
+                "is_input": false
+            }
+        ],
+        "parameters": {
+            "Ip": 1.0,
+            "k": 1.0
+        },
+        "x_min": 1.05,
+        "x_max": 20.0,
+        "notes": ""
+    }
+]
