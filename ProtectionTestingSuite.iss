@@ -21,9 +21,11 @@ WizardStyle=modern
 
 ArchitecturesInstallIn64BitMode=x64compatible
 PrivilegesRequired=admin
+
 DisableProgramGroupPage=yes
 
 SetupIconFile=resources\ProtectionTestingSuite.ico
+
 Uninstallable=yes
 UninstallDisplayName={#MyAppName}
 UninstallDisplayIcon={app}\{#MyAppExeName}
@@ -31,51 +33,56 @@ UninstallDisplayIcon={app}\{#MyAppExeName}
 
 [Files]
 
-; ---------------------------------------------------------
-; Main application
-; ---------------------------------------------------------
+; =========================================================
+; APPLICATION
+; =========================================================
 
 Source: "ProtectionTestingSuite.exe"; \
     DestDir: "{app}"; \
     Flags: ignoreversion
 
 
-; ---------------------------------------------------------
-; Application resources / main icon
-; ---------------------------------------------------------
+; =========================================================
+; APPLICATION RESOURCES
+; =========================================================
 
 Source: "resources\*"; \
     DestDir: "{app}\resources"; \
     Flags: ignoreversion recursesubdirs createallsubdirs
 
 
-; ---------------------------------------------------------
-; CLEAN initial application data
-; ---------------------------------------------------------
-
-Source: "release_data\*"; \
-    DestDir: "{app}\release_data"; \
-    Flags: ignoreversion recursesubdirs createallsubdirs
-
-
 [Dirs]
 
-; Installed application directories
-Name: "{app}\resources"
+; =========================================================
+; PERSISTENT USER DATA
+;
+; These directories are created empty.
+;
+; NO development projects or test data are installed.
+; =========================================================
 
-; These are retained by the uninstaller because they are
-; user/application data directories.
 Name: "{localappdata}\ProtectionTestingSuite"
+
 Name: "{localappdata}\ProtectionTestingSuite\data"
+
 Name: "{localappdata}\ProtectionTestingSuite\projects"
 
 
 [Icons]
 
+; =========================================================
+; START MENU SHORTCUT
+; =========================================================
+
 Name: "{autoprograms}\{#MyAppName}"; \
     Filename: "{app}\{#MyAppExeName}"; \
     WorkingDir: "{app}"; \
     IconFilename: "{app}\resources\ProtectionTestingSuite.ico"
+
+
+; =========================================================
+; DESKTOP SHORTCUT
+; =========================================================
 
 Name: "{autodesktop}\{#MyAppName}"; \
     Filename: "{app}\{#MyAppExeName}"; \
@@ -83,7 +90,23 @@ Name: "{autodesktop}\{#MyAppName}"; \
     IconFilename: "{app}\resources\ProtectionTestingSuite.ico"
 
 
+[UninstallDelete]
+
+; =========================================================
+; DO NOT DELETE USER DATA
+;
+; Projects, test history, assets and thermal templates
+; are deliberately preserved during uninstall.
+; =========================================================
+
+; Nothing is specified here intentionally.
+
+
 [Run]
+
+; =========================================================
+; LAUNCH APPLICATION AFTER INSTALLATION
+; =========================================================
 
 Filename: "{app}\{#MyAppExeName}"; \
     Description: "Launch {#MyAppName}"; \
