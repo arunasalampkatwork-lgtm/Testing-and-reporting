@@ -26,7 +26,9 @@ from app.config.protection_functions import (
 from app.config.protection_curves import (
     get_curves
 )
-
+from app.ui.thermal_testing_dialog import (
+    ThermalTestingDialog
+)
 
 DEFAULT_TOLERANCE = 5.0
 
@@ -1211,6 +1213,11 @@ class TestingView(QWidget):
             )
 
             self.connect_differential()
+
+            return
+        if self.test_type == "thermal":
+
+            self.create_thermal_fields()
 
             return
 
@@ -3002,3 +3009,36 @@ class TestingView(QWidget):
             # Do not crash the GUI merely because a
             # field is incomplete while switching CTs.
             pass
+
+    def create_thermal_fields(self):
+
+        self.add_readonly(
+            "thermal_info",
+            "Thermal Testing"
+        )
+
+        self.add_number(
+            "test_current",
+            "Test Current",
+            "xIn",
+            True
+        )
+
+        self.add_number(
+            "actual_time",
+            "Actual Operating Time",
+            "s",
+            True
+        )
+
+        self.add_readonly(
+            "expected_time",
+            "Expected Operating Time",
+            "s"
+        )
+
+        self.add_readonly(
+            "error",
+            "Error",
+            "%"
+        )

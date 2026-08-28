@@ -96,7 +96,7 @@ exe = EXE(
     icon=str(
         PROJECT_ROOT /
         "installer" /
-        "ProtectionTestingSuite_1.ico"
+        "ProtectionTestingSuite_2.ico"
     ),
 
     version=str(

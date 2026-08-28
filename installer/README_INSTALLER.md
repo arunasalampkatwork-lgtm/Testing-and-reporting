@@ -33,7 +33,7 @@ The expected layout is:
     +-- installer\
         +-- ProtectionTestingSuite.spec
         +-- ProtectionTestingSuite.iss
-        +-- ProtectionTestingSuite_1.ico
+        +-- ProtectionTestingSuite_2.ico
         +-- version_info.txt
         +-- build_installer.ps1
         +-- build_installer.bat

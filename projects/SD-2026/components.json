@@ -810,8 +810,10 @@
         "firmware": "",
         "coil_voltage": "",
         "contact_configuration": "",
-        "meter_type": "",
-        "meter_functions": [],
+        "meter_type": "Ammeter",
+        "meter_functions": [
+            "CURRENT"
+        ],
         "accuracy_class": "",
         "protection_functions": []
     },

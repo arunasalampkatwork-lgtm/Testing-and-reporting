@@ -19,7 +19,7 @@ ArchitecturesInstallIn64BitMode=x64compatible
 PrivilegesRequired=admin
 DisableProgramGroupPage=yes
 UninstallDisplayIcon={app}\{#MyAppExeName}
-SetupIconFile=ProtectionTestingSuite_1.ico
+SetupIconFile=ProtectionTestingSuite_2.ico
 
 [Files]
 Source: "..\dist\ProtectionTestingSuite.exe"; DestDir: "{app}"; Flags: ignoreversion

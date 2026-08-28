@@ -172,7 +172,14 @@ PROTECTION_FUNCTIONS = {
             "Master trip / lockout function."
         ),
     },
-
+    "49": {
+        "name": "Thermal Overload",
+        "test_type": "thermal",
+        "description": (
+            "Thermal overload protection based on "
+            "relay-specific thermal characteristics."
+        ),
+    },
 }
 
 
@@ -230,6 +237,10 @@ PROTECTION_ALIASES = {
 
     "50BF": "50BF",
     "86": "86",
+    
+    "49": "49",
+    "49 THERMAL": "49",
+    "49 THERMAL OVERLOAD": "49",
 }
 
 
