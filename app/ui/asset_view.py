@@ -46,6 +46,10 @@ from app.ui.meter_testing_dialog import (
     MeterTestingDialog
 )
 
+from app.ui.thermal_template_manager_dialog import (
+    ThermalTemplateManagerDialog
+)
+
 
 
 class PanelAssetDialog(QDialog):
@@ -379,6 +383,10 @@ class AssetView(QWidget):
             "Edit Protection Functions"
         )
 
+        self.thermal_templates = QPushButton(
+            "Thermal Templates"
+        )
+
         self.configure_panel = QPushButton(
             "Edit Panel Configuration"
         )
@@ -466,6 +474,7 @@ class AssetView(QWidget):
                 self.configure_panel,
                 self.configure_component,
                 self.configure_protection,
+                self.thermal_templates,
             ],
         )
 
@@ -707,6 +716,10 @@ class AssetView(QWidget):
 
         self.configure_protection.clicked.connect(
             self.configure_selected_protection
+        )
+
+        self.thermal_templates.clicked.connect(
+            self.open_thermal_template_manager
         )
 
         self.configure_panel.clicked.connect(
@@ -1230,6 +1243,10 @@ class AssetView(QWidget):
         )
 
         self.configure_protection.setEnabled(
+            relay_selected
+        )
+
+        self.thermal_templates.setEnabled(
             relay_selected
         )
 
@@ -2247,6 +2264,76 @@ class AssetView(QWidget):
                 "Save Failed",
                 str(error),
             )
+
+    # =================================================
+    # THERMAL TEMPLATE MANAGEMENT
+    # =================================================
+
+    def open_thermal_template_manager(self):
+        component = self.get_selected_component()
+
+        if component is None:
+            QMessageBox.warning(
+                self,
+                "No Component Selected",
+                "Please select a numerical relay first.",
+            )
+            return
+
+        component_type = str(
+            getattr(component, "component_type", "")
+        ).strip().upper()
+
+        if component_type != "NUMERICAL_RELAY":
+            QMessageBox.warning(
+                self,
+                "Invalid Component",
+                "Thermal templates can only be configured "
+                "for a numerical relay.",
+            )
+            return
+
+        database = getattr(
+            self.test_service,
+            "database",
+            None,
+        )
+
+        if database is None:
+            QMessageBox.warning(
+                self,
+                "Database Not Available",
+                "The project database is not available.",
+            )
+            return
+
+        manufacturer = str(
+            getattr(component, "manufacturer", "") or ""
+        ).strip()
+
+        model = str(
+            getattr(component, "model", "") or ""
+        ).strip()
+
+        if not manufacturer or not model:
+            QMessageBox.warning(
+                self,
+                "Relay Configuration Missing",
+                (
+                    "Please configure the relay manufacturer "
+                    "and model before creating thermal templates."
+                ),
+            )
+            return
+
+        dialog = ThermalTemplateManagerDialog(
+            database=database,
+            manufacturer=manufacturer,
+            model=model,
+            parent=self,
+        )
+
+        dialog.exec()
 
     # =================================================
     # SAVE COMPONENT CONFIGURATION

@@ -26,8 +26,12 @@ from app.config.protection_functions import (
 from app.config.protection_curves import (
     get_curves
 )
-from app.ui.thermal_testing_dialog import (
-    ThermalTestingDialog
+from app.services.thermal_template_service import (
+    ThermalTemplateService
+)
+
+from app.services.thermal_calculator import (
+    ThermalCalculator
 )
 
 DEFAULT_TOLERANCE = 5.0
@@ -427,6 +431,7 @@ class TestingView(QWidget):
             "current_pickup_time",
             "directional_current",
             "differential",
+            "thermal",
         )
 
     # =====================================================
@@ -601,6 +606,29 @@ class TestingView(QWidget):
         )
 
         # =================================================
+        # RESULT
+        #
+        # Create this BEFORE create_function_fields().
+        # Some field signals can fire while the function
+        # fields are being constructed.
+        # =================================================
+
+        self.result_widget = QLineEdit()
+
+        self.result_widget.setReadOnly(
+            True
+        )
+
+        self.result_widget.setStyleSheet(
+            """
+            QLineEdit {
+                font-weight: bold;
+                padding: 5px;
+            }
+            """
+        )
+
+        # =================================================
         # CREATE FUNCTION FIELDS
         # =================================================
 
@@ -632,21 +660,6 @@ class TestingView(QWidget):
         # =================================================
         # RESULT
         # =================================================
-
-        self.result_widget = QLineEdit()
-
-        self.result_widget.setReadOnly(
-            True
-        )
-
-        self.result_widget.setStyleSheet(
-            """
-            QLineEdit {
-                font-weight: bold;
-                padding: 5px;
-            }
-            """
-        )
 
         self.form_layout.addRow(
             "Result",
@@ -2473,6 +2486,21 @@ class TestingView(QWidget):
         ] = "A"
 
         # -------------------------------------------------
+        # Thermal template metadata
+        # -------------------------------------------------
+
+        if self.test_type == "thermal":
+            thermal_widget = self.fields.get(
+                "thermal_template"
+            )
+
+            values["thermal_template_id"] = (
+                thermal_widget.currentData()
+                if thermal_widget is not None
+                else ""
+            )
+
+        # -------------------------------------------------
         # CT information
         # -------------------------------------------------
 
@@ -2607,6 +2635,30 @@ class TestingView(QWidget):
                 "current_2",
                 "expected_differential"
             ]
+
+        elif self.test_type == "thermal":
+
+            required_fields = [
+                "test_current",
+                "actual_time",
+            ]
+
+            if getattr(
+                self,
+                "thermal_template",
+                None,
+            ) is None:
+
+                QMessageBox.warning(
+                    self,
+                    "Thermal Template",
+                    (
+                        "No thermal template is configured "
+                        "for this relay."
+                    )
+                )
+
+                return False
 
         # =================================================
         # REQUIRED VALUE CHECK
@@ -2783,6 +2835,30 @@ class TestingView(QWidget):
                     ""
                 ),
         }
+
+        if self.test_type == "thermal":
+            settings.update({
+                "thermal_template_id":
+                    values.get(
+                        "thermal_template_id",
+                        ""
+                    ),
+                "thermal_template":
+                    values.get(
+                        "thermal_template",
+                        ""
+                    ),
+                "thermal_curve_type":
+                    (
+                        self.thermal_template.curve_type
+                        if getattr(
+                            self,
+                            "thermal_template",
+                            None,
+                        ) is not None
+                        else ""
+                    ),
+            })
 
         # =================================================
         # SAVE
@@ -3004,6 +3080,10 @@ class TestingView(QWidget):
 
                 self.calculate_differential()
 
+            elif self.test_type == "thermal":
+
+                self.calculate_thermal_expected_time()
+
         except Exception:
 
             # Do not crash the GUI merely because a
@@ -3011,34 +3091,397 @@ class TestingView(QWidget):
             pass
 
     def create_thermal_fields(self):
+        """
+        Build the 49 thermal test interface.
+
+        The thermal characteristic is resolved from the relay's
+        manufacturer + model + protection function (49).
+        """
+
+        database = getattr(
+            self.test_service,
+            "database",
+            None,
+        )
+
+        self.thermal_template = None
+
+        if database is None:
+            self.add_readonly(
+                "thermal_info",
+                "Thermal template database unavailable",
+            )
+            return
+
+        self.thermal_template_service = (
+            ThermalTemplateService(database)
+        )
+
+        manufacturer = str(
+            getattr(
+                self.component,
+                "manufacturer",
+                "",
+            )
+            or ""
+        ).strip()
+
+        model = str(
+            getattr(
+                self.component,
+                "model",
+                "",
+            )
+            or ""
+        ).strip()
 
         self.add_readonly(
-            "thermal_info",
-            "Thermal Testing"
+            "thermal_relay",
+            f"{manufacturer} {model}".strip()
+            or "Relay manufacturer/model not configured",
+        )
+
+        template_widget = QComboBox()
+        self.fields["thermal_template"] = template_widget
+
+        self.form_layout.addRow(
+            self.make_label(
+                "Thermal Template",
+                "",
+                True,
+            ),
+            template_widget,
+        )
+
+        self.add_readonly(
+            "rated_current",
+            "Template Rated Current",
+            "A",
+        )
+
+        self.add_readonly(
+            "pickup_current",
+            "Thermal Pickup",
+            "xIn",
+        )
+
+        self.add_readonly(
+            "thermal_constant",
+            "Thermal Constant",
+            "s",
         )
 
         self.add_number(
             "test_current",
             "Test Current",
             "xIn",
-            True
+            True,
+        )
+
+        self.add_readonly(
+            "test_current_a",
+            "Test Current",
+            "A",
+        )
+
+        self.add_readonly(
+            "expected_time",
+            "Expected Operating Time",
+            "s",
         )
 
         self.add_number(
             "actual_time",
             "Actual Operating Time",
             "s",
-            True
+            True,
         )
 
         self.add_readonly(
-            "expected_time",
-            "Expected Operating Time",
-            "s"
+            "error_percent",
+            "Thermal Time Error",
+            "%",
         )
 
-        self.add_readonly(
-            "error",
-            "Error",
-            "%"
+        template_widget.currentIndexChanged.connect(
+            self.on_thermal_template_changed
         )
+
+        self.fields["test_current"].textChanged.connect(
+            self.calculate_thermal_expected_time
+        )
+
+        self.fields["actual_time"].textChanged.connect(
+            self.calculate_thermal_result
+        )
+
+        self.tolerance_widget.textChanged.connect(
+            self.calculate_thermal_result
+        )
+
+        templates = []
+
+        if manufacturer and model:
+            templates = (
+                self.thermal_template_service
+                .get_templates_for_relay(
+                    manufacturer=manufacturer,
+                    model=model,
+                    protection_function="49",
+                )
+            )
+
+        for template in templates:
+            template_widget.addItem(
+                template.name,
+                template.template_id,
+            )
+
+        if not templates:
+            template_widget.addItem(
+                "NO TEMPLATE CONFIGURED",
+                None,
+            )
+            template_widget.setEnabled(False)
+
+            info = QLabel(
+                "Create a thermal template using "
+                "Asset View → Thermal Templates."
+            )
+            info.setWordWrap(True)
+            self.fields["thermal_info"] = info
+
+            self.form_layout.addRow(info)
+            return
+
+        template_widget.setCurrentIndex(0)
+
+    def on_thermal_template_changed(self, index):
+        widget = self.fields.get("thermal_template")
+
+        if widget is None:
+            return
+
+        template_id = widget.currentData()
+
+        if not template_id:
+            self.thermal_template = None
+            return
+
+        self.thermal_template = (
+            self.thermal_template_service
+            .get_template(template_id)
+        )
+
+        if self.thermal_template is None:
+            return
+
+        template = self.thermal_template
+
+        self.fields["rated_current"].setText(
+            f"{template.rated_current:g}"
+        )
+
+        self.fields["pickup_current"].setText(
+            f"{template.pickup_current:g}"
+        )
+
+        self.fields["thermal_constant"].setText(
+            f"{template.thermal_constant:g}"
+        )
+
+        self.calculate_thermal_expected_time()
+
+    def calculate_thermal_expected_time(self):
+        """
+        Calculate the expected thermal operating time.
+
+        This method is called automatically when the thermal
+        template changes and whenever Test Current changes.
+        During UI construction, Test Current is intentionally
+        empty, so an empty value is a normal state rather than
+        an error condition.
+
+        The result widget is also created early in build_ui(),
+        but hasattr() is retained here so this method remains
+        safe during future UI changes.
+        """
+
+        if getattr(
+            self,
+            "thermal_template",
+            None,
+        ) is None:
+            return
+
+        test_current_widget = self.fields.get(
+            "test_current"
+        )
+
+        if test_current_widget is None:
+            return
+
+        test_current_text = (
+            test_current_widget.text().strip()
+        )
+
+        # -------------------------------------------------
+        # Empty input is normal during initialization.
+        # Do not attempt float("").
+        # -------------------------------------------------
+
+        if not test_current_text:
+            self.fields["expected_time"].clear()
+            self.fields["test_current_a"].clear()
+            self.fields["error_percent"].clear()
+
+            if hasattr(self, "result_widget"):
+                self.result_widget.clear()
+
+            return
+
+        try:
+            test_current = float(
+                test_current_text
+            )
+
+            if test_current <= 0:
+                raise ValueError(
+                    "Test current must be greater than zero."
+                )
+
+            template = self.thermal_template
+
+            if template.curve_type == "POINT_TABLE":
+                expected = (
+                    ThermalCalculator.interpolate_time(
+                        test_current,
+                        template.curves,
+                    )
+                )
+
+            elif template.curve_type == "EXPONENTIAL":
+                expected = (
+                    ThermalCalculator.exponential_time(
+                        current_multiple=test_current,
+                        pickup_multiple=template.pickup_current,
+                        thermal_constant=template.thermal_constant,
+                    )
+                )
+
+            elif template.curve_type == "EQUATION":
+                expected = ThermalCalculator.equation_time(
+                    current_multiple=test_current,
+                    equation=template.equation,
+                    parameters=template.parameters,
+                    independent_variable=template.independent_variable,
+                )
+
+            else:
+                raise ValueError(
+                    f"Unsupported thermal curve type: "
+                    f"{template.curve_type}"
+                )
+
+            if expected == float("inf"):
+                self.fields["expected_time"].setText(
+                    "NO TRIP"
+                )
+            else:
+                self.fields["expected_time"].setText(
+                    f"{expected:.4f}"
+                )
+
+            if self.nominal_current > 0:
+                self.fields["test_current_a"].setText(
+                    f"{test_current * self.nominal_current:.4f}"
+                )
+            else:
+                self.fields["test_current_a"].clear()
+
+            self.calculate_thermal_result()
+
+        except (
+            ValueError,
+            TypeError,
+            ZeroDivisionError,
+            OverflowError,
+        ):
+            self.fields["expected_time"].clear()
+            self.fields["test_current_a"].clear()
+            self.fields["error_percent"].clear()
+
+            if hasattr(self, "result_widget"):
+                self.result_widget.clear()
+
+    def calculate_thermal_result(self):
+        """
+        Evaluate the measured thermal operating time against
+        the calculated expected operating time.
+
+        Empty Actual Time is normal until the tester enters the
+        measured trip time, so it must not generate an exception
+        during form initialization or normal data entry.
+        """
+
+        expected_widget = self.fields.get(
+            "expected_time"
+        )
+        actual_widget = self.fields.get(
+            "actual_time"
+        )
+
+        if expected_widget is None or actual_widget is None:
+            return
+
+        expected_text = (
+            expected_widget.text().strip()
+        )
+
+        actual_text = (
+            actual_widget.text().strip()
+        )
+
+        if (
+            not expected_text
+            or expected_text == "NO TRIP"
+            or not actual_text
+        ):
+            self.fields["error_percent"].clear()
+
+            if hasattr(self, "result_widget"):
+                self.result_widget.clear()
+
+            return
+
+        try:
+            expected = float(expected_text)
+            actual = float(actual_text)
+            tolerance = float(
+                self.tolerance_widget.text()
+            )
+
+            result = ThermalCalculator.evaluate(
+                actual_time=actual,
+                expected_time=expected,
+                tolerance=tolerance,
+            )
+
+            self.fields["error_percent"].setText(
+                f"{result['error_percent']:.2f}"
+            )
+
+            if hasattr(self, "result_widget"):
+                self.result_widget.setText(
+                    result["result"]
+                )
+
+        except (
+            ValueError,
+            TypeError,
+            ZeroDivisionError,
+        ):
+            self.fields["error_percent"].clear()
+
+            if hasattr(self, "result_widget"):
+                self.result_widget.clear()

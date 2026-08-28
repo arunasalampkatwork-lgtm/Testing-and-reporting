@@ -6,9 +6,6 @@ This file defines:
     - display name
     - test type
     - description
-
-The UI uses the test_type to determine which testing template
-should be displayed.
 """
 
 PROTECTION_FUNCTIONS = {
@@ -30,6 +27,15 @@ PROTECTION_FUNCTIONS = {
         "test_type": "idmt",
         "description": (
             "Inverse definite minimum time overcurrent protection."
+        ),
+    },
+
+    "49": {
+        "name": "Thermal Overload",
+        "test_type": "thermal",
+        "description": (
+            "Thermal overload protection using a relay-specific "
+            "thermal characteristic template."
         ),
     },
 
@@ -172,14 +178,6 @@ PROTECTION_FUNCTIONS = {
             "Master trip / lockout function."
         ),
     },
-    "49": {
-        "name": "Thermal Overload",
-        "test_type": "thermal",
-        "description": (
-            "Thermal overload protection based on "
-            "relay-specific thermal characteristics."
-        ),
-    },
 }
 
 
@@ -195,6 +193,12 @@ PROTECTION_ALIASES = {
 
     "51": "51",
     "51 TIME OVERCURRENT": "51",
+
+    "49": "49",
+    "49 THERMAL": "49",
+    "49 THERMAL OVERLOAD": "49",
+    "THERMAL": "49",
+    "THERMAL OVERLOAD": "49",
 
     "50N": "50N",
     "50N INSTANTANEOUS EARTH FAULT": "50N",
@@ -237,10 +241,6 @@ PROTECTION_ALIASES = {
 
     "50BF": "50BF",
     "86": "86",
-    
-    "49": "49",
-    "49 THERMAL": "49",
-    "49 THERMAL OVERLOAD": "49",
 }
 
 
@@ -249,17 +249,10 @@ PROTECTION_ALIASES = {
 # =============================================================
 
 def normalize_protection_code(protection_code):
-    """
-    Convert a protection-function display name or code into
-    the canonical protection code.
-    """
-
     if protection_code is None:
         return None
 
-    text = str(
-        protection_code
-    ).strip()
+    text = str(protection_code).strip()
 
     if not text:
         return None
@@ -272,67 +265,30 @@ def normalize_protection_code(protection_code):
     if upper in PROTECTION_ALIASES:
         return PROTECTION_ALIASES[upper]
 
-    # Match the beginning of strings such as:
-    # "51 Time Overcurrent"
     for code in PROTECTION_FUNCTIONS.keys():
-
-        if upper.startswith(
-            code.upper() + " "
-        ):
-
+        if upper.startswith(code.upper() + " "):
             return code
 
     return upper
 
 
-def get_protection_function(
-    protection_code
-):
-    """
-    Return configuration for a protection function.
-    """
-
-    code = normalize_protection_code(
-        protection_code
-    )
-
-    return PROTECTION_FUNCTIONS.get(
-        code
-    )
+def get_protection_function(protection_code):
+    code = normalize_protection_code(protection_code)
+    return PROTECTION_FUNCTIONS.get(code)
 
 
-def get_protection_test_type(
-    protection_code
-):
-    """
-    Return the test type for a protection function.
-    """
-
-    function = get_protection_function(
-        protection_code
-    )
+def get_protection_test_type(protection_code):
+    function = get_protection_function(protection_code)
 
     if function is None:
         return None
 
-    return function.get(
-        "test_type"
-    )
+    return function.get("test_type")
 
 
 def get_all_protection_functions():
-    """
-    Return all configured protection functions.
-    """
-
     return PROTECTION_FUNCTIONS.copy()
 
 
 def get_protection_codes():
-    """
-    Return all canonical protection codes.
-    """
-
-    return list(
-        PROTECTION_FUNCTIONS.keys()
-    )
+    return list(PROTECTION_FUNCTIONS.keys())
